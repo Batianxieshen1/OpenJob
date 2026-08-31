@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openjob"
+version = "0.1.0"
+description = "BOSS直聘智能求职Agent - 端到端自动化求职工具"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "httpx>=0.27",
+    "patchright>=1.58.2",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+    "anthropic>=0.40",
+    "markdown2>=2.4",
+    "bottle>=0.13",
+    "openpyxl>=3.1",
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+]
+
+[project.optional-dependencies]
+pdf = [
+    "xhtml2pdf>=0.2.11",
+]
+
+[project.scripts]
+openjob = "openjob.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openjob"]
+artifacts = [
+    "src/openjob/browser/runtime/*.mjs",
+    "src/openjob/browser/runtime/site-patterns/*.md",
+    "src/openjob/data/*.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.format]
+indent-style = "tab"

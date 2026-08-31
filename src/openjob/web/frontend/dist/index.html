@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenJob Dashboard</title>
+    <meta name="description" content="OpenJob 本地求职助手：岗位采集、AI 评分、投递确认、定制简历与回复监听，数据全部留在本地。" />
+    <script>
+      // 首屏前确定主题，避免深浅切换闪烁
+      (function () {
+        var stored = null;
+        try { stored = localStorage.getItem('openjob-theme'); } catch (e) {}
+        var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'dark' : 'light');
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-CORno1Ni.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-B-jQiEsF.css">
+  </head>
+  <body class="bg-background text-foreground antialiased">
+    <div id="root"></div>
+  </body>
+</html>

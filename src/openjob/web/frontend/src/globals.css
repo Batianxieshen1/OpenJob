@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DeepSeek 风格设计令牌（计划书 §6.2）
+   RGB 三元组便于 Tailwind 以 alpha-value 组合透明度。
+   浅色为默认；跟随系统深色，手动主题用 html.light / html.dark 覆盖。 */
+:root {
+  --bg: 255 255 255;          /* #FFFFFF 页面底 */
+  --surface: 247 248 250;     /* #F7F8FA 卡片/侧栏 */
+  --surface-hover: 240 242 245; /* #F0F2F5 悬停态 */
+  --border-c: 229 232 236;    /* #E5E8EC 1px 分隔线 */
+  --text: 27 31 39;           /* #1B1F27 主文本 */
+  --text-2: 90 98 112;        /* #5A6270 次文本 */
+  --accent: 61 91 245;        /* #3D5BF5 品牌蓝（加深以达 WCAG AA 对比度） */
+  --accent-soft: 77 107 254;  /* 搭配 /10 透明度使用 */
+  --success: 22 163 74;       /* #16A34A */
+  --warning: 217 119 6;       /* #D97706 */
+  --danger: 220 38 38;        /* #DC2626 */
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-overlay: 16px;
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg: 15 17 22;           /* #0F1116 近黑非纯黑 */
+    --surface: 23 26 33;      /* #171A21 */
+    --surface-hover: 30 34 43; /* #1E222B */
+    --border-c: 38 43 54;     /* #262B36 */
+    --text: 232 234 237;      /* #E8EAED */
+    --text-2: 154 163 176;    /* #9AA3B0 */
+    --accent: 93 123 255;     /* #5D7BFF */
+    --accent-soft: 93 123 255;
+  }
+}
+
+html.dark {
+  --bg: 15 17 22;
+  --surface: 23 26 33;
+  --surface-hover: 30 34 43;
+  --border-c: 38 43 54;
+  --text: 232 234 237;
+  --text-2: 154 163 176;
+  --accent: 93 123 255;
+  --accent-soft: 93 123 255;
+}
+
+* {
+  border-color: rgb(var(--border-c));
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 数字统一等宽数字 */
+.tabular-nums,
+[class*='font-mono'] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar：中性灰，随主题 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-c));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--text-2));
+}
+
+/* 统一动效：150-300ms、同一条缓动曲线、只动 transform/opacity/color */
+.transition-soft {
+  transition-property: transform, opacity, color, background-color, border-color;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out-soft);
+}
+
+/* 页面/抽屉进入 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 240ms var(--ease-out-soft) both;
+}
+
+/* 列表交错入场（首屏一次性，§6.3） */
+.stagger > * {
+  animation: rise-in 240ms var(--ease-out-soft) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(7) { animation-delay: 240ms; }
+.stagger > *:nth-child(8) { animation-delay: 280ms; }
+
+/* 按钮物理按压感（全局，§6.3） */
+button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* 主题切换平滑过渡：只过渡颜色类属性 */
+body,
+header,
+aside,
+main,
+.bg-card,
+.bg-surface-hover,
+.bg-background,
+.border-card-border {
+  transition:
+    background-color 180ms var(--ease-out-soft),
+    color 180ms var(--ease-out-soft),
+    border-color 180ms var(--ease-out-soft);
+}
+
+/* 骨架屏 shimmer（形状对齐最终布局） */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  border-radius: var(--radius-control);
+  background: linear-gradient(
+    90deg,
+    rgb(var(--surface)) 0%,
+    rgb(var(--surface-hover)) 40%,
+    rgb(var(--surface)) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* 按钮物理按压感（配合组件 :active scale-98） */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
