@@ -95,10 +95,14 @@ export function Header() {
               </NavLink>
             ))}
           </nav>
+        ) : fallbackTitle ? (
+          <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted" aria-current="page">
+            <span className="shrink-0">OpenJob</span>
+            <span className="text-muted-3">/</span>
+            <span className="truncate font-semibold text-foreground">{fallbackTitle}</span>
+          </div>
         ) : (
-          <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">
-            {fallbackTitle || 'OpenJob'}
-          </h1>
+          <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">OpenJob</h1>
         )}
       </div>
 
@@ -109,7 +113,7 @@ export function Header() {
         </div>
         <span
           className="hidden font-mono tabular-nums text-foreground sm:inline"
-          title={inWindow ? '发送窗口内（09:00-16:00）' : '发送窗口外（09:00-16:00），投递任务会暂停'}
+          title={(inWindow ? '发送窗口内（09:00-16:00）' : '发送窗口外（09:00-16:00）') + ' · 本地时区 ' + (Intl.DateTimeFormat().resolvedOptions().timeZone || 'local')}
         >
           <span className={cn('mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle', inWindow ? 'bg-success' : 'bg-muted-3')} />
           {formatClock(now)}

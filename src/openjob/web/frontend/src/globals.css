@@ -23,6 +23,12 @@
   --warning: 233 154 36;       /* #E99A24 */
   --danger: 229 72 77;         /* #E5484D */
 
+  /* 品牌渐变令牌：只用于 Logo/空状态/少量视觉强调，不参与交互语义 */
+  --brand-blue: 20 103 248;      /* #1467F8 */
+  --brand-purple: 114 87 232;    /* #7257E8 */
+  --brand-pink: 244 126 156;     /* #F47E9C */
+  --brand-orange: 255 169 104;   /* #FFA968 */
+
   --radius-control: 10px;
   --radius-card: 18px;
   --radius-module: 22px;

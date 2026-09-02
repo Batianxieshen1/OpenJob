@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { BrandMark } from '@/components/brand/Brand'
 import { BarChart3, BriefcaseBusiness, ClipboardCheck, FileText, LayoutDashboard, Radar, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -47,9 +48,9 @@ export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
       <NavLink
         to="/"
         aria-label="OpenJob 工作台"
-        className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-shell shadow-pop"
+        className="mb-6 flex h-11 w-11 items-center justify-center transition-soft hover:scale-105"
       >
-        <span className="text-sm font-bold tracking-tight">OJ</span>
+        <BrandMark size={30} />
       </NavLink>
 
       {/* 图标导航 */}

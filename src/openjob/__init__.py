@@ -11,4 +11,4 @@ if sys.platform == "win32":
     if hasattr(sys.stderr, "reconfigure"):
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

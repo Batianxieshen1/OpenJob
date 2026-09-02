@@ -280,6 +280,27 @@ export default function ResumePage() {
         </div>
       </header>
 
+      {!selectedJobId && (
+        <section className="rise-in rounded-module border border-card-border bg-card p-6 shadow-card">
+          <ol className="grid gap-3 sm:grid-cols-3">
+            {[
+              { step: '1', title: '上传简历底稿', desc: '配置页上传一页式 Word 底稿，支持多方向。' },
+              { step: '2', title: '选择目标岗位', desc: '在上方下拉中挑选已评分的岗位。' },
+              { step: '3', title: '生成并导出', desc: 'AI 按 JD 定向改写，确认后导出 docx。' },
+            ].map(item => (
+              <li key={item.step} className="rounded-2xl border border-card-border bg-surface-hover p-4">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-xs font-semibold text-shell">{item.step}</span>
+                <div className="mt-2 text-sm font-semibold text-foreground">{item.title}</div>
+                <p className="mt-1 text-xs leading-5 text-muted">{item.desc}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-4 flex justify-end">
+            <Button variant="secondary" size="sm" onClick={() => { window.location.href = '/jobs' }}>去岗位池挑选岗位</Button>
+          </div>
+        </section>
+      )}
+
       {error && (
         <div className="rounded-card border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</div>
       )}

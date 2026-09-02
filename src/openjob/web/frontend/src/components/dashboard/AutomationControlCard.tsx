@@ -19,16 +19,16 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
   const usagePct = quota.daily_limit > 0 ? Math.min(100, Math.round((quota.sent / quota.daily_limit) * 100)) : 0
 
   return (
-    <section className="flex min-h-[212px] flex-col rounded-module bg-ink p-5 text-shell shadow-pop">
+    <section className="flex min-h-[212px] flex-col rounded-module bg-ink p-5 text-shell shadow-pop dark:bg-[#1B2237] dark:text-white dark:shadow-[0_0_0_1px_rgb(96_130_255/0.25),0_16px_40px_rgb(0_0_0/0.45)]">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="text-[11px] font-medium tracking-[0.18em] text-shell/50">今日自动化</div>
+          <div className="text-[11px] font-medium tracking-[0.18em] text-shell/50 dark:text-white/50">今日自动化</div>
           <div className="mt-1 max-w-full text-[13px] font-semibold sm:text-sm">{today}</div>
         </div>
         <button
           type="button"
           onClick={() => { window.location.href = '/config?section=throttle' }}
-          className="flex items-center gap-1 rounded-full border border-shell/15 px-3 py-1.5 text-xs text-shell/80 transition-soft hover:border-shell/40 hover:text-shell"
+          className="flex items-center gap-1 rounded-full border border-shell/15 dark:border-white/20 px-3 py-1.5 text-xs text-shell/80 dark:text-white/90 transition-soft hover:border-shell/40 hover:text-shell"
         >
           {SEND_WINDOW}
           <ArrowUpRight className="h-3 w-3" />
@@ -36,24 +36,24 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="rounded-2xl bg-shell/8 px-3 py-2.5">
-          <div className="text-[11px] text-shell/50">今日已投递</div>
+        <div className="rounded-2xl bg-shell/8 dark:bg-white/5 px-3 py-2.5">
+          <div className="text-[11px] text-shell/50 dark:text-white/50">今日已投递</div>
           <div className="mt-0.5 text-xl font-semibold tabular-nums">
             {quota.sent}
-            <span className="text-xs font-normal text-shell/50"> / {quota.daily_limit}</span>
+            <span className="text-xs font-normal text-shell/50 dark:text-white/50"> / {quota.daily_limit}</span>
           </div>
         </div>
-        <div className="rounded-2xl bg-shell/8 px-3 py-2.5">
-          <div className="text-[11px] text-shell/50">剩余额度</div>
+        <div className="rounded-2xl bg-shell/8 dark:bg-white/5 px-3 py-2.5">
+          <div className="text-[11px] text-shell/50 dark:text-white/50">剩余额度</div>
           <div className="mt-0.5 flex items-baseline gap-2">
             <span className="text-xl font-semibold tabular-nums">{quota.remaining}</span>
-            <span className="text-[11px] text-shell/50">已用 {usagePct}%</span>
+            <span className="text-[11px] text-shell/50 dark:text-white/50">已用 {usagePct}%</span>
           </div>
         </div>
       </div>
 
       {/* 额度进度条 */}
-      <div className="mt-3 h-1 overflow-hidden rounded-full bg-shell/10">
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-shell/10 dark:bg-white/10">
         <div
           className={cn('h-full rounded-full transition-all duration-500', quota.exhausted ? 'bg-warning' : 'bg-primary')}
           style={{ width: `${usagePct}%` }}

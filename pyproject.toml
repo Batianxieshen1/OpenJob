@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openjob"
-version = "0.1.0"
+version = "1.0.0"
 description = "BOSS直聘智能求职Agent - 端到端自动化求职工具"
 requires-python = ">=3.10"
 dependencies = [

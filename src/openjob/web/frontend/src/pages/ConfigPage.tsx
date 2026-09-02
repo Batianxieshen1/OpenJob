@@ -10,6 +10,7 @@ import { BaseResumes } from '@/components/config/BaseResumes'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Save, RotateCcw, Upload, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { BrandLogo } from '@/components/brand/Brand'
 
 const AI_SERVICES = {
   anthropic: {
@@ -257,6 +258,10 @@ export default function ConfigPage() {
 
   return (
     <div className="h-full overflow-y-auto space-y-4 pr-4">
+      <header>
+        <h1 className="text-lg font-semibold">配置</h1>
+        <p className="text-xs text-muted">所有设置只保存在本地 config.yaml，修改后记得保存。</p>
+      </header>
         {/* Actions bar */}
         <div className="flex items-center justify-between sticky top-0 bg-background z-10 py-2">
           <div className="flex items-center gap-2">
@@ -276,6 +281,10 @@ export default function ConfigPage() {
         {/* Profile Section */}
         <SectionCard title="个人信息" sectionKey="profile" expanded={expandedSections} toggle={toggleSection}>
           <div className="space-y-4">
+            {/* 品牌识别：横向 Logo 按主题切换，宽度克制不抢配置主体 */}
+            <div className="hidden justify-end border-b border-card-border pb-3 sm:flex">
+              <BrandLogo maxWidth={150} />
+            </div>
             {/* Resume upload */}
             <div>
               <label className="block text-xs text-foreground mb-2">简历文件</label>

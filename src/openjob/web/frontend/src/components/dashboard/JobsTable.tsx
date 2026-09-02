@@ -129,7 +129,96 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
         <span className="text-xs text-muted">{total} 条记录</span>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        {/* 移动端（<lg）使用岗位卡片；桌面端保持表格 */}
+        <div className="space-y-2 px-3 pb-3 lg:hidden">
+          {jobs.map(job => {
+            const isExternalPlatform = job.source_platform === 'zhilian' || job.source_platform === '51job'
+            const externalUrl = safeExternalJobUrl(job)
+            const alreadySent = ['sent', 'replied', 'resume_sent', 'needs_resume', 'follow_up_sent'].includes(job.status)
+            const isSelected = selectedIds.includes(job.id)
+            return (
+              <div
+                key={job.id}
+                className={cn(
+                  'rounded-card border p-4 transition-soft',
+                  isSelected ? 'border-primary bg-accent-soft/40' : 'border-card-border bg-card'
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <label className="flex min-w-0 items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelected(job.id)}
+                      aria-label={`选择 ${job.company} ${job.title}`}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-foreground">{job.company}</span>
+                      <span className="block truncate text-[13px] text-foreground">{job.title}</span>
+                    </span>
+                  </label>
+                  <ScoreBadge score={job.score || 0} />
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                  <span>{job.city || '未识别'}</span>
+                  <span className="text-muted-3">·</span>
+                  <span>{job.salary || '-'}</span>
+                  <span className="text-muted-3">·</span>
+                  <Badge variant={statusVariant(job.status) as any}>{getStatusLabel(job.status)}</Badge>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-3">
+                  <span className="rounded-full bg-accent-soft px-1.5 py-0.5 font-semibold text-primary">
+                    {job.source_platform === 'zhilian' ? '智联' : job.source_platform === '51job' ? '51job' : 'BOSS'}
+                  </span>
+                  <span>{job.hr_active || '活跃度未知'}</span>
+                  <span>· {timeAgo(job.created_at)}</span>
+                </div>
+                {hasActions && (
+                  <div className="mt-3 flex flex-wrap gap-1.5 border-t border-card-border pt-2.5" onClick={event => event.stopPropagation()}>
+                    {isExternalPlatform && externalUrl && (
+                      <a href={externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-card-border px-2 py-1.5 text-[11px] font-semibold text-primary hover:bg-accent-soft">
+                        <ExternalLink className="h-3.5 w-3.5" />打开平台
+                      </a>
+                    )}
+                    {isExternalPlatform && !externalUrl && (
+                      <span className="rounded-lg bg-warning/10 px-2 py-1.5 text-[11px] font-semibold text-warning">链接不可用</span>
+                    )}
+                    {isExternalPlatform && onMarkManuallySent && (
+                      <button
+                        type="button"
+                        disabled={alreadySent}
+                        onClick={() => onMarkManuallySent(job)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-semibold text-white hover:opacity-90 disabled:bg-success/10 disabled:text-success disabled:opacity-100"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />{alreadySent ? '已发送' : '我已发送'}
+                      </button>
+                    )}
+                    {job.status === 'filtered' && onApprove && (
+                      <button
+                        type="button"
+                        onClick={() => onApprove(job)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-primary/40 px-2 py-1.5 text-[11px] font-semibold text-primary hover:bg-accent-soft"
+                      >放行到确认队列</button>
+                    )}
+                    {onSoftDelete && (
+                      <button type="button" onClick={() => onSoftDelete(job)} className="rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger" aria-label={`将 ${job.company} ${job.title} 移入回收站`}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {!jobs.length && (
+            <div className="rounded-card border border-dashed border-card-border bg-surface-hover px-4 py-8 text-center text-sm text-muted">
+              {loading ? '正在读取岗位…' : '没有符合当前条件的岗位'}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b border-card-border bg-accent-soft text-xs text-muted">

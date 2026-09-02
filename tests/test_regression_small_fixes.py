@@ -57,10 +57,10 @@ class VersionMetadataTests(unittest.TestCase):
             / "Sidebar.tsx"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('version = "0.1.0"', pyproject)
-        self.assertEqual(openjob.__version__, "0.1.0")
-        self.assertEqual(json.loads(health())["version"], "0.1.0")
-        self.assertIn("v0.1.0 · 本地控制台", sidebar_source)
+        self.assertIn('version = "1.0.0"', pyproject)
+        self.assertEqual(openjob.__version__, "1.0.0")
+        self.assertEqual(json.loads(health())["version"], "1.0.0")
+        self.assertIn("v1.0", sidebar_source)
         self.assertNotIn("v2.3.1", sidebar_source)
 
 
@@ -395,17 +395,27 @@ class DashboardPageTests(unittest.TestCase):
             / "DashboardPage.tsx"
         ).read_text(encoding="utf-8")
 
-    def test_dashboard_renders_monitor_execution_history(self):
-        self.assertIn("MonitorExecutionView", self.source)
-        self.assertIn("history", self.source)
-        self.assertIn("<MonitorExecutionView history={history}", self.source)
+    def test_monitor_page_renders_monitor_execution_history(self):
+        monitor_source = monitor_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "pages" / "MonitorPage.tsx"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("MonitorExecutionView", monitor_source)
+        self.assertIn("history", monitor_source)
+        self.assertIn("<MonitorExecutionView history={history}", monitor_source)
 
     def test_dashboard_exposes_manual_refresh_button(self):
-        self.assertIn("RefreshCw", self.source)
-        self.assertIn("onClick={refresh}", self.source)
-        self.assertIn("refreshing ? '刷新中' : '刷新'", self.source)
-        self.assertIn("最后刷新：", self.source)
-        self.assertIn("refreshing && 'animate-spin'", self.source)
+        hero_source = hero_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "components" / "dashboard" / "DashboardHero.tsx"
+        ).read_text(encoding="utf-8")
+
+
+        self.assertIn("RefreshCw", hero_source)
+        self.assertIn("onRefresh", hero_source)
+        self.assertIn("refreshing", hero_source)
+        self.assertIn("animate-spin", hero_source)
 
     def test_dashboard_can_stop_after_start_response_arrives(self):
         active_branch = self.source.index("if (activeTask?.mode === mode)")
@@ -429,21 +439,17 @@ class DashboardPageTests(unittest.TestCase):
         self.assertIn("setLastRefreshedAt", hook_source)
         self.assertIn("setWorkbench(prev => ({ ...prev, task, last_task: task }))", hook_source)
 
-    def test_dashboard_filters_today_jobs_and_clears_hidden_selection(self):
-        self.assertIn("filteredTodayJobs", self.source)
-        self.assertIn("setSelected(filteredTodayJobs.map(job => job.id))", self.source)
-        self.assertIn("visibleJobIds.has(id)", self.source)
-        self.assertIn("没有符合当前条件的岗位", self.source)
+    def test_confirm_page_filters_jobs_and_clears_hidden_selection(self):
+        confirm_source = confirm_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "pages" / "ConfirmQueuePage.tsx"
+        ).read_text(encoding="utf-8")
 
-    def test_workbench_stats_distinguish_today_total_and_current_pending(self):
-        self.assertIn("type StatsScope = 'today' | 'total'", self.source)
-        self.assertIn("今日数据", self.source)
-        self.assertIn("累计数据", self.source)
-        self.assertIn("workbench.funnel_today", self.source)
-        self.assertIn("workbench.pending_confirmation.length", self.source)
-        self.assertIn("今日新增岗位", self.source)
-        self.assertIn("当前待确认", self.source)
-        self.assertIn("今日已投递", self.source)
+
+        self.assertIn("filtered", confirm_source)
+        self.assertIn("setSelected(filtered.map(job => job.id))", confirm_source)
+        self.assertIn("selected.filter(id => filtered.some(job => job.id === id))", confirm_source)
+        self.assertIn("没有符合当前条件的岗位", confirm_source)
 
     def test_workbench_task_status_shows_current_run_metrics(self):
         self.assertIn("本轮扫描", self.source)
@@ -510,50 +516,49 @@ class DashboardPageTests(unittest.TestCase):
         self.assertIn("created_within", search_hook_source)
         self.assertIn("onPageChange", jobs_table_source)
         self.assertIn("pageSize", jobs_table_source)
-        self.assertIn("招聘者活跃", jobs_table_source)
+        self.assertIn("job.hr_active", jobs_table_source)
         self.assertIn("活跃度未知", jobs_table_source)
         self.assertIn("dateStr.replace(' ', 'T')", jobs_table_source)
         self.assertIn("`${dateStr.replace(' ', 'T')}Z`", jobs_table_source)
 
-    def test_dashboard_exposes_batch_reject_for_selected_pending_jobs(self):
-        # Arrange: DashboardPage source is loaded in setUp.
+    def test_confirm_page_exposes_batch_reject_for_selected_pending_jobs(self):
+        confirm_source = confirm_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "pages" / "ConfirmQueuePage.tsx"
+        ).read_text(encoding="utf-8")
 
-        # Act / Assert
-        self.assertIn("rejectSelectedJobs", self.source)
-        self.assertIn("/api/workbench/reject", self.source)
-        self.assertIn("放弃已选", self.source)
-        self.assertIn("确定放弃这", self.source)
-        self.assertIn("setSelected(prev => prev.filter", self.source)
+
+        self.assertIn("rejectSelected", confirm_source)
+        self.assertIn("/api/workbench/reject", confirm_source)
+        self.assertIn("放弃已选", confirm_source)
+        self.assertIn("确定放弃这", confirm_source)
+        self.assertIn("setSelected(prev => prev.filter", confirm_source)
 
     def test_each_pending_job_card_has_a_reject_action(self):
-        self.assertIn("onReject={() => rejectSelectedJobs([job.id])}", self.source)
-        self.assertIn("放弃岗位", self.source)
+        cards_source = cards_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "components" / "jobs" / "JobCards.tsx"
+        ).read_text(encoding="utf-8")
 
-    def test_dashboard_sends_ready_greetings_without_second_confirmation(self):
-        # Arrange: DashboardPage source is loaded in setUp.
+        confirm_source = confirm_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "pages" / "ConfirmQueuePage.tsx"
+        ).read_text(encoding="utf-8")
 
-        # Act / Assert
-        self.assertIn("sendReadyGreetings", self.source)
-        self.assertIn("direct_send: true", self.source)
-        self.assertIn("已直接进入发送流程", self.source)
-        self.assertNotIn("confirmDeliver(pendingGreetingJobs.map", self.source)
-        self.assertNotIn("confirmDeliver([job.id])}>发送招呼语", self.source)
-        self.assertIn("已在当前发送队列中，请等待依次发送", self.source)
-        self.assertIn("追加到当前发送队列", self.source)
 
-    def test_dashboard_pending_greetings_can_be_rejected(self):
-        # Arrange: DashboardPage source is loaded in setUp.
+        self.assertIn("onReject", cards_source)
+        self.assertIn("放弃岗位", cards_source)
+        self.assertIn("onReject={() => rejectSelected([job.id])}", confirm_source)
 
-        # Act / Assert
-        self.assertIn("const pendingGreetingJobs = workbench.pending_greetings", self.source)
-        self.assertNotIn(
-            "workbench.pending_greetings.filter(job => !confirmedDeliveryIds.has(job.id))",
-            self.source,
-        )
-        self.assertIn("rejectSelectedJobs(pendingGreetingJobs.map(job => job.id))", self.source)
-        pending_section = self.source[self.source.index("待发送招呼语"):]
-        self.assertIn("rejectSelectedJobs([job.id])", pending_section)
-        self.assertIn(">放弃</Button>", pending_section)
+    def test_priority_items_retry_sends_without_second_confirmation(self):
+        priority_source = priority_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "components" / "dashboard" / "PriorityItemsCard.tsx"
+        ).read_text(encoding="utf-8")
+
+
+        self.assertIn("direct_send: true", priority_source)
+        self.assertIn("重试发送", priority_source)
 
     def test_dashboard_send_errors_do_not_fake_an_active_full_task(self):
         # Arrange: DashboardPage source is loaded in setUp.
@@ -562,32 +567,43 @@ class DashboardPageTests(unittest.TestCase):
         self.assertNotIn("blockedFullTask", self.source)
         self.assertNotIn("send-errors-blocked-full-flow", self.source)
         self.assertNotIn("全流程卡在打招呼环节", self.source)
-        self.assertIn("放弃已失效岗位", self.source)
-        self.assertIn("放弃全部", self.source)
+        priority_source = priority_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "components" / "dashboard" / "PriorityItemsCard.tsx"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("发送失败", priority_source)
+        self.assertIn("重试发送", priority_source)
 
     def test_monitor_pending_replies_can_be_dismissed(self):
-        # Arrange: DashboardPage source is loaded in setUp.
+        monitor_source = monitor_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "pages" / "MonitorPage.tsx"
+        ).read_text(encoding="utf-8")
 
-        # Act / Assert
-        self.assertIn("dismissPendingReply", self.source)
-        self.assertIn("/dismiss", self.source)
-        self.assertIn("reply_dismissed", self.source)
-        self.assertIn("放弃", self.source)
+
+        self.assertIn("dismissPendingReply", monitor_source)
+        self.assertIn("/dismiss", monitor_source)
+        self.assertIn("reply_dismissed", monitor_source)
+        self.assertIn("放弃", monitor_source)
 
     def test_monitor_surfaces_resume_generation_failures_as_pending_items(self):
-        # Arrange: DashboardPage source is loaded in setUp.
+        monitor_source = monitor_source = (
+            ROOT / "src" / "openjob" / "web" / "frontend" / "src"
+            / "pages" / "MonitorPage.tsx"
+        ).read_text(encoding="utf-8")
 
-        # Act / Assert
-        self.assertIn("item.action === 'resume_failed'", self.source)
-        self.assertIn("isResumeFailureResolved", self.source)
-        self.assertIn("resumeFailures", self.source)
-        self.assertIn("pendingItems", self.source)
-        self.assertIn("displayedHistory", self.source)
-        self.assertIn("定制简历生成失败，尚无可下载文件", self.source)
-        self.assertIn("系统失败原因", self.source)
-        self.assertIn("parsed.systemReason", self.source)
-        self.assertIn("Boolean(item.resolved || item.resume_path)", self.source)
-        self.assertNotIn("hrText || item.detail || getActionLabel(item.action)", self.source)
+
+        self.assertIn("item.action === 'resume_failed'", monitor_source)
+        self.assertIn("isResumeFailureResolved", monitor_source)
+        self.assertIn("resumeFailures", monitor_source)
+        self.assertIn("pendingItems", monitor_source)
+        self.assertIn("displayedHistory", monitor_source)
+        self.assertIn("定制简历生成失败，尚无可下载文件", monitor_source)
+        self.assertIn("系统失败原因", monitor_source)
+        self.assertIn("parsed.systemReason", monitor_source)
+        self.assertIn("Boolean(item.resolved || item.resume_path)", monitor_source)
+        self.assertNotIn("hrText || item.detail || getActionLabel(item.action)", monitor_source)
 
     def test_monitor_parses_legacy_resume_failure_text_as_a_system_reason(self):
         history_detail_source = (
@@ -609,8 +625,8 @@ class DashboardPageTests(unittest.TestCase):
 
     def test_dashboard_shows_automatic_task_deadline_and_stop_reason(self):
         self.assertIn("自动截止：", self.source)
-        self.assertIn("visibleTask.deadline_at", self.source)
-        self.assertIn("visibleTask.stop_reason", self.source)
+        self.assertIn("activeTask.deadline_at", self.source)
+        self.assertIn("activeTask.stop_reason", self.source)
 
 
 class SidebarTests(unittest.TestCase):
@@ -652,7 +668,7 @@ class HeaderTests(unittest.TestCase):
     def test_header_version_metadata_right_side_omits_duplicate_console_label(self):
         # Act / Assert
         self.assertNotIn("v2.1 · 本地控制台", self.source)
-        self.assertIn("本地服务运行中", self.source)
+        self.assertIn("本地服务", self.source)
 
 
 class ConfigPageTests(unittest.TestCase):

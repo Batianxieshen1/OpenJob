@@ -80,7 +80,7 @@ export function DashboardHero({ onRunFullFlow, onOpenCollect, onRunMonitor, moni
         >
           <RefreshCw className={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
         </button>
-        <span className="hidden whitespace-nowrap text-xs text-muted-3 md:inline">{today}</span>
+        <span className="hidden whitespace-nowrap text-xs text-muted-3 md:inline" title="按浏览器本地时区显示">{today}</span>
       </div>
     </section>
   )

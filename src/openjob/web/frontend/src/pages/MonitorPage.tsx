@@ -239,6 +239,27 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
             title="暂无待处理的 HR 消息"
             description="监测运行时会自动检查新回复；发现 HR 要简历或提问时，会出现在这里等你处理。"
             steps={['确认投递后开启监测', 'HR 回复自动入库', '在这里逐条处理']}
+            action={
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/workbench/task', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mode: 'monitor' }),
+                    })
+                    if (!res.ok && res.status !== 409) {
+                      const data = await res.json().catch(() => ({}))
+                      throw new Error(data.error || '启动失败')
+                    }
+                    await refresh()
+                  } catch { /* 启动失败时保持空状态 */ }
+                }}
+              >
+                启动一轮监测
+              </Button>
+            }
           />
         )}
       </div>
