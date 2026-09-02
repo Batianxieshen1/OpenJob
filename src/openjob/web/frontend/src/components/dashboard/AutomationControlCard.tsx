@@ -20,10 +20,10 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
 
   return (
     <section className="flex min-h-[212px] flex-col rounded-module bg-ink p-5 text-shell shadow-pop">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="text-[11px] font-medium tracking-[0.18em] text-shell/50">今日自动化</div>
-          <div className="mt-1 text-sm font-semibold">{today}</div>
+          <div className="mt-1 max-w-full text-[13px] font-semibold sm:text-sm">{today}</div>
         </div>
         <button
           type="button"

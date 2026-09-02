@@ -119,7 +119,8 @@ body {
   transition-timing-function: var(--ease-product);
 }
 
-/* 页面/抽屉进入 */
+/* 页面/抽屉进入：to 不声明 transform，动画结束后元素回到无 transform 态，
+   避免残留 transform 使后代 position:fixed 浮层（弹窗）包含块错位 */
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -127,7 +128,6 @@ body {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 .rise-in {

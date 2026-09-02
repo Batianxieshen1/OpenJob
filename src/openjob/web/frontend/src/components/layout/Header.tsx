@@ -74,14 +74,17 @@ export function Header() {
     <header className="flex h-[72px] shrink-0 items-center justify-between gap-4 border-b border-card-border px-5 md:px-7 xl:px-9">
       <div className="flex min-w-0 items-center gap-3">
         {inPills ? (
-          <nav aria-label="主导航" className="flex items-center gap-1.5 rounded-full border border-card-border bg-card p-1">
+          <nav
+            aria-label="主导航"
+            className="-mx-1 flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-card-border bg-card p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {pillItems.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'rounded-full px-4 py-1.5 text-[13px] font-semibold transition-soft',
+                    'shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-semibold transition-soft',
                     isActive
                       ? 'bg-ink text-shell shadow-pop'
                       : 'text-muted hover:-translate-y-px hover:text-foreground'

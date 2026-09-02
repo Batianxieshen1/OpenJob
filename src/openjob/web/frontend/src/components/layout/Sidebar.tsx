@@ -42,12 +42,12 @@ export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
   }, [pendingRepliesProp])
 
   return (
-    <aside className="flex w-[76px] shrink-0 flex-col items-center border-r border-card-border bg-shell py-5">
+    <aside className="hidden w-[76px] shrink-0 flex-col items-center border-r border-card-border bg-shell py-5 lg:flex">
       {/* Logo */}
       <NavLink
         to="/"
         aria-label="OpenJob 工作台"
-        className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-white shadow-pop"
+        className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-shell shadow-pop"
       >
         <span className="text-sm font-bold tracking-tight">OJ</span>
       </NavLink>

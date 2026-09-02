@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { Radar, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface DashboardHeroProps {
@@ -54,17 +54,22 @@ export function DashboardHero({ onRunFullFlow, onOpenCollect, onRunMonitor, moni
         <button
           type="button"
           onClick={onOpenCollect}
-          className="flex h-11 items-center gap-1.5 rounded-full border border-card-border bg-card px-5 text-[13px] font-semibold text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95"
+          aria-label="单独采集岗位"
+          title="单独采集岗位"
+          className="h-11 whitespace-nowrap items-center gap-1.5 rounded-full border border-card-border bg-card px-4 text-[13px] font-semibold text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95 sm:px-5 inline-flex"
         >
-          单独采集
+          <Search className="h-4 w-4" />
+          <span className="hidden sm:inline">单独采集</span>
         </button>
         <button
           type="button"
           onClick={onRunMonitor}
-          className="flex h-11 items-center gap-1.5 rounded-full border border-card-border bg-card px-5 text-[13px] font-semibold text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95"
+          aria-label={monitorRunning ? '监测运行中' : '开启监测'}
+          title={monitorRunning ? '监测运行中' : '开启监测'}
+          className="h-11 whitespace-nowrap items-center gap-1.5 rounded-full border border-card-border bg-card px-4 text-[13px] font-semibold text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95 sm:px-5 inline-flex"
         >
-          {monitorRunning && <span className="breathe h-1.5 w-1.5 rounded-full bg-success" />}
-          {monitorRunning ? '监测运行中' : '开启监测'}
+          <Radar className={monitorRunning ? 'h-4 w-4 text-success' : 'h-4 w-4'} />
+          <span className="hidden sm:inline">{monitorRunning ? '监测运行中' : '开启监测'}</span>
         </button>
         <button
           type="button"
@@ -75,7 +80,7 @@ export function DashboardHero({ onRunFullFlow, onOpenCollect, onRunMonitor, moni
         >
           <RefreshCw className={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
         </button>
-        <span className="hidden text-xs text-muted-3 md:inline">{today}</span>
+        <span className="hidden whitespace-nowrap text-xs text-muted-3 md:inline">{today}</span>
       </div>
     </section>
   )

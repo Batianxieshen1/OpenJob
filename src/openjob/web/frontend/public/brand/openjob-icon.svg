@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">OpenJob icon</title>
+  <defs><linearGradient id="flight" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#1467F8"/><stop offset=".5" stop-color="#7257E8"/><stop offset="1" stop-color="#F47E9C"/></linearGradient></defs>
+  <path d="M50 254 446 76Q468 66 462 93L300 426Q291 445 272 426L217 291 64 273Q38 268 50 254Z" fill="url(#flight)"/>
+  <path d="M50 254 217 291 462 93M217 291 272 426 300 426 296 282" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity=".94"/>
+  <path d="M217 291 296 282" fill="none" stroke="#fff" stroke-width="17" stroke-linecap="round" opacity=".58"/>
+  <circle cx="217" cy="291" r="16" fill="#FFD176"/>
+</svg>

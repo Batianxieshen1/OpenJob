@@ -3,11 +3,21 @@ import { useDashboard, type Job } from '@/hooks/useDashboard'
 import { useDebouncedValue, EMPTY_JOB_FILTERS, hasActiveJobFilters, hasInvalidSalaryRange, filterJobs, type JobFilters } from '@/lib/jobFilters'
 import { Button } from '@/components/ui/button'
 import { JobFilterBar } from '@/components/jobs/JobFilterBar'
-import { JobActionCard, JobDetailModal } from '@/pages/DashboardPage'
+import { JobActionCard, JobDetailModal } from '@/components/jobs/JobCards'
+import { cn } from '@/lib/utils'
 
-interface WorkbenchData {
-  pending_confirmation: Job[]
-  send_errors: Job[]
+const PAGE_SIZE = 16
+
+type QuickFilter = 'all' | 'high_match' | 'active_today'
+
+const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
+  { key: 'all', label: '全部' },
+  { key: 'high_match', label: '高匹配 ≥80' },
+  { key: 'active_today', label: '今日活跃' },
+]
+
+function isActiveToday(job: Job) {
+  return Boolean(job.hr_active && (job.hr_active.includes('分钟') || job.hr_active.includes('在线') || job.hr_active.includes('今日')))
 }
 
 export default function ConfirmQueuePage() {
@@ -16,6 +26,8 @@ export default function ConfirmQueuePage() {
   const [filters, setFilters] = useState<JobFilters>({ ...EMPTY_JOB_FILTERS })
   const [notice, setNotice] = useState('')
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
+  const [page, setPage] = useState(0)
   const debouncedQuery = useDebouncedValue(filters.query, 250)
 
   const pendingJobs = workbench.pending_confirmation || []
@@ -25,11 +37,28 @@ export default function ConfirmQueuePage() {
   )
   const effectiveFilters = useMemo<JobFilters>(() => ({ ...filters, query: debouncedQuery }), [filters, debouncedQuery])
   const filtered = useMemo(() => filterJobs(jobs, effectiveFilters), [jobs, effectiveFilters])
+  const quickFiltered = useMemo(() => {
+    if (quickFilter === 'high_match') return filtered.filter(job => (job.score || 0) >= 80)
+    if (quickFilter === 'active_today') return filtered.filter(isActiveToday)
+    return filtered
+  }, [filtered, quickFilter])
+  // 高分优先展示：评分降序，方便先处理最值得投的
+  const sorted = useMemo(
+    () => [...quickFiltered].sort((a, b) => (b.score || 0) - (a.score || 0)),
+    [quickFiltered],
+  )
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const pageJobs = useMemo(() => sorted.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE), [sorted, safePage])
   const actionable = useMemo(() => selected.filter(id => filtered.some(job => job.id === id)), [selected, filtered])
 
   useEffect(() => {
     setSelected(prev => prev.filter(id => jobs.some(job => job.id === id)))
   }, [jobs])
+
+  useEffect(() => {
+    setPage(0)
+  }, [quickFilter, filters])
 
   const confirmDeliver = async (ids: string[]) => {
     if (!ids.length) return
@@ -87,56 +116,87 @@ export default function ConfirmQueuePage() {
   }
 
   return (
-    <div className="rise-in mx-auto max-w-[1440px] space-y-4">
+    <div className="mx-auto max-w-[1440px] space-y-4">
       <header>
-        <h1 className="text-lg font-bold">投递确认</h1>
+        <h1 className="text-lg font-semibold">投递确认</h1>
         <p className="text-xs text-muted">
           这里是投递前的人工闸门：AI 只建议，你拍板。勾选岗位 → 一键投递 → 招呼语生成后按安全队列发送。
         </p>
       </header>
 
-      {notice && <div className="rounded-card border border-card-border bg-card px-4 py-3 text-sm text-foreground">{notice}</div>}
+      {notice && <div className="rise-in rounded-card border border-card-border bg-card px-4 py-3 text-sm text-foreground">{notice}</div>}
 
-      <section className="rounded-3xl border border-card-border bg-card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="text-xs text-muted">
-            待确认 <span className="font-bold text-foreground">{jobs.length}</span> 个
+      {/* 批量操作栏：吸顶，滚动时始终可操作 */}
+      <div className="sticky top-0 z-30 rounded-card border border-card-border bg-shell/95 px-4 py-3 shadow-card backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">
+              待确认 <span className="font-semibold text-foreground tabular-nums">{jobs.length}</span> 个
+              {selected.length > 0 && <span className="ml-1 text-primary">· 已选 {selected.length}</span>}
+            </span>
+            <div className="flex items-center gap-1 rounded-full border border-card-border bg-card p-1">
+              {QUICK_FILTERS.map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setQuickFilter(item.key)}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-semibold transition-soft',
+                    quickFilter === item.key ? 'bg-ink text-shell' : 'text-muted hover:text-foreground'
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
             {workbench.send_errors && workbench.send_errors.length > 0 && (
-              <span className="ml-2 text-warning">另有 {workbench.send_errors.length} 个发送失败岗位在岗位池待处理</span>
+              <span className="hidden text-xs text-warning md:inline">另有 {workbench.send_errors.length} 个发送失败岗位在岗位池待处理</span>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setSelected(filtered.map(job => job.id))}>全选</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setSelected(filtered.map(job => job.id))}>全选本页结果</Button>
             <Button variant="secondary" size="sm" onClick={() => setSelected([])}>清空</Button>
-            <Button variant="secondary" size="sm" onClick={() => rejectSelected(actionable)}>放弃已选 {actionable.length} 个</Button>
-            <Button size="sm" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length} 个</Button>
+            <Button variant="secondary" size="sm" onClick={() => rejectSelected(actionable)}>放弃已选 {actionable.length}</Button>
+            <Button size="sm" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
           </div>
         </div>
+      </div>
+
+      <section className="rounded-module border border-card-border bg-card p-5">
         <JobFilterBar
           filters={filters}
           onChange={setFilters}
           onReset={() => setFilters({ ...EMPTY_JOB_FILTERS })}
-          resultCount={filtered.length}
+          resultCount={sorted.length}
           totalCount={jobs.length}
           invalidSalary={hasInvalidSalaryRange(filters)}
         />
-        {filtered.length ? (
-          <div className="stagger grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {filtered.map(job => (
-              <JobActionCard
-                key={job.id}
-                job={job}
-                selected={selected.includes(job.id)}
-                onToggle={() => setSelected(prev => (prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]))}
-                onDetail={() => setSelectedJob(job)}
-                onReject={() => rejectSelected([job.id])}
-              />
-            ))}
-          </div>
+        {pageJobs.length ? (
+          <>
+            <div className="stagger grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {pageJobs.map(job => (
+                <JobActionCard
+                  key={job.id}
+                  job={job}
+                  selected={selected.includes(job.id)}
+                  onToggle={() => setSelected(prev => (prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]))}
+                  onDetail={() => setSelectedJob(job)}
+                  onReject={() => rejectSelected([job.id])}
+                />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted">
+                <Button variant="secondary" size="sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>上一页</Button>
+                <span className="tabular-nums">第 {safePage + 1} / {totalPages} 页 · 共 {sorted.length} 个</span>
+                <Button variant="secondary" size="sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>下一页</Button>
+              </div>
+            )}
+          </>
         ) : jobs.length ? (
           <div className="rounded-2xl border border-dashed border-card-border bg-surface-hover p-5 text-center text-sm text-muted">
             <p>没有符合当前条件的岗位</p>
-            <Button className="mt-3" variant="secondary" size="sm" onClick={() => setFilters({ ...EMPTY_JOB_FILTERS })}>重置筛选</Button>
+            <Button className="mt-3" variant="secondary" size="sm" onClick={() => { setFilters({ ...EMPTY_JOB_FILTERS }); setQuickFilter('all') }}>重置筛选</Button>
           </div>
         ) : hasActiveJobFilters(filters) ? (
           <div className="rounded-2xl border border-dashed border-card-border bg-surface-hover p-5 text-center text-sm text-muted">没有符合筛选条件的岗位。</div>

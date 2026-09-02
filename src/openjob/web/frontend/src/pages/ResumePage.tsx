@@ -343,7 +343,11 @@ export default function ResumePage() {
                 <CardTitle className="text-sm">版本</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 text-xs">
-                {versions.length === 0 && <p className="text-muted">尚无版本。</p>}
+                {versions.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-card-border p-3 text-xs text-muted">
+                    还没有简历版本。选择岗位后在右侧点「生成定制简历」，第一个版本会出现在这里。
+                  </div>
+                )}
                 {versions.map(v => (
                   <button
                     key={v.id}

@@ -125,7 +125,7 @@ export default function StatsPage() {
     <div className="rise-in mx-auto max-w-[1440px] space-y-4">
       <header className="space-y-3">
         <div>
-          <h1 className="text-lg font-bold">市场分析</h1>
+          
           <p className="text-xs text-muted">
             基于{SCOPE_LABELS[scope]}（{stats.total} 个）的市场画像，随每轮采集自动更新。
           </p>

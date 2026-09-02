@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { RotateCcw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,10 +28,20 @@ export function JobFilterBar({
   showSource = false,
 }: JobFilterBarProps) {
   const update = (key: keyof JobFilters, value: string) => onChange({ ...filters, [key]: value })
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <div className="mb-4 rounded-2xl border border-card-border bg-surface-hover p-3">
-      <div className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-4">
+      <button
+        type="button"
+        onClick={() => setExpanded(prev => !prev)}
+        aria-expanded={expanded}
+        className="mb-2 flex w-full items-center justify-between text-xs font-semibold text-muted md:hidden"
+      >
+        筛选条件{expanded ? '（收起）' : '（展开）'}
+        <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      <div className={expanded ? 'grid min-w-0 grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-4' : 'hidden min-w-0 grid-cols-1 gap-2 md:grid md:grid-cols-2 2xl:grid-cols-4'}>
         <label className="relative min-w-0 md:col-span-2 2xl:col-span-1">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
           <Input

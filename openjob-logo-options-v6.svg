@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="2100" viewBox="0 0 1800 2100" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo exploration — new visual batch</title>
+  <desc id="desc">Ten new OpenJob logo directions inspired by abstract lettermarks, geometric monograms, expressive wordmarks and app-ready symbols.</desc>
+  <defs>
+    <linearGradient id="g1" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#2457F5"/><stop offset=".46" stop-color="#8B4DE5"/><stop offset="1" stop-color="#FF6F9C"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00B8A9"/><stop offset=".48" stop-color="#2C8BFF"/><stop offset="1" stop-color="#925CE5"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#1F4ED0"/><stop offset=".52" stop-color="#655FE4"/><stop offset="1" stop-color="#FFB35B"/></linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1D77FF"/><stop offset=".5" stop-color="#00CDB7"/><stop offset="1" stop-color="#FF8A77"/></linearGradient>
+    <linearGradient id="g5" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#5A2BD1"/><stop offset=".52" stop-color="#D347CF"/><stop offset="1" stop-color="#FFAD62"/></linearGradient>
+    <linearGradient id="g6" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3855F1"/><stop offset=".48" stop-color="#1FBFD0"/><stop offset="1" stop-color="#9BDF77"/></linearGradient>
+    <linearGradient id="g7" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#0F4DA8"/><stop offset=".5" stop-color="#5E75F4"/><stop offset="1" stop-color="#F28BA5"/></linearGradient>
+    <linearGradient id="g8" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF5F82"/><stop offset=".48" stop-color="#A54BDD"/><stop offset="1" stop-color="#397FFF"/></linearGradient>
+    <linearGradient id="g9" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#04A99B"/><stop offset=".5" stop-color="#227FF5"/><stop offset="1" stop-color="#FFA23F"/></linearGradient>
+    <linearGradient id="g10" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF796A"/><stop offset=".45" stop-color="#D953B8"/><stop offset="1" stop-color="#615AF1"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#172033" flood-opacity=".13"/></filter>
+    <style>
+      .heading { font-family: Arial, sans-serif; font-size: 27px; font-weight: 800; letter-spacing: 2px; fill: #64748B; }
+      .intro { font-family: Arial, sans-serif; font-size: 22px; fill: #94A3B8; }
+      .number { font-family: Arial, sans-serif; font-size: 21px; font-weight: 800; letter-spacing: 1px; fill: #94A3B8; }
+      .name { font-family: Arial, sans-serif; font-size: 22px; font-weight: 700; fill: #25324A; }
+      .note { font-family: Arial, sans-serif; font-size: 17px; fill: #94A3B8; }
+      .sans { font-family: Arial, Helvetica, sans-serif; font-size: 82px; font-weight: 750; letter-spacing: -4px; fill: #101828; }
+      .serif { font-family: Georgia, Baskerville, 'Times New Roman', serif; font-size: 86px; font-weight: 700; letter-spacing: -5px; fill: #101828; }
+      .soft { font-family: Arial, Helvetica, sans-serif; font-size: 82px; font-weight: 500; letter-spacing: -5px; fill: #101828; }
+      .mono { font-family: 'Courier New', monospace; font-size: 72px; font-weight: 700; letter-spacing: -5px; fill: #101828; }
+      .wide { font-family: Arial, Helvetica, sans-serif; font-size: 73px; font-weight: 700; letter-spacing: 1px; fill: #101828; }
+      .reverse { font-family: Arial, Helvetica, sans-serif; font-size: 82px; font-weight: 750; letter-spacing: -4px; fill: #FFFFFF; }
+      .tiny { font-family: Arial, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1.4px; fill: #CBD5E1; }
+    </style>
+  </defs>
+  <rect width="1800" height="2100" fill="#F5F7FB"/>
+  <text x="90" y="68" class="heading">OPENJOB · NEW VISUAL EXPLORATION</text>
+  <text x="90" y="108" class="intro">这一批不再沿用之前的“窗口”套路，改从字母标、几何、流动线条、徽章和强字标五个方向自由探索。</text>
+
+  <!-- 01 -->
+  <g transform="translate(70 150)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">01</text><text x="82" y="48" class="name">CUT O</text><text x="38" y="76" class="note">极简切口字母标，像一个主动打开的入口</text>
+    <g transform="translate(104 115) scale(.34)" filter="url(#shadow)"><path d="M210 29 C125 -5 35 43 17 128 C0 211 56 295 141 307 C221 319 292 270 307 197" fill="none" stroke="url(#g1)" stroke-width="58" stroke-linecap="round"/><path d="M218 262 L300 181" fill="none" stroke="url(#g1)" stroke-width="58" stroke-linecap="round"/><circle cx="137" cy="162" r="18" fill="#FFD06E"/></g>
+    <text x="330" y="218" class="sans">OpenJob</text><text x="700" y="298" class="tiny">01 / 10</text>
+  </g>
+
+  <!-- 02 -->
+  <g transform="translate(930 150)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">02</text><text x="82" y="48" class="name">OJ TILE</text><text x="38" y="76" class="note">圆角方块里的 OJ，适合 App 图标</text>
+    <g transform="translate(104 113) scale(.35)" filter="url(#shadow)"><rect x="20" y="20" width="300" height="300" rx="82" fill="url(#g2)"/><path d="M92 163 C92 110 131 72 182 72 C231 72 267 108 267 157 C267 208 230 245 181 245 C130 245 92 211 92 163Z" fill="none" stroke="#fff" stroke-width="32"/><path d="M220 78 V208 C220 243 243 262 274 262" fill="none" stroke="#fff" stroke-width="29" stroke-linecap="round"/><circle cx="165" cy="163" r="12" fill="#FFD275"/></g>
+    <text x="330" y="218" class="serif">OpenJob</text><text x="700" y="298" class="tiny">02 / 10</text>
+  </g>
+
+  <!-- 03 -->
+  <g transform="translate(70 530)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">03</text><text x="82" y="48" class="name">RISING DOT</text><text x="38" y="76" class="note">一点光沿着上升曲线前进，轻盈而有方向</text>
+    <g transform="translate(106 112) scale(.34)" filter="url(#shadow)"><path d="M42 286 C71 206 107 131 164 97 C211 69 254 91 260 143 C268 208 282 246 338 246 C390 246 425 196 449 126" fill="none" stroke="url(#g3)" stroke-width="51" stroke-linecap="round"/><path d="M417 126 H449 V158" fill="none" stroke="url(#g3)" stroke-width="24" stroke-linecap="round"/><circle cx="42" cy="286" r="19" fill="#FFBD64"/></g>
+    <text x="330" y="218" class="soft">OpenJob</text><text x="700" y="298" class="tiny">03 / 10</text>
+  </g>
+
+  <!-- 04 -->
+  <g transform="translate(930 530)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">04</text><text x="82" y="48" class="name">BLOOM MARK</text><text x="38" y="76" class="note">四片渐变花瓣，代表机会从中心展开</text>
+    <g transform="translate(107 112) scale(.35)" filter="url(#shadow)"><path d="M174 171 C110 143 73 93 91 52 C108 13 161 11 198 53 C233 11 286 13 303 52 C321 93 284 143 220 171 C284 199 321 249 303 290 C286 329 233 331 198 289 C161 331 108 329 91 290 C73 249 110 199 174 171Z" fill="url(#g4)"/><circle cx="197" cy="171" r="31" fill="#fff"/><circle cx="197" cy="171" r="13" fill="#FFD176"/></g>
+    <text x="330" y="218" class="sans">OpenJob</text><text x="700" y="298" class="tiny">04 / 10</text>
+  </g>
+
+  <!-- 05 -->
+  <g transform="translate(70 910)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">05</text><text x="82" y="48" class="name">LENS</text><text x="38" y="76" class="note">像镜头一样聚焦，表达智能匹配与洞察</text>
+    <g transform="translate(105 112) scale(.34)" filter="url(#shadow)"><path d="M43 171 C78 79 151 35 210 35 C270 35 343 79 378 171 C343 263 270 307 210 307 C151 307 78 263 43 171Z" fill="none" stroke="url(#g5)" stroke-width="38" stroke-linejoin="round"/><circle cx="210" cy="171" r="77" fill="url(#g5)"/><circle cx="210" cy="171" r="25" fill="#fff"/><circle cx="210" cy="171" r="10" fill="#FFD174"/></g>
+    <text x="330" y="218" class="serif">OpenJob</text><text x="700" y="298" class="tiny">05 / 10</text>
+  </g>
+
+  <!-- 06 dark -->
+  <g transform="translate(930 910)"><rect width="800" height="350" rx="30" fill="#151A2D"/>
+    <text x="38" y="48" class="number" fill="#667085">06</text><text x="82" y="48" class="name" fill="#E8ECF5">NIGHT SIGNAL</text><text x="38" y="76" class="note" fill="#8892A8">深色底版本，适合宣传页与 GitHub Banner</text>
+    <g transform="translate(108 108) scale(.35)" filter="url(#shadow)"><path d="M192 25 C112 25 48 89 48 169 C48 248 112 311 192 311 C272 311 336 248 336 169" fill="none" stroke="url(#g6)" stroke-width="47" stroke-linecap="round"/><path d="M192 25 H336 V169" fill="none" stroke="#151A2D" stroke-width="56" stroke-linecap="round"/><path d="M192 25 L336 169" fill="none" stroke="url(#g6)" stroke-width="21" stroke-linecap="round"/><circle cx="192" cy="169" r="21" fill="#FFD171"/></g>
+    <text x="330" y="218" class="reverse">OpenJob</text><text x="700" y="298" class="tiny" fill="#667085">06 / 10</text>
+  </g>
+
+  <!-- 07 -->
+  <g transform="translate(70 1290)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">07</text><text x="82" y="48" class="name">STACKED O</text><text x="38" y="76" class="note">层层打开的圆环，像信息被逐步筛选</text>
+    <g transform="translate(111 114) scale(.34)" filter="url(#shadow)"><path d="M197 35 C113 35 45 96 45 171 C45 246 113 307 197 307 C281 307 349 246 349 171 C349 96 281 35 197 35Z" fill="none" stroke="url(#g7)" stroke-width="31"/><path d="M197 76 C142 76 98 117 98 171 C98 225 142 266 197 266 C252 266 296 225 296 171" fill="none" stroke="url(#g7)" stroke-width="31" stroke-linecap="round"/><path d="M247 227 L296 171" stroke="url(#g7)" stroke-width="31" stroke-linecap="round"/><circle cx="197" cy="171" r="15" fill="#FFC76A"/></g>
+    <text x="330" y="218" class="wide">OpenJob</text><text x="700" y="298" class="tiny">07 / 10</text>
+  </g>
+
+  <!-- 08 -->
+  <g transform="translate(930 1290)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">08</text><text x="82" y="48" class="name">PAPER PLANE</text><text x="38" y="76" class="note">轻微的前进感，不画具体简历或职位</text>
+    <g transform="translate(102 112) scale(.35)" filter="url(#shadow)"><path d="M30 182 L356 34 L239 302 L177 205 Z" fill="url(#g8)"/><path d="M30 182 L177 205 L356 34" fill="none" stroke="#fff" stroke-width="17" stroke-linejoin="round" opacity=".9"/><path d="M177 205 L171 292" stroke="#fff" stroke-width="17" stroke-linecap="round" opacity=".9"/><circle cx="177" cy="205" r="15" fill="#FFD279"/></g>
+    <text x="330" y="218" class="sans">OpenJob</text><text x="700" y="298" class="tiny">08 / 10</text>
+  </g>
+
+  <!-- 09 -->
+  <g transform="translate(70 1670)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">09</text><text x="82" y="48" class="name">OPEN HAND</text><text x="38" y="76" class="note">像一只托住机会的手，温暖但保持现代感</text>
+    <g transform="translate(106 108) scale(.35)" filter="url(#shadow)"><path d="M71 282 C39 244 32 192 55 148 C76 108 116 93 145 117 L171 138 V78 C171 52 190 34 214 34 C238 34 257 52 257 78 V148 L257 65 C257 39 276 21 300 21 C324 21 343 39 343 65 V177 C343 257 296 313 213 313 H131 C106 313 85 299 71 282Z" fill="none" stroke="url(#g9)" stroke-width="37" stroke-linecap="round" stroke-linejoin="round"/><circle cx="214" cy="178" r="18" fill="#FFD173"/></g>
+    <text x="330" y="218" class="serif">OpenJob</text><text x="700" y="298" class="tiny">09 / 10</text>
+  </g>
+
+  <!-- 10 -->
+  <g transform="translate(930 1670)"><rect width="800" height="350" rx="30" fill="#fff"/>
+    <text x="38" y="48" class="number">10</text><text x="82" y="48" class="name">WORDMARK O</text><text x="38" y="76" class="note">把图标藏进 O 里，最适合做长期品牌字标</text>
+    <g transform="translate(100 108) scale(.35)" filter="url(#shadow)"><path d="M197 31 C112 31 44 93 44 171 C44 248 112 311 197 311 C282 311 350 248 350 171 C350 93 282 31 197 31Z" fill="none" stroke="url(#g10)" stroke-width="48" stroke-linecap="round"/><path d="M197 86 V256" stroke="url(#g10)" stroke-width="27" stroke-linecap="round"/><path d="M197 171 L252 116" stroke="#fff" stroke-width="38" stroke-linecap="round"/><circle cx="197" cy="171" r="15" fill="#FFD176"/></g>
+    <text x="330" y="218" class="wide">OpenJob</text><text x="700" y="298" class="tiny">10 / 10</text>
+  </g>
+
+  <text x="90" y="2070" class="intro">我参考了抽象字母标、几何字母组合、流动曲线和可缩放 App 图标的常见品牌语言，但本页全部是 OpenJob 的独立概念稿。</text>
+</svg>
