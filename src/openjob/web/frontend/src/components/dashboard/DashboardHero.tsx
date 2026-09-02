@@ -1,15 +1,17 @@
-import { ArrowRight, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface DashboardHeroProps {
   onRunFullFlow: () => void
   onOpenCollect: () => void
+  onRunMonitor: () => void
+  monitorRunning: boolean
   refreshing: boolean
   onRefresh: () => void
 }
 
-/** Hero 主视觉：eyebrow + 主标题 + 主操作（对应 Bento 左上区块） */
-export function DashboardHero({ onRunFullFlow, onOpenCollect, refreshing, onRefresh }: DashboardHeroProps) {
+/** Hero 主视觉：eyebrow + 主标题 + 三个任务入口（全流程 / 单独采集 / 单独监测） */
+export function DashboardHero({ onRunFullFlow, onOpenCollect, onRunMonitor, monitorRunning, refreshing, onRefresh }: DashboardHeroProps) {
   const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
   return (
     <section className="relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
@@ -42,7 +44,7 @@ export function DashboardHero({ onRunFullFlow, onOpenCollect, refreshing, onRefr
         </p>
       </div>
 
-      <div className="relative mt-5 flex items-center gap-3">
+      <div className="relative mt-5 flex items-center gap-2.5">
         <Button
           onClick={onRunFullFlow}
           className="h-11 rounded-full bg-ink px-6 text-[13px] font-semibold text-shell hover:bg-ink/85"
@@ -52,11 +54,17 @@ export function DashboardHero({ onRunFullFlow, onOpenCollect, refreshing, onRefr
         <button
           type="button"
           onClick={onOpenCollect}
-          aria-label="单独采集岗位"
-          title="单独采集岗位"
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border bg-card text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95"
+          className="flex h-11 items-center gap-1.5 rounded-full border border-card-border bg-card px-5 text-[13px] font-semibold text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95"
         >
-          <ArrowRight className="h-4 w-4" />
+          单独采集
+        </button>
+        <button
+          type="button"
+          onClick={onRunMonitor}
+          className="flex h-11 items-center gap-1.5 rounded-full border border-card-border bg-card px-5 text-[13px] font-semibold text-foreground transition-soft hover:-translate-y-px hover:border-primary/50 hover:text-primary active:scale-95"
+        >
+          {monitorRunning && <span className="breathe h-1.5 w-1.5 rounded-full bg-success" />}
+          {monitorRunning ? '监测运行中' : '开启监测'}
         </button>
         <button
           type="button"

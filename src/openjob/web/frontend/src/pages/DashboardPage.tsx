@@ -578,6 +578,8 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
           <DashboardHero
             onRunFullFlow={() => { setCollectDialogMode('full'); setCollectDialogOpen(true) }}
             onOpenCollect={() => { setCollectDialogMode('collect'); setCollectDialogOpen(true) }}
+            onRunMonitor={() => { void handleModeClick('monitor') }}
+            monitorRunning={activeTask?.mode === 'monitor' && activeTask.status !== 'stopping'}
             refreshing={refreshing}
             onRefresh={() => { void refresh() }}
           />
