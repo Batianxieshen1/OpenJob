@@ -234,7 +234,7 @@ export default function ConfigPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="max-w-md rounded-2xl border border-card-border bg-surface-hover p-6 text-center">
-          <div className="text-sm font-black text-foreground">配置加载失败</div>
+          <div className="text-sm font-semibold text-foreground">配置加载失败</div>
           <p className="mt-2 text-xs leading-6 text-muted">
             请确认后端服务已启动：在项目根目录运行 openjob web，或启动 127.0.0.1:8686 后刷新页面。
           </p>
@@ -375,7 +375,7 @@ export default function ConfigPage() {
               return (
                 <div key={platform} className={`rounded-2xl border p-4 ${enabled ? 'border-primary/30 bg-surface-hover' : 'border-card-border bg-card opacity-70'}`}>
                   <div className="flex items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 text-sm font-black text-foreground">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <input type="checkbox" checked={enabled} onChange={event => setPlatformEnabled(platform, event.target.checked)} className="h-4 w-4 accent-primary" />
                       {label}
                     </label>
@@ -545,7 +545,7 @@ export default function ConfigPage() {
             <div className="rounded-2xl border border-card-border bg-surface-hover p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-black text-foreground">AI 连接检测</div>
+                  <div className="text-sm font-semibold text-foreground">AI 连接检测</div>
                   <p className="mt-1 text-xs text-muted">不会消耗对话 Token；检测已保存的 Key、Base URL 和服务可用性。</p>
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleAiTest} disabled={aiTest.testing}>
@@ -675,7 +675,7 @@ export default function ConfigPage() {
             </Field>
             <div className="flex items-center justify-between rounded-2xl border border-card-border bg-surface-hover p-4">
               <div>
-                <label className="text-sm font-black text-foreground">检测到 HR 问题时自动回复</label>
+                <label className="text-sm font-semibold text-foreground">检测到 HR 问题时自动回复</label>
                 <p className="mt-1 text-xs text-muted">默认关闭。关闭时只生成回复建议，需要你在“监测执行”中确认后发送。</p>
               </div>
               <Switch checked={config.monitor?.auto_reply_hr_questions ?? false} onChange={v => updateConfig('monitor.auto_reply_hr_questions', v)} />
@@ -723,7 +723,7 @@ function SectionCard({ title, sectionKey, expanded, toggle, children }: {
         className="w-full flex items-center justify-between p-4 transition-colors hover:bg-surface-hover"
         onClick={() => toggle(sectionKey)}
       >
-        <span className="text-sm font-black text-foreground">{title}</span>
+        <span className="text-sm font-semibold text-foreground">{title}</span>
         {isExpanded ? <ChevronDown className="w-4 h-4 text-foreground" /> : <ChevronRight className="w-4 h-4 text-foreground" />}
       </button>
       {isExpanded && <div className="px-4 pb-4">{children}</div>}

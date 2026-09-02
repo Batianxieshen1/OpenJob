@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1800" viewBox="0 0 1600 1800" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo options A to D</title>
+  <desc id="desc">Four original gradient logo directions for OpenJob.</desc>
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3976EA"/><stop offset=".48" stop-color="#8B5CF6"/><stop offset="1" stop-color="#F26B8A"/></linearGradient>
+    <linearGradient id="b" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#14B8A6"/><stop offset=".5" stop-color="#38BDF8"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+    <linearGradient id="c" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3730A3"/><stop offset=".48" stop-color="#06B6D4"/><stop offset="1" stop-color="#F472B6"/></linearGradient>
+    <linearGradient id="d" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#4338CA"/><stop offset=".42" stop-color="#A855F7"/><stop offset=".75" stop-color="#FB7185"/><stop offset="1" stop-color="#F59E0B"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#172554" flood-opacity=".12"/></filter>
+    <style>
+      .word { font-family: Georgia, Baskerville, 'Times New Roman', serif; font-size: 142px; font-weight: 700; letter-spacing: -6px; fill: #111827; }
+      .label { font-family: Arial, sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 2px; fill: #64748B; }
+      .note { font-family: Arial, sans-serif; font-size: 22px; fill: #94A3B8; }
+    </style>
+  </defs>
+  <rect width="1600" height="1800" fill="#F8FAFC"/>
+  <text x="110" y="82" class="label">OPENJOB · LOGO OPTIONS</text>
+  <text x="110" y="124" class="note">四个渐变方向总览｜A 机会入口 · B 连接桥梁 · C AI 对话 · D 智能轨道</text>
+
+  <!-- A -->
+  <g transform="translate(90 180)">
+    <rect width="1420" height="340" rx="34" fill="#FFFFFF"/>
+    <text x="42" y="60" class="label">A · OPPORTUNITY PORTAL</text>
+    <g transform="translate(250 92)" filter="url(#shadow)">
+      <path d="M0 158 C0 70 58 0 132 0 C206 0 264 70 264 158 C264 187 251 205 230 212 C204 221 188 201 159 192 C143 187 121 185 102 192 C73 201 58 221 34 212 C13 205 0 187 0 158Z" fill="url(#a)"/>
+      <path d="M63 170 Q132 95 201 170" fill="none" stroke="#FFF" stroke-width="17" stroke-linecap="round" opacity=".95"/>
+      <path d="M132 170 V67" stroke="#FFF" stroke-width="14" stroke-linecap="round" opacity=".8"/>
+      <path d="M132 68 L106 94 M132 68 L158 94" fill="none" stroke="#FFF" stroke-width="14" stroke-linecap="round"/>
+      <path d="M214 48 L220 63 L235 69 L220 75 L214 90 L208 75 L193 69 L208 63 Z" fill="#FFD166"/>
+    </g>
+    <text x="620" y="245" class="word">OpenJob</text>
+  </g>
+
+  <!-- B -->
+  <g transform="translate(90 580)">
+    <rect width="1420" height="340" rx="34" fill="#FFFFFF"/>
+    <text x="42" y="60" class="label">B · OPPORTUNITY BRIDGE</text>
+    <g transform="translate(240 88)" filter="url(#shadow)">
+      <path d="M20 205 C76 88 150 88 211 174 C263 247 317 241 369 112" fill="none" stroke="url(#b)" stroke-width="42" stroke-linecap="round"/>
+      <path d="M301 113 H369 V181" fill="none" stroke="url(#b)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M128 116 C156 83 192 69 224 73" fill="none" stroke="#F8FAFC" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="107" cy="207" r="19" fill="#FCD34D"/>
+    </g>
+    <text x="620" y="245" class="word">OpenJob</text>
+  </g>
+
+  <!-- C -->
+  <g transform="translate(90 980)">
+    <rect width="1420" height="340" rx="34" fill="#FFFFFF"/>
+    <text x="42" y="60" class="label">C · AI JOB ASSISTANT</text>
+    <g transform="translate(246 91)" filter="url(#shadow)">
+      <path d="M34 20 H232 C263 20 288 45 288 76 V193 C288 224 263 249 232 249 H152 L91 295 V249 H34 C3 249 -22 224 -22 193 V76 C-22 45 3 20 34 20Z" fill="url(#c)"/>
+      <path d="M74 155 L113 192 L190 101" fill="none" stroke="#FFF" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M229 34 L238 56 L260 65 L238 74 L229 96 L220 74 L198 65 L220 56 Z" fill="#FFD166"/>
+    </g>
+    <text x="620" y="245" class="word">OpenJob</text>
+  </g>
+
+  <!-- D -->
+  <g transform="translate(90 1380)">
+    <rect width="1420" height="340" rx="34" fill="#FFFFFF"/>
+    <text x="42" y="60" class="label">D · SMART OPPORTUNITY ORBIT</text>
+    <g transform="translate(240 86)" filter="url(#shadow)">
+      <path d="M242 43 C151 -5 49 24 17 105 C-18 193 57 267 150 274 C241 281 326 228 331 143" fill="none" stroke="url(#d)" stroke-width="39" stroke-linecap="round"/>
+      <path d="M331 143 L294 118 M331 143 L315 183" fill="none" stroke="url(#d)" stroke-width="27" stroke-linecap="round"/>
+      <circle cx="170" cy="151" r="37" fill="#F8FAFC" stroke="#A855F7" stroke-width="14"/>
+      <circle cx="170" cy="151" r="14" fill="#F59E0B"/>
+      <path d="M169 44 V4 M151 24 L169 4 L187 24" fill="none" stroke="#FBBF24" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="620" y="245" class="word">OpenJob</text>
+  </g>
+</svg>

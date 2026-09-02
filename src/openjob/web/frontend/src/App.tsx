@@ -30,24 +30,27 @@ function PageFallback() {
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="flex h-screen overflow-hidden bg-background text-foreground">
-        <Sidebar />
-        <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
-          <Header />
-          <main className="min-w-0 flex-1 overflow-y-auto p-6">
-            <Suspense fallback={<PageFallback />}>
-              <Routes>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/jobs" element={<JobsPage />} />
-                <Route path="/resume" element={<ResumePage />} />
-                <Route path="/stats" element={<StatsPage />} />
-                <Route path="/confirm" element={<ConfirmQueuePage />} />
-                <Route path="/monitor" element={<MonitorPage />} />
-                <Route path="/config" element={<ConfigPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </main>
+      {/* 浅灰画布上的悬浮 App Shell：大圆角 + 柔和投影 */}
+      <div className="h-dvh bg-canvas p-0 text-foreground sm:p-4 lg:p-6">
+        <div className="app-shell mx-auto flex h-full max-w-[1560px] overflow-hidden rounded-none bg-shell shadow-shell sm:rounded-shell">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <Header />
+            <main className="min-w-0 flex-1 overflow-y-auto px-5 py-6 md:px-7 xl:px-9">
+              <Suspense fallback={<PageFallback />}>
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/jobs" element={<JobsPage />} />
+                  <Route path="/resume" element={<ResumePage />} />
+                  <Route path="/stats" element={<StatsPage />} />
+                  <Route path="/confirm" element={<ConfirmQueuePage />} />
+                  <Route path="/monitor" element={<MonitorPage />} />
+                  <Route path="/config" element={<ConfigPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </main>
+          </div>
         </div>
       </div>
     </BrowserRouter>

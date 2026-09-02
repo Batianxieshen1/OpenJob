@@ -2,50 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
-/* DeepSeek 风格设计令牌（计划书 §6.2）
+/* OpenJob 设计令牌 v2 —— Light Futuristic / Soft Minimal / Bento Dashboard
+   参考视觉：浅灰画布上的悬浮白色 App Shell + 钴蓝点缀。
    RGB 三元组便于 Tailwind 以 alpha-value 组合透明度。
    浅色为默认；跟随系统深色，手动主题用 html.light / html.dark 覆盖。 */
 :root {
-  --bg: 255 255 255;          /* #FFFFFF 页面底 */
-  --surface: 247 248 250;     /* #F7F8FA 卡片/侧栏 */
-  --surface-hover: 240 242 245; /* #F0F2F5 悬停态 */
-  --border-c: 229 232 236;    /* #E5E8EC 1px 分隔线 */
-  --text: 27 31 39;           /* #1B1F27 主文本 */
-  --text-2: 90 98 112;        /* #5A6270 次文本 */
-  --accent: 61 91 245;        /* #3D5BF5 品牌蓝（加深以达 WCAG AA 对比度） */
-  --accent-soft: 77 107 254;  /* 搭配 /10 透明度使用 */
-  --success: 22 163 74;       /* #16A34A */
-  --warning: 217 119 6;       /* #D97706 */
-  --danger: 220 38 38;        /* #DC2626 */
+  --canvas: 233 234 236;       /* #E9EAEC 画布底（壳外） */
+  --shell: 252 252 253;        /* #FCFCFD 悬浮应用壳 */
+  --bg: 252 252 253;           /* 兼容旧引用：页面底=壳色 */
+  --surface: 245 246 248;      /* #F5F6F8 Soft Card */
+  --surface-hover: 239 241 244; /* #EFF1F4 悬停态 */
+  --border-c: 228 231 236;     /* #E4E7EC 1px 分隔线 */
+  --text: 21 23 28;            /* #15171C 主文本 */
+  --text-2: 111 116 128;       /* #6F7480 次文本 */
+  --text-3: 164 169 178;       /* #A4A9B2 三级文本 */
+  --ink: 17 18 22;             /* #111216 黑胶囊（导航激活/主按钮） */
+  --accent: 49 87 232;         /* #3157E8 品牌钴蓝 */
+  --accent-soft: 233 238 255;  /* #E9EEFF 浅蓝底（整色使用，不用透明度） */
+  --success: 34 160 107;       /* #22A06B */
+  --warning: 233 154 36;       /* #E99A24 */
+  --danger: 229 72 77;         /* #E5484D */
 
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-overlay: 16px;
+  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-module: 22px;
+  --radius-overlay: 24px;
+  --radius-shell: 28px;
+  --ease-product: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --bg: 15 17 22;           /* #0F1116 近黑非纯黑 */
-    --surface: 23 26 33;      /* #171A21 */
-    --surface-hover: 30 34 43; /* #1E222B */
-    --border-c: 38 43 54;     /* #262B36 */
-    --text: 232 234 237;      /* #E8EAED */
-    --text-2: 154 163 176;    /* #9AA3B0 */
-    --accent: 93 123 255;     /* #5D7BFF */
-    --accent-soft: 93 123 255;
+    --canvas: 11 13 18;        /* #0B0D12 画布底 */
+    --shell: 20 22 29;         /* #14161D 应用壳 */
+    --bg: 20 22 29;
+    --surface: 26 29 37;       /* #1A1D25 Soft Card */
+    --surface-hover: 33 37 47; /* #21252F */
+    --border-c: 41 46 58;      /* #292E3A */
+    --text: 232 234 237;       /* #E8EAED */
+    --text-2: 154 163 176;     /* #9AA3B0 */
+    --text-3: 122 130 143;
+    --ink: 232 234 237;        /* 深色下黑胶囊反转为浅色 */
+    --accent: 96 130 255;      /* #6082FF 深色下提亮一档 */
+    --accent-soft: 36 48 92;   /* #24305C 深色浅蓝底 */
   }
 }
 
 html.dark {
-  --bg: 15 17 22;
-  --surface: 23 26 33;
-  --surface-hover: 30 34 43;
-  --border-c: 38 43 54;
+  --canvas: 11 13 18;
+  --shell: 20 22 29;
+  --bg: 20 22 29;
+  --surface: 26 29 37;
+  --surface-hover: 33 37 47;
+  --border-c: 41 46 58;
   --text: 232 234 237;
   --text-2: 154 163 176;
-  --accent: 93 123 255;
-  --accent-soft: 93 123 255;
+  --text-3: 122 130 143;
+  --ink: 232 234 237;
+  --accent: 96 130 255;
+  --accent-soft: 36 48 92;
 }
 
 * {
@@ -60,9 +76,15 @@ html.dark {
 }
 
 body {
-  background-color: rgb(var(--bg));
+  background-color: rgb(var(--canvas));
   color: rgb(var(--text));
-  font-family: system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family:
+    Inter,
+    'HarmonyOS Sans SC',
+    'PingFang SC',
+    'Microsoft YaHei',
+    system-ui,
+    sans-serif;
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -92,9 +114,9 @@ body {
 
 /* 统一动效：150-300ms、同一条缓动曲线、只动 transform/opacity/color */
 .transition-soft {
-  transition-property: transform, opacity, color, background-color, border-color;
+  transition-property: transform, opacity, color, background-color, border-color, box-shadow;
   transition-duration: 180ms;
-  transition-timing-function: var(--ease-out-soft);
+  transition-timing-function: var(--ease-product);
 }
 
 /* 页面/抽屉进入 */
@@ -109,12 +131,12 @@ body {
   }
 }
 .rise-in {
-  animation: rise-in 240ms var(--ease-out-soft) both;
+  animation: rise-in 240ms var(--ease-product) both;
 }
 
-/* 列表交错入场（首屏一次性，§6.3） */
+/* 列表交错入场（首屏一次性） */
 .stagger > * {
-  animation: rise-in 240ms var(--ease-out-soft) both;
+  animation: rise-in 240ms var(--ease-product) both;
 }
 .stagger > *:nth-child(1) { animation-delay: 0ms; }
 .stagger > *:nth-child(2) { animation-delay: 40ms; }
@@ -125,7 +147,16 @@ body {
 .stagger > *:nth-child(7) { animation-delay: 240ms; }
 .stagger > *:nth-child(8) { animation-delay: 280ms; }
 
-/* 按钮物理按压感（全局，§6.3） */
+/* 运行状态点低频呼吸 */
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.82); }
+}
+.breathe {
+  animation: breathe 2.4s var(--ease-product) infinite;
+}
+
+/* 按钮物理按压感（全局） */
 button:not(:disabled):active {
   transform: scale(0.98);
 }
@@ -140,9 +171,9 @@ main,
 .bg-background,
 .border-card-border {
   transition:
-    background-color 180ms var(--ease-out-soft),
-    color 180ms var(--ease-out-soft),
-    border-color 180ms var(--ease-out-soft);
+    background-color 180ms var(--ease-product),
+    color 180ms var(--ease-product),
+    border-color 180ms var(--ease-product);
 }
 
 /* 骨架屏 shimmer（形状对齐最终布局） */
@@ -165,8 +196,6 @@ main,
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
-
-/* 按钮物理按压感（配合组件 :active scale-98） */
 
 @media (prefers-reduced-motion: reduce) {
   *,

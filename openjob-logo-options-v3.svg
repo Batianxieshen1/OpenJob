@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1900" viewBox="0 0 1600 1900" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo options v3</title>
+  <desc id="desc">Four cleaner, softer gradient logo directions for OpenJob, focused on an open opportunity window.</desc>
+  <defs>
+    <linearGradient id="blueVioletCoral" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2C67F2"/>
+      <stop offset="0.48" stop-color="#765BE8"/>
+      <stop offset="1" stop-color="#F38B9A"/>
+    </linearGradient>
+    <linearGradient id="tealVioletPeach" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#16B8B0"/>
+      <stop offset="0.5" stop-color="#6277E8"/>
+      <stop offset="1" stop-color="#F0A0A1"/>
+    </linearGradient>
+    <linearGradient id="navyLilacSun" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#315EEA"/>
+      <stop offset="0.5" stop-color="#8671E7"/>
+      <stop offset="0.78" stop-color="#E783AE"/>
+      <stop offset="1" stop-color="#FFBE72"/>
+    </linearGradient>
+    <linearGradient id="cyanPurpleRose" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#27B8D5"/>
+      <stop offset="0.45" stop-color="#6870E8"/>
+      <stop offset="1" stop-color="#ED83B6"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#24324D" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .eyebrow { font-family: Arial, sans-serif; font-size: 27px; font-weight: 700; letter-spacing: 2px; fill: #64748B; }
+      .sub { font-family: Arial, sans-serif; font-size: 22px; fill: #94A3B8; }
+      .word { font-family: Georgia, Baskerville, 'Times New Roman', serif; font-size: 142px; font-weight: 700; letter-spacing: -6px; fill: #101828; }
+      .mini { font-family: Arial, sans-serif; font-size: 19px; font-weight: 600; letter-spacing: .5px; fill: #94A3B8; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1900" fill="#F7F9FC"/>
+  <text x="100" y="70" class="eyebrow">OPENJOB · SOFTER LOGO DIRECTIONS</text>
+  <text x="100" y="110" class="sub">围绕“开放窗口”重新收敛｜更自然 · 更简洁 · 更适合小尺寸</text>
+
+  <!-- 01 -->
+  <g transform="translate(80 160)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="eyebrow">01 · OPEN FRAME</text>
+    <text x="42" y="92" class="sub">圆角窗口 + 柔和日出，表达打开机会</text>
+    <g transform="translate(270 112)" filter="url(#shadow)">
+      <path d="M70 16 H286 C322 16 350 44 350 80 V272 C350 308 322 336 286 336 H70 C34 336 6 308 6 272 V80 C6 44 34 16 70 16Z" fill="none" stroke="url(#blueVioletCoral)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M286 16 H350 V80" fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round"/>
+      <path d="M105 268 A96 96 0 0 1 297 268" fill="none" stroke="url(#blueVioletCoral)" stroke-width="28" stroke-linecap="round"/>
+      <circle cx="201" cy="177" r="18" fill="#FFC477"/>
+      <path d="M95 268 H307" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" opacity=".85"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+    <g transform="translate(1210 227)"><text x="0" y="0" class="mini">ICON</text><g transform="translate(0 24) scale(.42)"><path d="M70 16 H286 C322 16 350 44 350 80 V272 C350 308 322 336 286 336 H70 C34 336 6 308 6 272 V80 C6 44 34 16 70 16Z" fill="none" stroke="url(#blueVioletCoral)" stroke-width="38" stroke-linecap="round"/><path d="M286 16 H350 V80" fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round"/><path d="M105 268 A96 96 0 0 1 297 268" fill="none" stroke="url(#blueVioletCoral)" stroke-width="28" stroke-linecap="round"/><circle cx="201" cy="177" r="18" fill="#FFC477"/></g></g>
+  </g>
+
+  <!-- 02 -->
+  <g transform="translate(80 580)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="eyebrow">02 · OPEN CURTAIN</text>
+    <text x="42" y="92" class="sub">两片自然展开的形状，像窗口也像迎接机会</text>
+    <g transform="translate(275 105)" filter="url(#shadow)">
+      <path d="M70 48 C35 91 20 157 26 231 C29 270 42 299 64 319 C104 278 135 225 149 164 C158 124 154 83 141 48 C117 35 93 35 70 48Z" fill="url(#tealVioletPeach)"/>
+      <path d="M332 48 C367 91 382 157 376 231 C373 270 360 299 338 319 C298 278 267 225 253 164 C244 124 248 83 261 48 C285 35 309 35 332 48Z" fill="url(#tealVioletPeach)"/>
+      <path d="M166 58 C150 121 150 216 166 282" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" opacity=".8"/>
+      <path d="M236 58 C252 121 252 216 236 282" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" opacity=".8"/>
+      <path d="M166 282 C185 265 217 265 236 282" fill="none" stroke="url(#tealVioletPeach)" stroke-width="23" stroke-linecap="round"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+    <g transform="translate(1210 227)"><text x="0" y="0" class="mini">ICON</text><g transform="translate(0 24) scale(.42)"><path d="M70 48 C35 91 20 157 26 231 C29 270 42 299 64 319 C104 278 135 225 149 164 C158 124 154 83 141 48 C117 35 93 35 70 48Z" fill="url(#tealVioletPeach)"/><path d="M332 48 C367 91 382 157 376 231 C373 270 360 299 338 319 C298 278 267 225 253 164 C244 124 248 83 261 48 C285 35 309 35 332 48Z" fill="url(#tealVioletPeach)"/></g></g>
+  </g>
+
+  <!-- 03 -->
+  <g transform="translate(80 1000)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="eyebrow">03 · OPEN HORIZON</text>
+    <text x="42" y="92" class="sub">最克制的一版：窗口、地平线与一点暖光</text>
+    <g transform="translate(272 110)" filter="url(#shadow)">
+      <path d="M58 310 V116 C58 55 106 15 166 15 H291" fill="none" stroke="url(#navyLilacSun)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M291 15 H346 V70" fill="none" stroke="#FFFFFF" stroke-width="54" stroke-linecap="round"/>
+      <path d="M93 310 H310" stroke="url(#navyLilacSun)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M125 310 A105 105 0 0 1 335 310" fill="none" stroke="url(#navyLilacSun)" stroke-width="24" stroke-linecap="round"/>
+      <circle cx="230" cy="222" r="19" fill="#FFBF73"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+    <g transform="translate(1210 227)"><text x="0" y="0" class="mini">ICON</text><g transform="translate(0 24) scale(.42)"><path d="M58 310 V116 C58 55 106 15 166 15 H291" fill="none" stroke="url(#navyLilacSun)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/><path d="M291 15 H346 V70" fill="none" stroke="#FFFFFF" stroke-width="54" stroke-linecap="round"/><path d="M93 310 H310" stroke="url(#navyLilacSun)" stroke-width="28" stroke-linecap="round"/><path d="M125 310 A105 105 0 0 1 335 310" fill="none" stroke="url(#navyLilacSun)" stroke-width="24" stroke-linecap="round"/><circle cx="230" cy="222" r="19" fill="#FFBF73"/></g></g>
+  </g>
+
+  <!-- 04 -->
+  <g transform="translate(80 1420)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="eyebrow">04 · SOFT PORTAL</text>
+    <text x="42" y="92" class="sub">单一流动的开放入口，抽象但不复杂</text>
+    <g transform="translate(278 105)" filter="url(#shadow)">
+      <path d="M197 20 C110 20 43 83 43 166 V292" fill="none" stroke="url(#cyanPurpleRose)" stroke-width="56" stroke-linecap="round"/>
+      <path d="M197 20 C284 20 351 83 351 166 V292" fill="none" stroke="url(#cyanPurpleRose)" stroke-width="56" stroke-linecap="round"/>
+      <path d="M43 292 H351" stroke="url(#cyanPurpleRose)" stroke-width="24" stroke-linecap="round"/>
+      <path d="M197 78 V231" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity=".78"/>
+      <circle cx="197" cy="231" r="19" fill="#FFC37A"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+    <g transform="translate(1210 227)"><text x="0" y="0" class="mini">ICON</text><g transform="translate(0 24) scale(.42)"><path d="M197 20 C110 20 43 83 43 166 V292" fill="none" stroke="url(#cyanPurpleRose)" stroke-width="56" stroke-linecap="round"/><path d="M197 20 C284 20 351 83 351 166 V292" fill="none" stroke="url(#cyanPurpleRose)" stroke-width="56" stroke-linecap="round"/><path d="M43 292 H351" stroke="url(#cyanPurpleRose)" stroke-width="24" stroke-linecap="round"/><path d="M197 78 V231" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity=".78"/><circle cx="197" cy="231" r="19" fill="#FFC37A"/></g></g>
+  </g>
+</svg>

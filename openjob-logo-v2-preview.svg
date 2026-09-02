@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo v2 preview</title>
+  <desc id="desc">OpenJob wordmark with an open resume, upward arrow, checkmark, and spark.</desc>
+  <defs>
+    <linearGradient id="navyTeal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#102A43"/>
+      <stop offset="100%" stop-color="#0B7285"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#FBBF24"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="11" flood-color="#102A43" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="600" fill="#ffffff"/>
+  <g transform="translate(220 126)" filter="url(#shadow)">
+    <!-- open resume / folder silhouette -->
+    <path d="M18 86 Q18 52 52 52 H157 L188 84 H390 Q424 84 424 118 V331 Q424 365 390 365 H52 Q18 365 18 331 Z" fill="url(#navyTeal)"/>
+    <path d="M18 104 Q18 75 48 75 H160 L190 105 H424 V132 H18 Z" fill="#163B5C" opacity="0.55"/>
+    <!-- resume lines -->
+    <circle cx="104" cy="180" r="31" fill="#E8F3F5" opacity="0.92"/>
+    <path d="M73 254 H208 M73 282 H178 M73 310 H151" stroke="#E8F3F5" stroke-width="15" stroke-linecap="round" opacity="0.9"/>
+    <!-- upward opportunity arrow -->
+    <path d="M240 306 L284 261 L315 292 L380 220" fill="none" stroke="url(#amber)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M345 220 H380 V255" fill="none" stroke="url(#amber)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- checkmark -->
+    <path d="M244 170 L265 191 L302 151" fill="none" stroke="#72D6B1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- AI spark -->
+    <path d="M363 124 L371 145 L392 153 L371 161 L363 183 L355 161 L334 153 L355 145 Z" fill="#FBBF24"/>
+  </g>
+  <text x="760" y="370" fill="#102A43" font-family="Georgia, Baskerville, 'Times New Roman', serif" font-size="188" font-weight="700" letter-spacing="-8">OpenJob</text>
+</svg>

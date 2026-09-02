@@ -42,43 +42,52 @@ export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
   }, [pendingRepliesProp])
 
   return (
-    <aside className="w-60 border-r border-card-border bg-card flex flex-col">
-      <div className="h-16 flex items-center px-5 border-b border-card-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
-            <span className="font-bold text-sm">OJ</span>
-          </div>
-          <div>
-            <div className="font-black text-sm tracking-tight text-foreground">OpenJob</div>
-            <div className="text-[11px] text-muted">v0.1.0 · 本地控制台</div>
-          </div>
-        </div>
-      </div>
+    <aside className="flex w-[76px] shrink-0 flex-col items-center border-r border-card-border bg-shell py-5">
+      {/* Logo */}
+      <NavLink
+        to="/"
+        aria-label="OpenJob 工作台"
+        className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-white shadow-pop"
+      >
+        <span className="text-sm font-bold tracking-tight">OJ</span>
+      </NavLink>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      {/* 图标导航 */}
+      <nav className="flex flex-1 flex-col items-center gap-1.5">
         {navItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-sm transition-colors ${
+              `group relative flex h-11 w-11 items-center justify-center rounded-2xl transition-soft ${
                 isActive
-                  ? 'bg-accent-soft text-primary font-black'
-                  : 'text-muted hover:text-foreground hover:bg-surface-hover'
+                  ? 'bg-primary text-white shadow-pop'
+                  : 'text-muted hover:bg-surface-hover hover:text-foreground'
               }`
             }
           >
-            <span className="flex items-center gap-3">
-              <item.icon className="w-4 h-4" />
+            <item.icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+            {/* Tooltip */}
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute left-full z-50 ml-2.5 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-xs text-shell opacity-0 shadow-pop transition-soft group-hover:translate-x-0 group-hover:opacity-100 -translate-x-1"
+            >
               {item.label}
             </span>
             {item.to === '/monitor' && pendingReplies > 0 && (
-              <span className="h-2 w-2 rounded-full bg-danger" aria-label="有待处理事项" />
+              <span
+                className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-shell"
+                aria-label="有待处理事项"
+              />
             )}
           </NavLink>
         ))}
       </nav>
 
+      {/* 底部版本标识 */}
+      <div className="mt-6 text-[10px] font-semibold text-muted-3" title="OpenJob v1.0">
+        v1.0
+      </div>
     </aside>
   )
 }

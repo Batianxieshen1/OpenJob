@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1900" viewBox="0 0 1600 1900" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo options v2</title>
+  <desc id="desc">Four refined gradient logo directions for OpenJob.</desc>
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#326BFF"/><stop offset=".45" stop-color="#7657E8"/><stop offset="1" stop-color="#F06F9B"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#0EA5A4"/><stop offset=".48" stop-color="#42B7F4"/><stop offset="1" stop-color="#A76BEA"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#315CF5"/><stop offset=".46" stop-color="#8A4FE7"/><stop offset=".78" stop-color="#EA639A"/><stop offset="1" stop-color="#FFB36A"/></linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2D63F5"/><stop offset=".42" stop-color="#27C4D9"/><stop offset=".75" stop-color="#9F7AEA"/><stop offset="1" stop-color="#F07E91"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#1E293B" flood-opacity=".14"/></filter>
+    <style>
+      .word { font-family: Georgia, Baskerville, 'Times New Roman', serif; font-size: 142px; font-weight: 700; letter-spacing: -6px; fill: #111827; }
+      .label { font-family: Arial, sans-serif; font-size: 27px; font-weight: 700; letter-spacing: 2px; fill: #64748B; }
+      .desc { font-family: Arial, sans-serif; font-size: 22px; fill: #94A3B8; }
+    </style>
+  </defs>
+  <rect width="1600" height="1900" fill="#F8FAFC"/>
+  <text x="100" y="70" class="label">OPENJOB · REFINED LOGO DIRECTIONS</text>
+  <text x="100" y="110" class="desc">四个新版本｜渐变色 · 简洁 · 求职助手主题</text>
+
+  <!-- 1 -->
+  <g transform="translate(80 160)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="label">01 · OPEN PATH MONOGRAM</text>
+    <text x="42" y="92" class="desc">开放的 O + 向上的职业路径</text>
+    <g transform="translate(250 112)" filter="url(#shadow)">
+      <path d="M286 82 C249 33 193 8 132 8 C59 8 8 61 8 132 C8 203 59 256 132 256 C190 256 240 231 278 185" fill="none" stroke="url(#g1)" stroke-width="54" stroke-linecap="round"/>
+      <path d="M169 211 L222 158 L260 196 L331 103" fill="none" stroke="url(#g1)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M294 104 H331 V141" fill="none" stroke="url(#g1)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="107" cy="131" r="17" fill="#FFD166"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+  </g>
+
+  <!-- 2 -->
+  <g transform="translate(80 580)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="label">02 · WELCOMING PATHS</text>
+    <text x="42" y="92" class="desc">两条开放曲线 · 连接人与机会</text>
+    <g transform="translate(245 106)" filter="url(#shadow)">
+      <path d="M21 245 C53 143 95 73 154 73 C203 73 215 132 253 198 C279 243 318 251 369 219" fill="none" stroke="url(#g2)" stroke-width="52" stroke-linecap="round"/>
+      <path d="M369 219 C400 196 425 158 441 93" fill="none" stroke="url(#g2)" stroke-width="52" stroke-linecap="round"/>
+      <path d="M403 95 H441 V133" fill="none" stroke="url(#g2)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M150 109 C186 95 214 98 237 122" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" opacity=".85"/>
+      <circle cx="20" cy="245" r="17" fill="#F8B84E"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+  </g>
+
+  <!-- 3 -->
+  <g transform="translate(80 1000)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="label">03 · OPEN WINDOW</text>
+    <text x="42" y="92" class="desc">打开的机会窗口 · 星光指引</text>
+    <g transform="translate(255 110)" filter="url(#shadow)">
+      <path d="M63 23 H280 C312 23 337 48 337 80 V266 C337 298 312 323 280 323 H63 C31 323 6 298 6 266 V80 C6 48 31 23 63 23Z" fill="none" stroke="url(#g3)" stroke-width="40" stroke-linecap="round"/>
+      <path d="M173 269 C173 221 173 173 173 125" fill="none" stroke="url(#g3)" stroke-width="26" stroke-linecap="round"/>
+      <path d="M173 125 L135 163 M173 125 L211 163" fill="none" stroke="url(#g3)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M279 79 L288 101 L310 110 L288 119 L279 141 L270 119 L248 110 L270 101 Z" fill="#FFC857"/>
+      <path d="M64 23 H173" stroke="url(#g3)" stroke-width="40" stroke-linecap="round"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+  </g>
+
+  <!-- 4 -->
+  <g transform="translate(80 1420)">
+    <rect width="1440" height="380" rx="32" fill="#FFFFFF"/>
+    <text x="42" y="58" class="label">04 · MATCHED CONNECTION</text>
+    <text x="42" y="92" class="desc">两个机会形状 · 中间形成匹配勾选</text>
+    <g transform="translate(250 105)" filter="url(#shadow)">
+      <path d="M142 55 C99 27 43 44 26 91 C9 138 34 191 79 214 C124 237 176 220 194 178" fill="none" stroke="url(#g4)" stroke-width="52" stroke-linecap="round"/>
+      <path d="M304 55 C347 27 403 44 420 91 C437 138 412 191 367 214 C322 237 270 220 252 178" fill="none" stroke="url(#g4)" stroke-width="52" stroke-linecap="round"/>
+      <path d="M163 155 L205 195 L286 105" fill="none" stroke="#FFFFFF" stroke-width="27" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="26" cy="91" r="14" fill="#F8B84E"/><circle cx="420" cy="91" r="14" fill="#F8B84E"/>
+    </g>
+    <text x="650" y="275" class="word">OpenJob</text>
+  </g>
+</svg>

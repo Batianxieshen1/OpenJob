@@ -25,13 +25,15 @@ import {
   ExternalLink,
   Eye,
   MessageCircle,
-  Play,
   RefreshCw,
   Send,
-  Square,
   Trash2,
   XCircle,
 } from 'lucide-react'
+import { DashboardHero } from '@/components/dashboard/DashboardHero'
+import { WeeklyActivityChart } from '@/components/dashboard/WeeklyActivityChart'
+import { AutomationControlCard } from '@/components/dashboard/AutomationControlCard'
+import { PipelineProgress } from '@/components/dashboard/PipelineProgress'
 
 type WorkbenchMode = 'full' | 'collect' | 'rescore' | 'monitor'
 type DashboardView = 'workbench' | 'jobs' | 'monitor'
@@ -247,7 +249,7 @@ function PreflightPanel({
           {errors
             ? <XCircle className="h-5 w-5 text-danger" />
             : <AlertTriangle className="h-5 w-5 text-warning" />}
-          <div className="text-sm font-black text-foreground">{heading}</div>
+          <div className="text-sm font-semibold text-foreground">{heading}</div>
         </div>
         <div className="flex items-center gap-2">
           {needsConfig && (
@@ -274,8 +276,8 @@ function PreflightPanel({
                   ? <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
                   : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />}
                 <div>
-                  <div className="text-xs font-black text-muted">{check.title}</div>
-                  <div className="mt-0.5 text-sm font-black text-foreground">{check.message}</div>
+                  <div className="text-xs font-semibold text-muted">{check.title}</div>
+                  <div className="mt-0.5 text-sm font-semibold text-foreground">{check.message}</div>
                   <p className="mt-1 text-xs leading-5 text-muted">{check.detail}</p>
                 </div>
               </div>
@@ -294,7 +296,6 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
     loading,
     error,
     refreshing,
-    lastRefreshedAt,
     refresh,
     startTask,
     stopTask,
@@ -571,146 +572,124 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
 
   return (
     <div className="space-y-5">
-      <section id="today-workbench" className="scroll-mt-6 rounded-3xl border border-card-border bg-card p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <div className="text-xs font-black tracking-[0.18em] text-primary">TODAY WORKBENCH</div>
-            <h2 className="mt-1 text-3xl font-black tracking-tight">今日求职行动</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-right">
-              <Button variant="secondary" size="sm" onClick={refresh} disabled={refreshing}>
-                <RefreshCw className={cn('mr-2 h-4 w-4', refreshing && 'animate-spin')} />
-                {refreshing ? '刷新中' : '刷新'}
-              </Button>
-              {lastRefreshedAt && (
-                <div className="mt-1 text-[10px] text-muted">
-                  最后刷新：{lastRefreshedAt.toLocaleTimeString('zh-CN', { hour12: false })}
-                </div>
+      {/* Bento 顶区：Hero / 近7日行动 / 自动化控制 / 流程进度 */}
+      <div className="stagger grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-5">
+          <DashboardHero
+            onRunFullFlow={() => { setCollectDialogMode('full'); setCollectDialogOpen(true) }}
+            onOpenCollect={() => { setCollectDialogMode('collect'); setCollectDialogOpen(true) }}
+            refreshing={refreshing}
+            onRefresh={() => { void refresh() }}
+          />
+        </div>
+        <div className="xl:col-span-3">
+          <WeeklyActivityChart />
+        </div>
+        <div className="xl:col-span-4">
+          <AutomationControlCard
+            activeTask={activeTask}
+            quota={workbench.send_quota}
+            modePending={modePending}
+            onRunFullFlow={() => { setCollectDialogMode('full'); setCollectDialogOpen(true) }}
+            onStopTask={() => { if (activeTask) void handleModeClick(activeTask.mode as WorkbenchMode) }}
+          />
+        </div>
+        <div className="xl:col-span-8">
+          <PipelineProgress funnelToday={workbench.funnel_today} pendingCount={todayJobs.length} />
+        </div>
+        <div className="xl:col-span-4">
+          <section className="flex min-h-[108px] flex-col justify-center rounded-module border border-card-border bg-card px-6 py-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold text-muted">任务状态</h3>
+              {activeTask && (
+                <span className="flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
+                  <span className="breathe h-1.5 w-1.5 rounded-full bg-primary" />
+                  {activeTask.label}中
+                </span>
               )}
             </div>
-            <span className="rounded-full bg-accent-soft px-3 py-2 text-xs font-black text-primary">
-              {activeTask ? `${activeTask.label}中` : '当前空闲'}
+            <div className="mt-2 text-[15px] font-semibold text-foreground">
+              {activeTask ? currentTaskStage(activeTask.logs) : '空闲 · 等待启动'}
+            </div>
+            <div className="mt-1 text-xs text-muted">
+              {activeTask
+                ? `任务状态：${taskStatusText(activeTask.status)}`
+                : '启动全流程后，这里会显示实时阶段与进度。'}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {notice && <div className="rise-in rounded-2xl bg-accent-soft px-4 py-3 text-sm text-primary">{notice}</div>}
+      {preflightChecks.some(check => check.status !== 'pass') && (
+        <PreflightPanel checks={preflightChecks} checking={Boolean(modePending)} onRetry={retryPreflight} />
+      )}
+      {error && <div className="rise-in rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
+      {visibleTask && (
+        <div className="rise-in rounded-module border border-card-border bg-card p-4 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">任务运行状态</div>
+              <p className="mt-1 text-xs leading-5 text-muted">如果点击后浏览器没有反应，请先打开 BOSS 直聘并确认已登录；常见失败原因是 BOSS 未登录或 Chrome 调试连接不可用。</p>
+            </div>
+            <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-primary">
+              {visibleTask.label}
             </span>
           </div>
-        </div>
-
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {modes.map(item => {
-            const isActive = activeTask?.mode === item.mode
-            const disabled = Boolean(activeTask && !isActive)
-            return (
-              <button
-                key={item.mode}
-                onClick={() => {
-                  if (isActive) {
-                    void handleModeClick(item.mode)
-                    return
-                  }
-                  if (disabled) {
-                    setNotice(`当前正在运行${activeTask?.label || '其他任务'}，请先停止后再启动岗位采集。`)
-                    return
-                  }
-                  if (item.mode === 'collect' || item.mode === 'full') {
-                    setCollectDialogMode(item.mode)
-                    setCollectDialogOpen(true)
-                  }
-                  else void handleModeClick(item.mode)
-                }}
-                aria-disabled={disabled}
-                className={`min-h-[126px] rounded-3xl p-5 text-left transition ${
-                  isActive
-                    ? 'border-2 border-primary bg-primary text-white shadow-xl shadow-primary/20'
-                    : disabled
-                      ? 'cursor-not-allowed border border-card-border bg-card text-muted opacity-45'
-                      : 'border border-card-border bg-surface-hover text-foreground hover:border-primary/60 hover:shadow-md'
-                }`}
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="text-lg font-black">
-                    {modePending === item.mode
-                      ? isActive ? '任务停止中' : '任务启动中'
-                      : isActive ? `${item.title}中` : item.title}
-                  </div>
-                  {isActive ? <Square className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5" />}
-                </div>
-                <p className={`text-xs leading-6 ${isActive ? 'text-white/85' : 'text-muted'}`}>{item.description}</p>
-              </button>
-            )
-          })}
-        </div>
-        {notice && <div className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-sm text-primary">{notice}</div>}
-        {preflightChecks.some(check => check.status !== 'pass') && (
-          <PreflightPanel checks={preflightChecks} checking={Boolean(modePending)} onRetry={retryPreflight} />
-        )}
-        {error && <div className="mt-3 rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
-        {visibleTask && (
-          <div className="mt-3 rounded-3xl border border-card-border bg-surface-hover p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-black">任务运行状态</div>
-                <p className="mt-1 text-xs leading-5 text-muted">如果点击后浏览器没有反应，请先打开 BOSS 直聘并确认已登录；常见失败原因是 BOSS 未登录或 Chrome 调试连接不可用。</p>
-              </div>
-              <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-black text-primary">
-                {visibleTask.label}
-              </span>
-            </div>
-            <div className={`mt-3 rounded-2xl border px-4 py-3 ${taskStatusClass(visibleTask.status)}`}>
-              <div className="text-xs font-black text-primary">{taskStatusTitle(visibleTask.status)}</div>
-              <div className="mt-1 text-lg font-black text-foreground">{currentTaskStage(visibleTask.logs)}</div>
-              <div className="mt-1 text-xs font-bold text-muted">任务状态：{taskStatusText(visibleTask.status)}</div>
-              {visibleTask.deadline_at && (
-                <div className="mt-1 text-xs font-bold text-muted">
-                  自动截止：{new Date(visibleTask.deadline_at).toLocaleString('zh-CN', { hour12: false })}
-                </div>
-              )}
-              {visibleTask.metrics && taskMetricItems.some(item => item.key in visibleTask.metrics!) && (
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                  {taskMetricItems.map(item => (
-                    <div key={item.key} className="rounded-xl border border-card-border bg-card px-3 py-2">
-                      <div className="text-[10px] font-bold text-muted">{item.label}</div>
-                      <div className="mt-0.5 text-lg font-black text-foreground">{visibleTask.metrics?.[item.key] ?? 0}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {visibleTask.progress?.platforms && <CollectionProgressPanel progress={visibleTask.progress} />}
-            {visibleTask.error && visibleTaskError && (
-              <div className="mt-3 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <div className="font-black">{visibleTaskError.title}</div>
-                <p className="mt-1 text-xs leading-5">{visibleTaskError.detail}</p>
-                <details className="mt-2 text-xs text-muted">
-                  <summary className="cursor-pointer font-bold">查看原始错误</summary>
-                  <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-card p-2">{visibleTask.error}</pre>
-                </details>
+          <div className={`mt-3 rounded-2xl border px-4 py-3 ${taskStatusClass(visibleTask.status)}`}>
+            <div className="text-xs font-semibold text-primary">{taskStatusTitle(visibleTask.status)}</div>
+            <div className="mt-1 text-lg font-semibold text-foreground">{currentTaskStage(visibleTask.logs)}</div>
+            <div className="mt-1 text-xs text-muted">任务状态：{taskStatusText(visibleTask.status)}</div>
+            {visibleTask.deadline_at && (
+              <div className="mt-1 text-xs text-muted">
+                自动截止：{new Date(visibleTask.deadline_at).toLocaleString('zh-CN', { hour12: false })}
               </div>
             )}
-            {visibleTask.stop_reason && (
-              <div className={`mt-3 rounded-2xl px-3 py-3 text-sm ${visibleTask.stop_reason === 'daily_limit' ? 'border border-warning/30 bg-warning/10 text-warning' : 'bg-accent-soft text-primary'}`}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-black">{visibleTask.stop_reason === 'daily_limit' ? '本次未发送' : '任务说明'}</div>
-                    <div className="mt-1">{taskStopReasonLabel(visibleTask.stop_reason)}</div>
+            {visibleTask.metrics && taskMetricItems.some(item => item.key in visibleTask.metrics!) && (
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                {taskMetricItems.map(item => (
+                  <div key={item.key} className="rounded-xl border border-card-border bg-card px-3 py-2">
+                    <div className="text-[10px] text-muted">{item.label}</div>
+                    <div className="mt-0.5 text-lg font-semibold text-foreground tabular-nums">{visibleTask.metrics?.[item.key] ?? 0}</div>
                   </div>
-                  {visibleTask.stop_reason === 'daily_limit' && (
-                    <Button size="sm" variant="secondary" onClick={() => { window.location.href = '/config?section=throttle' }}>
-                      去设置发送额度
-                    </Button>
-                  )}
-                </div>
+                ))}
               </div>
             )}
           </div>
-        )}
-      </section>
+          {visibleTask.progress?.platforms && <CollectionProgressPanel progress={visibleTask.progress} />}
+          {visibleTask.error && visibleTaskError && (
+            <div className="mt-3 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
+              <div className="font-semibold">{visibleTaskError.title}</div>
+              <p className="mt-1 text-xs leading-5">{visibleTaskError.detail}</p>
+              <details className="mt-2 text-xs text-muted">
+                <summary className="cursor-pointer">查看原始错误</summary>
+                <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-card p-2">{visibleTask.error}</pre>
+              </details>
+            </div>
+          )}
+          {visibleTask.stop_reason && (
+            <div className={`mt-3 rounded-2xl px-3 py-3 text-sm ${visibleTask.stop_reason === 'daily_limit' ? 'border border-warning/30 bg-warning/10 text-warning' : 'bg-accent-soft text-primary'}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold">{visibleTask.stop_reason === 'daily_limit' ? '本次未发送' : '任务说明'}</div>
+                  <div className="mt-1">{taskStopReasonLabel(visibleTask.stop_reason)}</div>
+                </div>
+                {visibleTask.stop_reason === 'daily_limit' && (
+                  <Button size="sm" variant="secondary" onClick={() => { window.location.href = '/config?section=throttle' }}>
+                    去设置发送额度
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {workbench.send_quota?.exhausted && (
         <section className="rounded-3xl border border-warning/30 bg-warning/10 p-5 text-warning">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-black">今日发送额度已用完</h3>
+              <h3 className="text-lg font-semibold">今日发送额度已用完</h3>
               <p className="mt-1 text-sm leading-6">
                 今日已发送 {workbench.send_quota.sent}/{workbench.send_quota.daily_limit} 条，未发送岗位已保留在“待发送招呼语”；明日额度恢复后再重试。
               </p>
@@ -725,7 +704,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-black">求职数据</h3>
+            <h3 className="text-lg font-semibold">求职数据</h3>
             <p className="mt-0.5 text-xs text-muted">今日看行动节奏，累计看岗位池沉淀。</p>
           </div>
           <div className="inline-flex rounded-full border border-card-border bg-card p-1">
@@ -737,7 +716,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
                 key={option.value}
                 type="button"
                 onClick={() => setStatsScope(option.value)}
-                className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                   statsScope === option.value ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-primary'
                 }`}
               >
@@ -758,7 +737,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
             return (
               <div key={item.key} className="rounded-2xl border border-card-border bg-card p-4">
                 <div className="text-xs text-muted">{statsScope === 'today' ? item.todayLabel : item.totalLabel}</div>
-                <div className={`mt-1 text-2xl font-black ${item.highlight ? 'text-primary' : 'text-foreground'}`}>
+                <div className={`mt-1 text-2xl font-semibold ${item.highlight ? 'text-primary' : 'text-foreground'}`}>
                   {value}
                 </div>
                 <div className="mt-1 text-[10px] font-bold text-muted">{supportingText}</div>
@@ -772,7 +751,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
       <section className="rise-in rounded-3xl border border-card-border bg-card p-5">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-black">优先处理：HR 要简历 / 定制简历下载</h3>
+            <h3 className="text-lg font-semibold">优先处理：HR 要简历 / 定制简历下载</h3>
             <p className="mt-1 text-xs text-muted">首页只展示需要你手动下载并自行发给 HR 的定制简历事项。</p>
           </div>
           <Button variant="secondary" size="sm">查看全部简历事项</Button>
@@ -782,8 +761,8 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
             {workbench.needs_resume.slice(0, 4).map(job => (
               <div key={job.id} className="rounded-2xl border border-card-border bg-surface-hover p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="font-black">{job.company}｜{job.title}</div>
-                  <span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-black text-primary">待发简历</span>
+                  <div className="font-semibold">{job.company}｜{job.title}</div>
+                  <span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-primary">待发简历</span>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-muted">HR 已请求简历，系统已准备定制化简历下载入口。</p>
                 <div className="mt-3 flex gap-2">
@@ -802,7 +781,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
         <section className="rounded-3xl border border-danger/20 bg-danger/10 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-black text-danger">发送失败待处理</h3>
+              <h3 className="text-lg font-semibold text-danger">发送失败待处理</h3>
               <p className="mt-1 text-xs text-danger/80">这些岗位已生成招呼语，但没有成功发送。你可以重试，或放弃已失效岗位。</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -815,10 +794,10 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
               <div key={job.id} className="rounded-2xl border border-danger/20 bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-black">{job.company}｜{job.title}</div>
+                    <div className="font-semibold">{job.company}｜{job.title}</div>
                     <div className="mt-1 text-xs text-danger">最近失败原因：{job.last_error || '发送失败，等待重试'}</div>
                   </div>
-                  <span className="rounded-full bg-danger/10 px-2 py-1 text-[11px] font-black text-danger">发送失败</span>
+                  <span className="rounded-full bg-danger/10 px-2 py-1 text-[11px] font-semibold text-danger">发送失败</span>
                 </div>
                 <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">{job.greeting || '招呼语已生成，等待重新发送。'}</p>
                 <div className="mt-3 flex gap-2">
@@ -837,7 +816,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
         <section className="rounded-3xl border border-primary/20 bg-accent-soft p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-black">待发送招呼语</h3>
+              <h3 className="text-lg font-semibold">待发送招呼语</h3>
               <p className="mt-1 text-xs text-muted">这些岗位已确认并生成招呼语，点击后会直接进入发送流程。</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -850,10 +829,10 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
               <div key={job.id} className="rounded-2xl border border-primary/20 bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-black">{job.company}｜{job.title}</div>
+                    <div className="font-semibold">{job.company}｜{job.title}</div>
                     <div className="mt-1 text-xs text-primary">已生成招呼语，等待发送</div>
                   </div>
-                  <span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-black text-primary">待发送</span>
+                  <span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-primary">待发送</span>
                 </div>
                 <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">{job.greeting || '招呼语已生成，等待发送。'}</p>
                 <div className="mt-3 flex gap-2">
@@ -871,7 +850,7 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
       <section className="rise-in rounded-3xl border border-card-border bg-card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-black">今日待确认</h3>
+            <h3 className="text-lg font-semibold">今日待确认</h3>
             <p className="mt-1 text-xs text-muted">展示需要你人工确认是否推进投递的岗位，支持全选、部分选择、一键投递。</p>
           </div>
           <div className="flex gap-2">
@@ -890,18 +869,27 @@ export default function DashboardPage({ view = 'workbench' }: DashboardPageProps
           invalidSalary={hasInvalidSalaryRange(todayFilters)}
         />
         {filteredTodayJobs.length ? (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {filteredTodayJobs.map(job => (
-              <JobActionCard
-                key={job.id}
-                job={job}
-                selected={selected.includes(job.id)}
-                onToggle={() => toggleJob(job.id)}
-                onDetail={() => openJobDetail(job)}
-                onReject={() => rejectSelectedJobs([job.id])}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {filteredTodayJobs.slice(0, 6).map(job => (
+                <JobActionCard
+                  key={job.id}
+                  job={job}
+                  selected={selected.includes(job.id)}
+                  onToggle={() => toggleJob(job.id)}
+                  onDetail={() => openJobDetail(job)}
+                  onReject={() => rejectSelectedJobs([job.id])}
+                />
+              ))}
+            </div>
+            {filteredTodayJobs.length > 6 && (
+              <div className="mt-3 text-center">
+                <Button variant="secondary" size="sm" onClick={() => { window.location.href = '/confirm' }}>
+                  查看全部 {filteredTodayJobs.length} 个待确认岗位
+                </Button>
+              </div>
+            )}
+          </>
         ) : todayJobs.length ? (
           <div className="rounded-2xl border border-dashed border-card-border bg-surface-hover p-5 text-center text-sm text-muted">
             <p>没有符合当前条件的岗位</p>
@@ -928,13 +916,13 @@ function CollectionProgressPanel({ progress }: { progress: CollectionProgress })
   return (
     <div className="mt-3 rounded-2xl border border-primary/20 bg-accent-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-black text-primary">多平台采集进度</div>
+        <div className="text-sm font-semibold text-primary">多平台采集进度</div>
         <div className="text-xs font-bold text-muted">{progress.outcome === 'running' ? '执行中' : progress.outcome || '已结束'}</div>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         {Object.entries(progress.platforms || {}).map(([platform, state]) => (
           <div key={platform} className="rounded-xl border border-card-border bg-card p-3">
-            <div className="flex items-center justify-between text-sm font-black">
+            <div className="flex items-center justify-between text-sm font-semibold">
               <span>{platform === 'boss' ? 'BOSS 直聘' : platform === 'zhilian' ? '智联招聘' : '前程无忧'}</span>
               <span>新增 {state.new}</span>
             </div>
@@ -955,7 +943,7 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: {
     <div className={`rounded-2xl border p-4 ${selected ? 'border-primary bg-surface-hover' : 'border-card-border bg-surface-hover'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-black">{job.company}｜{job.title}</div>
+          <div className="font-semibold">{job.company}｜{job.title}</div>
           <div className="mt-1 text-xs text-muted">{jobSubtitle(job)}</div>
         </div>
         <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`选择岗位：${job.company} ${job.title}`} className="mt-1 h-4 w-4 accent-primary" />
@@ -976,8 +964,8 @@ export function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void
       <div className="max-h-[86vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black tracking-[0.18em] text-primary">岗位详情</div>
-            <h3 className="mt-1 text-2xl font-black">{job.company}｜{job.title}</h3>
+            <div className="text-xs font-semibold tracking-[0.18em] text-primary">岗位详情</div>
+            <h3 className="mt-1 text-2xl font-semibold">{job.company}｜{job.title}</h3>
             <p className="mt-1 text-sm text-muted">{job.salary || '薪资未填'} · {job.city || '城市未填'} · {getStatusLabel(job.status)}</p>
           </div>
           <Button variant="secondary" size="sm" onClick={onClose}>关闭</Button>
@@ -991,11 +979,11 @@ export function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void
           <InfoBlock label="定制简历" value={job.resume_path || '未生成'} />
         </div>
         <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
-          <div className="text-sm font-black">评分理由</div>
+          <div className="text-sm font-semibold">评分理由</div>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">{job.score_reason || '-'}</p>
         </div>
         <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
-          <div className="text-sm font-black">招呼语</div>
+          <div className="text-sm font-semibold">招呼语</div>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">{job.greeting || '未生成'}</p>
         </div>
         <WelfareVerifyBlock jobId={job.id} jd={job.jd || ''} />
@@ -1026,7 +1014,7 @@ function WelfareVerifyBlock({ jobId, jd }: { jobId: string; jd: string }) {
   if (!jd.trim()) return null
   return (
     <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
-      <div className="text-sm font-black">福利核验</div>
+      <div className="text-sm font-semibold">福利核验</div>
       <p className="mt-1 text-xs text-muted">标签可能不真实。输入福利关键词（逗号分隔），逐个到 JD 原文里找证据。</p>
       <div className="mt-2 flex gap-2">
         <input
@@ -1356,7 +1344,7 @@ const markManuallySent = async (job: Job) => {
         {permanentDeleteIds.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
             <div className="w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
-              <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-danger" /><div><h3 className="text-xl font-black">确认永久删除</h3><p className="mt-2 text-sm leading-6 text-muted">将永久删除 {permanentDeleteIds.length} 条岗位及其历史，无法恢复。存在发送或回复证据的岗位会被后端拒绝删除。</p></div></div>
+              <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-danger" /><div><h3 className="text-xl font-semibold">确认永久删除</h3><p className="mt-2 text-sm leading-6 text-muted">将永久删除 {permanentDeleteIds.length} 条岗位及其历史，无法恢复。存在发送或回复证据的岗位会被后端拒绝删除。</p></div></div>
               <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-3 text-sm font-bold"><input type="checkbox" checked={permanentDeleteAcknowledged} onChange={event => setPermanentDeleteAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 accent-danger" /><span>我确认永久删除，并了解此操作无法撤销。</span></label>
               <div className="mt-6 flex justify-end gap-3"><Button variant="secondary" size="sm" onClick={() => setPermanentDeleteIds([])}>取消</Button><Button variant="destructive" size="sm" disabled={!permanentDeleteAcknowledged} onClick={() => void confirmPermanentDelete()}>永久删除</Button></div>
             </div>
@@ -1370,7 +1358,7 @@ const markManuallySent = async (job: Job) => {
     <div className="rounded-3xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black">岗位池</h2>
+          <h2 className="text-2xl font-semibold">岗位池</h2>
           <p className="mt-1 text-sm text-muted">集中查看已采集岗位、AI 分数、状态和详情入口。</p>
         </div>
         <div className="flex items-center gap-2">
@@ -1409,10 +1397,10 @@ const markManuallySent = async (job: Job) => {
         <div className="mb-4 rounded-2xl border border-card-border bg-surface-hover p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-black">投递队列</div>
+              <div className="text-sm font-semibold">投递队列</div>
               <p className="mt-1 text-xs text-muted">只展示已人工确认的 BOSS 发送任务；智联和 51job 不会进入此队列。</p>
             </div>
-            <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-black text-primary">
+            <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-primary">
               {deliveryTask.status === 'running' ? '处理中' : deliveryTask.status === 'completed' ? '已完成' : deliveryTask.status === 'failed' ? '失败' : deliveryTask.status}
             </span>
           </div>
@@ -1592,10 +1580,10 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
     <div className="rounded-3xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black">监测执行</h2>
+          <h2 className="text-2xl font-semibold">监测执行</h2>
           <p className="mt-1 text-sm text-muted">这里不启动监测，只处理监测发现的 HR 问题、回复建议和结果。</p>
         </div>
-        <span className="rounded-full bg-accent-soft px-3 py-2 text-xs font-black text-primary">待处理 {pendingItems.length}</span>
+        <span className="rounded-full bg-accent-soft px-3 py-2 text-xs font-semibold text-primary">待处理 {pendingItems.length}</span>
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
         {[
@@ -1639,12 +1627,12 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
                 <div className="mt-2 rounded-full bg-card px-2 py-1 text-center font-bold text-primary">{getActionLabel(item.action)}</div>
               </div>
               <div>
-                <div className="font-black">{item.company || '岗位'}｜{item.title || '监测记录'}</div>
+                <div className="font-semibold">{item.company || '岗位'}｜{item.title || '监测记录'}</div>
                 {showReplyContent ? (
                   <div className="mt-3 space-y-3">
                     {(isFollowUp || hrText) && (
                       <div>
-                        <div className="text-xs font-black text-primary">{isFollowUp ? '自动跟进说明' : '对方问题 / HR'}</div>
+                        <div className="text-xs font-semibold text-primary">{isFollowUp ? '自动跟进说明' : '对方问题 / HR'}</div>
                         <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted">
                           {isFollowUp ? 'HR 超过设定时间未回复，系统已自动执行一次跟进。' : hrText}
                         </p>
@@ -1652,13 +1640,13 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
                     )}
                     {isResumeFailure && (
                       <div className="rounded-2xl border border-danger/30 bg-danger/10 p-3">
-                        <div className="text-xs font-black text-danger">系统失败原因</div>
+                        <div className="text-xs font-semibold text-danger">系统失败原因</div>
                         <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-danger">{systemFailureReason}</p>
                       </div>
                     )}
                     {canReply ? (
                       <div>
-                        <div className="mb-1 text-xs font-black text-primary">AI 建议回复</div>
+                        <div className="mb-1 text-xs font-semibold text-primary">AI 建议回复</div>
                         <textarea
                           value={draftFor(item)}
                           onChange={event => setReplyDrafts(prev => ({ ...prev, [item.id]: event.target.value }))}
@@ -1667,7 +1655,7 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
                       </div>
                     ) : isResumeRequest || !hasGeneratedReply ? null : (
                       <div className="rounded-2xl border border-card-border bg-card p-3">
-                        <div className="text-xs font-black text-primary">AI 回复</div>
+                        <div className="text-xs font-semibold text-primary">AI 回复</div>
                         <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted">{aiReplyText}</p>
                       </div>
                     )}

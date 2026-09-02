@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="3020" viewBox="0 0 1800 3020" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo exploration — 10 concepts</title>
+  <desc id="desc">Ten independent OpenJob logo and wordmark directions, prepared as a visual selection board.</desc>
+  <defs>
+    <linearGradient id="gA" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#1769FF"/><stop offset=".48" stop-color="#7658E8"/><stop offset="1" stop-color="#FF7E9D"/></linearGradient>
+    <linearGradient id="gB" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#00A8B5"/><stop offset=".5" stop-color="#4A7CFF"/><stop offset="1" stop-color="#B45AE5"/></linearGradient>
+    <linearGradient id="gC" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#2B4BD9"/><stop offset=".46" stop-color="#7B68E9"/><stop offset=".78" stop-color="#EC78B0"/><stop offset="1" stop-color="#FFC16B"/></linearGradient>
+    <linearGradient id="gD" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1E7CFF"/><stop offset=".42" stop-color="#00C5B8"/><stop offset="1" stop-color="#F08A83"/></linearGradient>
+    <linearGradient id="gE" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#5A36D6"/><stop offset=".52" stop-color="#D54FD9"/><stop offset="1" stop-color="#FF9E68"/></linearGradient>
+    <linearGradient id="gF" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3856F5"/><stop offset=".5" stop-color="#13BFD4"/><stop offset="1" stop-color="#80D88E"/></linearGradient>
+    <linearGradient id="gG" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#164EAD"/><stop offset=".55" stop-color="#5D77F4"/><stop offset="1" stop-color="#F58BA4"/></linearGradient>
+    <linearGradient id="gH" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F45C83"/><stop offset=".5" stop-color="#A553E5"/><stop offset="1" stop-color="#3E89FF"/></linearGradient>
+    <linearGradient id="gI" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#00A7A0"/><stop offset=".5" stop-color="#1E8CFF"/><stop offset="1" stop-color="#F5A24A"/></linearGradient>
+    <linearGradient id="gJ" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF7D6E"/><stop offset=".45" stop-color="#E456B8"/><stop offset="1" stop-color="#6D5CF6"/></linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="160%" height="170%"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#1F2A44" flood-opacity=".14"/></filter>
+    <filter id="soft" x="-30%" y="-30%" width="170%" height="180%"><feGaussianBlur stdDeviation="16"/></filter>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 28px; font-weight: 800; letter-spacing: 2px; fill: #64748B; }
+      .intro { font-family: Arial, sans-serif; font-size: 23px; fill: #94A3B8; }
+      .num { font-family: Arial, sans-serif; font-size: 24px; font-weight: 800; letter-spacing: 1px; fill: #94A3B8; }
+      .name { font-family: Arial, sans-serif; font-size: 25px; font-weight: 700; fill: #25324A; }
+      .note { font-family: Arial, sans-serif; font-size: 18px; fill: #94A3B8; }
+      .wordSans { font-family: Arial, Helvetica, sans-serif; font-size: 92px; font-weight: 750; letter-spacing: -4px; fill: #111827; }
+      .wordSerif { font-family: Georgia, Baskerville, 'Times New Roman', serif; font-size: 96px; font-weight: 700; letter-spacing: -5px; fill: #111827; }
+      .wordMono { font-family: 'Courier New', monospace; font-size: 82px; font-weight: 700; letter-spacing: -5px; fill: #111827; }
+      .wordSoft { font-family: Arial, Helvetica, sans-serif; font-size: 92px; font-weight: 500; letter-spacing: -5px; fill: #111827; }
+      .wordStack { font-family: Arial, Helvetica, sans-serif; font-size: 70px; font-weight: 800; letter-spacing: -3px; fill: #111827; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="3020" fill="#F6F8FC"/>
+  <text x="90" y="70" class="title">OPENJOB · 10 LOGO CONCEPTS</text>
+  <text x="90" y="112" class="intro">完全放开后的第一轮探索｜图标与文字一起重新设计，请从整体气质挑选方向</text>
+
+  <!-- card 01 -->
+  <g transform="translate(70 160)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">01</text><text x="92" y="54" class="name">APERTURE O</text><text x="42" y="88" class="note">把 Open 变成一个有出口的 O</text>
+    <g transform="translate(92 155)" filter="url(#shadow)">
+      <path d="M208 28 C130 -4 44 38 20 116 C-6 200 41 288 125 310 C201 330 279 287 303 219" fill="none" stroke="url(#gA)" stroke-width="50" stroke-linecap="round"/>
+      <path d="M221 259 L294 186" fill="none" stroke="url(#gA)" stroke-width="50" stroke-linecap="round"/>
+      <circle cx="137" cy="164" r="22" fill="#FFC477"/>
+    </g>
+    <text x="390" y="286" class="wordSans">OpenJob</text>
+  </g>
+
+  <!-- card 02 -->
+  <g transform="translate(930 160)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">02</text><text x="92" y="54" class="name">OPEN PATH</text><text x="42" y="88" class="note">从入口到机会的一条连续路径</text>
+    <g transform="translate(90 150)" filter="url(#shadow)">
+      <path d="M36 293 C52 198 76 95 148 62 C200 39 242 69 251 122 C262 186 263 257 331 271 C390 284 431 235 455 163" fill="none" stroke="url(#gB)" stroke-width="48" stroke-linecap="round"/>
+      <path d="M419 163 H455 V199" fill="none" stroke="url(#gB)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="38" cy="293" r="17" fill="#FFB95F"/>
+    </g>
+    <text x="390" y="286" class="wordSerif">OpenJob</text>
+  </g>
+
+  <!-- card 03 -->
+  <g transform="translate(70 710)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">03</text><text x="92" y="54" class="name">DOORWAY J</text><text x="42" y="88" class="note">用 J 做出一扇向前打开的门</text>
+    <g transform="translate(110 145)" filter="url(#shadow)">
+      <path d="M70 310 V102 C70 54 108 20 157 20 H328" fill="none" stroke="url(#gC)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M328 20 H373 V65" fill="none" stroke="#fff" stroke-width="58" stroke-linecap="round"/>
+      <path d="M179 310 H373" stroke="url(#gC)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M241 120 V254 C241 291 266 310 300 310" fill="none" stroke="url(#gC)" stroke-width="27" stroke-linecap="round"/>
+      <circle cx="283" cy="205" r="15" fill="#FFC16B"/>
+    </g>
+    <text x="390" y="286" class="wordSans">OpenJob</text>
+  </g>
+
+  <!-- card 04 -->
+  <g transform="translate(930 710)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">04</text><text x="92" y="54" class="name">AURORA WINDOW</text><text x="42" y="88" class="note">一轮光从开放的窗中升起</text>
+    <g transform="translate(110 150)" filter="url(#shadow)">
+      <path d="M55 305 V97 C55 52 91 20 137 20 H326" fill="none" stroke="url(#gD)" stroke-width="42" stroke-linecap="round"/>
+      <path d="M326 20 H380 V74" fill="none" stroke="#fff" stroke-width="55" stroke-linecap="round"/>
+      <path d="M75 305 H375" stroke="url(#gD)" stroke-width="24" stroke-linecap="round"/>
+      <path d="M133 305 A105 105 0 0 1 343 305" fill="none" stroke="url(#gD)" stroke-width="28" stroke-linecap="round"/>
+      <circle cx="238" cy="215" r="23" fill="#FFD06E"/>
+    </g>
+    <text x="390" y="286" class="wordSoft">OpenJob</text>
+  </g>
+
+  <!-- card 05 -->
+  <g transform="translate(70 1260)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">05</text><text x="92" y="54" class="name">JOB BEACON</text><text x="42" y="88" class="note">像灯塔一样，把合适的机会照亮</text>
+    <g transform="translate(118 142)" filter="url(#shadow)">
+      <path d="M200 18 L286 167 L200 316 L114 167 Z" fill="none" stroke="url(#gE)" stroke-width="38" stroke-linejoin="round"/>
+      <path d="M200 75 L252 167 L200 259 L148 167 Z" fill="url(#gE)" opacity=".92"/>
+      <circle cx="200" cy="167" r="23" fill="#FFD27B"/>
+      <path d="M56 167 H92 M308 167 H344" stroke="url(#gE)" stroke-width="22" stroke-linecap="round"/>
+    </g>
+    <text x="390" y="286" class="wordSerif">OpenJob</text>
+  </g>
+
+  <!-- card 06 -->
+  <g transform="translate(930 1260)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">06</text><text x="92" y="54" class="name">SMART DIALOG</text><text x="42" y="88" class="note">求职助手的陪伴感：对话、理解、行动</text>
+    <g transform="translate(95 150)" filter="url(#shadow)">
+      <path d="M45 42 H311 C345 42 370 67 370 101 V231 C370 265 345 290 311 290 H170 L99 329 V290 H45 C11 290 -14 265 -14 231 V101 C-14 67 11 42 45 42Z" fill="none" stroke="url(#gF)" stroke-width="37" stroke-linejoin="round"/>
+      <circle cx="102" cy="168" r="18" fill="#FFB970"/><circle cx="178" cy="168" r="18" fill="#A2E67B"/><circle cx="254" cy="168" r="18" fill="#8B7CF5"/>
+    </g>
+    <text x="390" y="286" class="wordSans">OpenJob</text>
+  </g>
+
+  <!-- card 07 -->
+  <g transform="translate(70 1810)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">07</text><text x="92" y="54" class="name">LAYERED HORIZON</text><text x="42" y="88" class="note">多层信息被整理成清晰的前路</text>
+    <g transform="translate(95 155)" filter="url(#shadow)">
+      <path d="M36 245 H366" stroke="url(#gG)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M66 192 H336" stroke="url(#gG)" stroke-width="28" stroke-linecap="round" opacity=".82"/>
+      <path d="M96 139 H306" stroke="url(#gG)" stroke-width="28" stroke-linecap="round" opacity=".64"/>
+      <path d="M126 86 H276" stroke="url(#gG)" stroke-width="28" stroke-linecap="round" opacity=".46"/>
+      <path d="M263 85 L319 29" stroke="url(#gG)" stroke-width="28" stroke-linecap="round"/>
+      <circle cx="263" cy="85" r="19" fill="#FFC06A"/>
+    </g>
+    <text x="390" y="286" class="wordMono">OpenJob</text>
+  </g>
+
+  <!-- card 08 -->
+  <g transform="translate(930 1810)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">08</text><text x="92" y="54" class="name">RIBBON SIGNAL</text><text x="42" y="88" class="note">一条柔韧的彩带，形成 O 与前进方向</text>
+    <g transform="translate(104 140)" filter="url(#shadow)">
+      <path d="M307 37 C222 -4 91 25 47 126 C9 213 57 301 153 322 C251 343 334 290 347 202 C357 139 325 91 263 71 C197 50 131 80 111 139 C90 202 123 253 182 266 C244 279 294 240 300 187" fill="none" stroke="url(#gH)" stroke-width="42" stroke-linecap="round"/>
+      <path d="M300 187 L360 127" stroke="url(#gH)" stroke-width="42" stroke-linecap="round"/>
+      <circle cx="182" cy="266" r="15" fill="#FFD078"/>
+    </g>
+    <text x="390" y="286" class="wordSerif">OpenJob</text>
+  </g>
+
+  <!-- card 09 -->
+  <g transform="translate(70 2360)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">09</text><text x="92" y="54" class="name">HUMAN LINK</text><text x="42" y="88" class="note">人与机会相互靠近，中心留出 Open</text>
+    <g transform="translate(112 148)" filter="url(#shadow)">
+      <path d="M78 77 C28 110 16 177 48 229 C82 284 155 298 206 264" fill="none" stroke="url(#gI)" stroke-width="48" stroke-linecap="round"/>
+      <path d="M322 77 C372 110 384 177 352 229 C318 284 245 298 194 264" fill="none" stroke="url(#gI)" stroke-width="48" stroke-linecap="round"/>
+      <path d="M150 180 C168 157 203 157 222 180" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/>
+      <circle cx="78" cy="77" r="17" fill="#FFC16B"/><circle cx="322" cy="77" r="17" fill="#FFC16B"/>
+    </g>
+    <text x="390" y="286" class="wordSoft">OpenJob</text>
+  </g>
+
+  <!-- card 10 -->
+  <g transform="translate(930 2360)">
+    <rect width="800" height="500" rx="34" fill="#fff"/>
+    <text x="42" y="54" class="num">10</text><text x="92" y="54" class="name">OJ FUSION</text><text x="42" y="88" class="note">把 O 和 J 合成一个更像品牌的符号</text>
+    <g transform="translate(103 143)" filter="url(#shadow)">
+      <path d="M199 30 C115 30 49 91 49 168 C49 246 113 306 192 306 C254 306 300 272 300 218 V146" fill="none" stroke="url(#gJ)" stroke-width="49" stroke-linecap="round"/>
+      <path d="M300 62 V218 C300 271 337 306 389 306" fill="none" stroke="url(#gJ)" stroke-width="49" stroke-linecap="round"/>
+      <path d="M300 62 H359" stroke="#fff" stroke-width="55" stroke-linecap="round"/>
+      <circle cx="160" cy="168" r="19" fill="#FFD07A"/>
+    </g>
+    <text x="390" y="286" class="wordSans">OpenJob</text>
+  </g>
+
+  <text x="90" y="2965" class="intro">本页是概念探索稿，不代表最终字体、比例与颜色；选定方向后可继续制作正式 SVG、PNG、favicon 与深色背景版本。</text>
+</svg>

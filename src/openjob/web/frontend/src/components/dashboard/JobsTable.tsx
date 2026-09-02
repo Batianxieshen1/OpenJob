@@ -152,8 +152,8 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="max-w-[160px] truncate font-black text-foreground">{job.company}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${job.source_platform === 'boss' || !job.source_platform ? 'bg-accent-soft text-primary' : 'bg-accent-soft text-primary'}`}>
+                          <span className="max-w-[160px] truncate font-semibold text-foreground">{job.company}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${job.source_platform === 'boss' || !job.source_platform ? 'bg-accent-soft text-primary' : 'bg-accent-soft text-primary'}`}>
                             {job.source_platform === 'zhilian' ? '智联' : job.source_platform === '51job' ? '51job' : 'BOSS'}
                           </span>
                           {job.company_size && (
@@ -169,7 +169,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                         <div className="mt-1 text-muted">{job.recruitment_type === 'campus' ? '校招' : job.recruitment_type === 'experienced' ? '社招' : '类型未识别'}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`font-mono font-black ${getScoreColor(job.score)}`}>{job.score || '-'}</span>
+                        <span className={`font-mono font-semibold ${getScoreColor(job.score)}`}>{job.score || '-'}</span>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={statusVariant(job.status) as any}>{getStatusLabel(job.status)}</Badge>
@@ -223,15 +223,15 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                         <td colSpan={hasActions ? 11 : 10} className="px-6 py-4">
                           <div className="grid grid-cols-1 gap-4 text-sm lg:grid-cols-3">
                             <div className="rounded-2xl border border-card-border bg-card p-4">
-                              <p className="mb-2 text-xs font-black text-primary">JD摘要</p>
+                              <p className="mb-2 text-xs font-semibold text-primary">JD摘要</p>
                               <p className="line-clamp-6 leading-6 text-muted">{job.jd || '无'}</p>
                             </div>
                             <div className="rounded-2xl border border-card-border bg-card p-4">
-                              <p className="mb-2 text-xs font-black text-primary">招呼语</p>
+                              <p className="mb-2 text-xs font-semibold text-primary">招呼语</p>
                               <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.greeting || '未生成'}</p>
                             </div>
                             <div className="rounded-2xl border border-card-border bg-card p-4">
-                              <p className="mb-2 text-xs font-black text-primary">评分理由</p>
+                              <p className="mb-2 text-xs font-semibold text-primary">评分理由</p>
                               <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.score_reason || '无'}</p>
                             </div>
                           </div>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-labelledby="title desc">
+  <title id="title">OpenJob logo preview</title>
+  <desc id="desc">Original OpenJob wordmark with an abstract open doorway and career path symbol.</desc>
+  <defs>
+    <linearGradient id="sunrise" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4479E8"/>
+      <stop offset="53%" stop-color="#BBD4F1"/>
+      <stop offset="78%" stop-color="#FFE7A0"/>
+      <stop offset="100%" stop-color="#ED6B79"/>
+    </linearGradient>
+    <linearGradient id="path" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F06E79"/>
+      <stop offset="55%" stop-color="#FFD989"/>
+      <stop offset="100%" stop-color="#5B8BEA"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="9" stdDeviation="10" flood-color="#14213D" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="600" fill="#ffffff"/>
+  <g transform="translate(220 120)" filter="url(#softShadow)">
+    <path d="M0 312 C0 145 103 26 220 26 C337 26 440 145 440 312 C440 344 425 365 401 374 C371 385 344 367 314 355 C254 331 186 331 126 355 C96 367 69 385 39 374 C15 365 0 344 0 312Z" fill="url(#sunrise)"/>
+    <path d="M83 321 C126 284 165 260 220 260 C275 260 314 284 357 321 C321 312 283 307 220 307 C157 307 119 312 83 321Z" fill="url(#path)" opacity="0.98"/>
+    <path d="M151 245 L151 156 C151 132 170 113 194 113 L246 113 C270 113 289 132 289 156 L289 245" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" opacity="0.92"/>
+    <path d="M220 238 L220 143" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" opacity="0.72"/>
+  </g>
+  <text x="755" y="370" fill="#101010" font-family="Georgia, Baskerville, 'Times New Roman', serif" font-size="188" font-weight="700" letter-spacing="-8">OpenJob</text>
+</svg>

@@ -134,8 +134,8 @@ export function ScoreJobsDialog({ open, selectedJobIds, onClose, onStart }: Scor
       <div className="w-full max-w-xl rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-black tracking-[0.18em] text-primary">AI SCORING</div>
-            <h3 className="mt-1 text-2xl font-black">单独 AI 评分</h3>
+            <div className="text-xs font-semibold tracking-[0.18em] text-primary">AI SCORING</div>
+            <h3 className="mt-1 text-2xl font-semibold">单独 AI 评分</h3>
             <p className="mt-1 text-sm leading-6 text-muted">复用当前岗位池，不重新采集岗位；进入投递链路的岗位不会重评。</p>
           </div>
           <Button variant="secondary" size="sm" onClick={onClose}>关闭</Button>
@@ -165,7 +165,7 @@ export function ScoreJobsDialog({ open, selectedJobIds, onClose, onStart }: Scor
           </div>
           {runs.filter(run => ['running', 'paused'].includes(run.status)).slice(0, 3).map(run => (
             <div key={run.id} className="rounded-2xl border border-card-border bg-surface-hover p-3 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-black">{run.status === 'running' ? '评分中' : '已暂停'} · 剩余 {run.remaining_job_ids.length} 个岗位</span><div className="flex gap-2">{run.status === 'running' && <Button variant="secondary" size="sm" onClick={() => void runAction(run, 'pause')}>暂停</Button>}{run.recoverable && <Button size="sm" onClick={() => void runAction(run, 'resume')}>继续</Button>}<Button variant="ghost" size="sm" onClick={() => void runAction(run, 'end')}>结束</Button></div></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{run.status === 'running' ? '评分中' : '已暂停'} · 剩余 {run.remaining_job_ids.length} 个岗位</span><div className="flex gap-2">{run.status === 'running' && <Button variant="secondary" size="sm" onClick={() => void runAction(run, 'pause')}>暂停</Button>}{run.recoverable && <Button size="sm" onClick={() => void runAction(run, 'resume')}>继续</Button>}<Button variant="ghost" size="sm" onClick={() => void runAction(run, 'end')}>结束</Button></div></div>
               {run.pause_reason && <p className="mt-1 text-xs text-muted">{run.pause_reason}</p>}
             </div>
           ))}
@@ -181,5 +181,5 @@ export function ScoreJobsDialog({ open, selectedJobIds, onClose, onStart }: Scor
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl border border-card-border bg-surface-hover p-3"><div className="text-xs text-muted">{label}</div><div className="mt-1 text-xl font-black text-primary">{value}</div></div>
+  return <div className="rounded-xl border border-card-border bg-surface-hover p-3"><div className="text-xs text-muted">{label}</div><div className="mt-1 text-xl font-semibold text-primary">{value}</div></div>
 }
