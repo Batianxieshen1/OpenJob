@@ -6,18 +6,12 @@ import { BottomNav } from './components/layout/BottomNav'
 
 // 路由级代码分割：首屏只加载工作台，其余页面按需拉取
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const JobsPoolPage = lazy(() => import('./pages/JobsPoolPage'))
+const MonitorPage = lazy(() => import('./pages/MonitorPage'))
 const ConfigPage = lazy(() => import('./pages/ConfigPage'))
 const ResumePage = lazy(() => import('./pages/ResumePage'))
 const StatsPage = lazy(() => import('./pages/StatsPage'))
 const ConfirmQueuePage = lazy(() => import('./pages/ConfirmQueuePage'))
-
-function JobsPage() {
-  return <DashboardPage view="jobs" />
-}
-
-function MonitorPage() {
-  return <DashboardPage view="monitor" />
-}
 
 function PageFallback() {
   return (
@@ -41,7 +35,7 @@ export default function App() {
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/" element={<DashboardPage />} />
-                  <Route path="/jobs" element={<JobsPage />} />
+                  <Route path="/jobs" element={<JobsPoolPage />} />
                   <Route path="/resume" element={<ResumePage />} />
                   <Route path="/stats" element={<StatsPage />} />
                   <Route path="/confirm" element={<ConfirmQueuePage />} />
