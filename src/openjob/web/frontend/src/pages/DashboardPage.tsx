@@ -1163,7 +1163,7 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
     <div className="rounded-3xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold">监测执行</h2>
+          <h1 className="text-lg font-semibold">监测执行</h1>
           <p className="mt-1 text-sm text-muted">这里不启动监测，只处理监测发现的 HR 问题、回复建议和结果。</p>
         </div>
         <span className="rounded-full bg-accent-soft px-3 py-2 text-xs font-semibold text-primary">待处理 {pendingItems.length}</span>

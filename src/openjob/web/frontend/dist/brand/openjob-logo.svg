@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260" role="img" aria-labelledby="title">
+  <title id="title">OpenJob</title>
+  <defs>
+    <linearGradient id="flight" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#1467F8"/><stop offset=".5" stop-color="#7257E8"/><stop offset="1" stop-color="#F47E9C"/></linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5B35D8"/><stop offset=".5" stop-color="#B552E0"/><stop offset="1" stop-color="#FFA968"/></linearGradient>
+  </defs>
+  <g transform="translate(18 18) scale(.56)">
+    <path d="M28 188 374 33Q393 26 389 50L247 340Q242 352 224 338L176 220 39 205Q17 195 28 188Z" fill="url(#flight)"/>
+    <path d="M28 188 176 220 389 50M176 220 224 338 247 340 244 211" fill="none" stroke="#fff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" opacity=".94"/>
+    <path d="M176 220 244 211" fill="none" stroke="#fff" stroke-width="15" stroke-linecap="round" opacity=".58"/>
+    <circle cx="176" cy="220" r="13" fill="#FFD176"/>
+  </g>
+  <text x="295" y="161" font-family="Arial, Helvetica, sans-serif" font-size="112" font-weight="700" letter-spacing="-5" fill="#101828">Open<tspan fill="url(#word)">Job</tspan></text>
+</svg>

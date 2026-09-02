@@ -283,7 +283,7 @@ export default function ConfigPage() {
                 <div className="flex items-center gap-3 rounded-md border border-card-border bg-surface-hover p-3">
                   <span className="text-sm font-bold text-foreground">📄 {resumeInfo.filename}</span>
                   <span className="text-xs text-muted">({(resumeInfo.size / 1024).toFixed(1)} KB)</span>
-                  <button onClick={handleResumeDelete} className="ml-auto text-danger hover:text-danger">
+                  <button onClick={handleResumeDelete} aria-label="删除该简历文件" title="删除该简历文件" className="ml-auto text-danger hover:text-danger">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
