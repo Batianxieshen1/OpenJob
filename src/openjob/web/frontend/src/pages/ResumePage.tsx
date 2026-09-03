@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from '@/components/brand/Brand'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface JobLite {
@@ -260,11 +261,11 @@ export default function ResumePage() {
             {baseName && <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-primary">底稿：{baseName}</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={selectedJobId}
             onChange={e => setSelectedJobId(e.target.value)}
-            className="h-9 min-w-64 rounded-control border border-card-border bg-card px-3 text-sm"
+            className="h-9 min-w-0 flex-1 rounded-control border border-card-border bg-card px-3 text-sm sm:min-w-64 sm:flex-none"
           >
             <option value="">{jobsLoading ? '加载岗位…' : '选择岗位'}</option>
             {jobs.map(j => (
@@ -274,7 +275,11 @@ export default function ResumePage() {
               </option>
             ))}
           </select>
-          <Button onClick={() => generate(false)} disabled={!selectedJobId || phase === 'generating'}>
+          <Button
+            onClick={() => generate(false)}
+            disabled={!selectedJobId || phase === 'generating'}
+            className="w-full sm:w-auto"
+          >
             {phase === 'generating' ? '生成中…' : '按此 JD 优化'}
           </Button>
         </div>
@@ -295,8 +300,12 @@ export default function ResumePage() {
               </li>
             ))}
           </ol>
-          <div className="mt-4 flex justify-end">
-            <Button variant="secondary" size="sm" onClick={() => { window.location.href = '/jobs' }}>去岗位池挑选岗位</Button>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <BrandLogo maxWidth={120} className="opacity-90" />
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" onClick={() => { window.location.href = '/config' }}>上传简历底稿</Button>
+              <Button variant="secondary" size="sm" onClick={() => { window.location.href = '/jobs' }}>去岗位池挑选岗位</Button>
+            </div>
           </div>
         </section>
       )}

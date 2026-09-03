@@ -18,6 +18,7 @@ interface JobsTableProps {
   onSoftDelete?: (job: Job) => void
   onMarkManuallySent?: (job: Job) => void
   onApprove?: (job: Job) => void
+  onDetail?: (job: Job) => void
   loading?: boolean
   sortBy: JobSortKey
   sortOrder: JobSortOrder
@@ -75,7 +76,7 @@ function ScoreBadge({ score }: { score: number }) {
   )
 }
 
-export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedIds, onToggleSelected, onSoftDelete, onMarkManuallySent, onApprove, loading = false, sortBy, sortOrder, onSortChange }: JobsTableProps) {
+export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedIds, onToggleSelected, onSoftDelete, onMarkManuallySent, onApprove, onDetail, loading = false, sortBy, sortOrder, onSortChange }: JobsTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pageInput, setPageInput] = useState(String(page + 1))
   const totalPages = Math.ceil(total / pageSize)
@@ -174,8 +175,19 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                   <span>{job.hr_active || '活跃度未知'}</span>
                   <span>· {timeAgo(job.created_at)}</span>
                 </div>
-                {hasActions && (
-                  <div className="mt-3 flex flex-wrap gap-1.5 border-t border-card-border pt-2.5" onClick={event => event.stopPropagation()}>
+                <div className="mt-3 flex flex-wrap gap-1.5 border-t border-card-border pt-2.5">
+                  {onDetail && (
+                    <button
+                      type="button"
+                      onClick={() => onDetail(job)}
+                      aria-label={`查看 ${job.company} ${job.title} 详情`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-primary/40 bg-card px-2.5 py-1.5 text-[11px] font-semibold text-primary transition-soft hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      查看详情
+                    </button>
+                  )}
+                  {hasActions && (
+                  <div className="flex flex-wrap items-center gap-1.5" onClick={event => event.stopPropagation()}>
                     {isExternalPlatform && externalUrl && (
                       <a href={externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-card-border px-2 py-1.5 text-[11px] font-semibold text-primary hover:bg-accent-soft">
                         <ExternalLink className="h-3.5 w-3.5" />打开平台
@@ -207,7 +219,8 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                       </button>
                     )}
                   </div>
-                )}
+                  )}
+                </div>
               </div>
             )
           })}

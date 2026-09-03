@@ -52,6 +52,47 @@ async function captureRegressionMatrix(browser) {
     }
   }
 
+  // ISSUE-002 回归：/resume 390px main 不得横向溢出（selector+按钮堆叠验证）
+  await page.setViewport({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:8686/resume?theme=light', { waitUntil: 'networkidle2', timeout: 30000 });
+  await new Promise(r => setTimeout(r, 1200));
+  const resumeCheck = await page.evaluate(() => {
+    const main = document.querySelector('main');
+    const button = [...document.querySelectorAll('button')].find(b => b.textContent.includes('按此 JD 优化'));
+    const br = button ? button.getBoundingClientRect() : null;
+    return {
+      mainScrollW: main ? main.scrollWidth : -1,
+      mainClientW: main ? main.clientWidth : -1,
+      docScrollW: document.documentElement.scrollWidth,
+      buttonVisible: br ? br.right <= document.documentElement.clientWidth + 1 && br.width > 50 : false,
+    };
+  });
+  results.push({ test: 'resume-390-no-overflow', ok: resumeCheck.mainScrollW <= resumeCheck.mainClientW + 1 && resumeCheck.docScrollW <= 391, ...resumeCheck });
+  results.push({ test: 'resume-390-primary-action-visible', ok: resumeCheck.buttonVisible });
+
+  // ISSUE-003 回归：/jobs 390px 移动卡必须有「查看详情」且打开弹窗
+  await page.setViewport({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:8686/jobs?theme=light', { waitUntil: 'networkidle2', timeout: 30000 });
+  await new Promise(r => setTimeout(r, 1500));
+  const detailCheck = await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === '查看详情');
+    const first = buttons[0];
+    if (first) {
+      first.click();
+      return { count: buttons.length, clicked: true, hasAria: Boolean(first.getAttribute('aria-label')) };
+    }
+    return { count: 0, clicked: false };
+  });
+  await new Promise(r => setTimeout(r, 500));
+  const dialogOpen = await page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!dialog) return { open: false };
+    const r = dialog.getBoundingClientRect();
+    return { open: true, inViewport: r.top >= 0 && r.bottom <= innerHeight + 1 };
+  });
+  results.push({ test: 'jobs-390-view-details-action', ok: detailCheck.count > 0 && detailCheck.clicked && detailCheck.hasAria, count: detailCheck.count });
+  results.push({ test: 'jobs-390-detail-dialog-opens-in-viewport', ok: dialogOpen.open && dialogOpen.inViewport });
+
   // P0-1 弹窗测试：/confirm 滚动到中部打开详情，弹窗必须完整在视口内
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto('http://127.0.0.1:8686/confirm?theme=light', { waitUntil: 'networkidle2', timeout: 30000 });

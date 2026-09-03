@@ -38,6 +38,7 @@ class SendGuardTests(unittest.TestCase):
         throttle_config = {"browse_before_greet": False}
 
         with mock_evaluate_chain() as evaluate_mock, \
+             patch("openjob.executor.sender.new_tab", return_value="target-dup"), \
              patch("openjob.executor.sender._click_chat_button", return_value={"success": True}), \
              patch("openjob.executor.sender._handle_greet_popup", return_value={"success": True, "action": "no_popup"}), \
              patch("openjob.executor.sender._wait_for_chat_page", return_value={"success": True}), \

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDashboard, type HistoryItem } from '@/hooks/useDashboard'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { BrandLogo } from '@/components/brand/Brand'
 import { MessageCircle, Radar } from 'lucide-react'
 import { parseHistoryDetail } from '@/lib/historyDetail'
 import { getActionLabel } from '@/lib/status'
@@ -240,9 +241,18 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
             description="监测运行时会自动检查新回复；发现 HR 要简历或提问时，会出现在这里等你处理。"
             steps={['确认投递后开启监测', 'HR 回复自动入库', '在这里逐条处理']}
             action={
-              <Button
-                size="sm"
-                onClick={async () => {
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <BrandLogo maxWidth={110} className="mr-2 hidden opacity-90 sm:block" />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { window.location.href = '/config' }}
+                >
+                  配置监测规则
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={async () => {
                   try {
                     const res = await fetch('/api/workbench/task', {
                       method: 'POST',
@@ -258,7 +268,8 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
                 }}
               >
                 启动一轮监测
-              </Button>
+                  </Button>
+              </div>
             }
           />
         )}

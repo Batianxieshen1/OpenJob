@@ -74,9 +74,14 @@ export function Header() {
     <header className="flex h-[72px] shrink-0 items-center justify-between gap-4 border-b border-card-border px-5 md:px-7 xl:px-9">
       <div className="flex min-w-0 items-center gap-3">
         {inPills ? (
+          <>
+          {/* 小屏：显示当前页名（底部导航承担切换）；lg+：胶囊导航 */}
+          <h1 className="truncate text-lg font-semibold tracking-tight text-foreground lg:hidden">
+            {pillItems.find(item => item.to === location.pathname)?.label || 'OpenJob'}
+          </h1>
           <nav
             aria-label="主导航"
-            className="-mx-1 flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-card-border bg-card p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="hidden -mx-1 items-center gap-1.5 rounded-full border border-card-border bg-card p-1 lg:flex"
           >
             {pillItems.map(item => (
               <NavLink
@@ -95,6 +100,7 @@ export function Header() {
               </NavLink>
             ))}
           </nav>
+          </>
         ) : fallbackTitle ? (
           <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted" aria-current="page">
             <span className="shrink-0">OpenJob</span>

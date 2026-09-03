@@ -45,6 +45,7 @@ export default function JobsPoolPage() {
   const [page, setPage] = useState(0)
   const [filters, setFilters] = useState<JobFilters>({ ...EMPTY_JOB_FILTERS })
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [detailJob, setDetailJob] = useState<Job | null>(null)
   const [notice, setNotice] = useState('')
   const [showRecycleBin, setShowRecycleBin] = useState(false)
   const [showScoreDialog, setShowScoreDialog] = useState(false)
@@ -408,11 +409,13 @@ const markManuallySent = async (job: Job) => {
         onSoftDelete={job => void softDelete([job.id])}
         onMarkManuallySent={job => void markManuallySent(job)}
         onApprove={job => void approveJob(job)}
+        onDetail={job => setDetailJob(job)}
         loading={loading}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={changeSort}
       />
+      {detailJob && <JobDetailModal job={detailJob} onClose={() => setDetailJob(null)} />}
       <ScoreJobsDialog
         open={showScoreDialog}
         selectedJobIds={selectedIds}
