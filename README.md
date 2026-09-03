@@ -78,7 +78,7 @@ pip install -e .
 python scripts/setup.py
 
 # 3. 启动工作台
-python -m openjob.web.server
+openjob web
 # 浏览器打开 http://127.0.0.1:8686
 ```
 
