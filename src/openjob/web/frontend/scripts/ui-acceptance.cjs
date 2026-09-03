@@ -12,8 +12,36 @@ async function check(page, url, width) {
   }));
 }
 
+const SHOT_DIR = 'C:/Users/暴龙战士wink/Desktop/agent/OpenJob/ui-acceptance-screenshots';
+
+async function captureRegressionMatrix(browser) {
+  fs.mkdirSync(SHOT_DIR, { recursive: true });
+  const page = await browser.newPage();
+  const matrix = [];
+  for (const theme of ['light', 'dark']) {
+    for (const path of ['/', '/jobs', '/confirm', '/stats', '/monitor', '/config', '/resume']) {
+      const width = path === '/' ? 1280 : 1280;
+      await page.setViewport({ width, height: 900 });
+      await page.goto(`http://127.0.0.1:8686${path}?theme=${theme}`, { waitUntil: 'networkidle2', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 1200));
+      const name = `${path.replace(/\//g, '_') || '_home'}-${theme}-1280.png`.replace(/^_/, '');
+      await page.screenshot({ path: `${SHOT_DIR}/${name}` });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      matrix.push({ name, overflowPx: overflow });
+      console.log(`📸 ${name} 溢出=${overflow}px`);
+    }
+  }
+  const bad = matrix.filter(m => m.overflowPx > 1);
+  console.log(bad.length ? `FAIL ${bad.length} 个页面横向溢出` : 'ALL-PASS 视觉回归矩阵已存档');
+}
+
 (async () => {
   const browser = await puppeteer.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox'] });
+  if (process.argv.includes('--shots')) {
+    await captureRegressionMatrix(browser);
+    await browser.close();
+    return;
+  }
   const page = await browser.newPage();
   const results = [];
 
