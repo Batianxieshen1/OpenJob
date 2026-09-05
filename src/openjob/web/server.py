@@ -138,6 +138,7 @@ def set_base_dir(base_dir: Path | str) -> None:
 	from openjob.ai.resume_engine import engine as resume_engine
 
 	resume_engine.RUNTIME_DB_PATH = DATA_DIR / "openjob.db"
+	resume_engine.RUNTIME_DATA_DIR = DATA_DIR
 	mark_orphaned_scoring_runs_paused(DATA_DIR / "openjob.db")
 	mark_orphaned_collection_runs_stopped(DATA_DIR / "openjob.db")
 

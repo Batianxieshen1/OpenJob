@@ -77,6 +77,8 @@ def rewrite_sections(
     jd: JdProfile,
     match: MatchReport,
     config: dict,
+    *,
+    candidates=None,
 ) -> RewriteResult:
     requirements = []
     for skill in jd.hard_requirements + jd.preferred_skills:
@@ -103,6 +105,13 @@ JD 要求：
 
 求职者原始简历（行末〔〕内是该行改写后的字数硬上限，只做等长换写）：
 {budgeted.strip()}"""
+    if candidates:
+        from openjob.ai.resume_engine.materials import material_prompt
+
+        material_section = material_prompt(candidates)
+        if material_section:
+            user += "\n\n" + material_section
+
     def _validate_style(payload):
         result = RewriteResult.from_payload(payload)
         real_changes = []
@@ -190,6 +199,7 @@ def validate_assembled(
     assembled_md: str,
     *,
     include_layout: bool = True,
+    trusted_material_text: str = "",
 ) -> tuple[list[str], list[str]]:
     """汇总校验：返回 (blocking_issues, warnings)。
 
@@ -204,7 +214,22 @@ def validate_assembled(
         return blocking, warnings
 
     # 事实完整性：新增事实（编造）/新增占位符/丢失核心事实（联系方式等）
-    blocking.extend(_find_blocking_integrity_issues(assembled_md, base_resume))
+    # 素材库可信事实并入允许集合：只放宽“事实确实来自选中素材”的情况
+    raw_issues = _find_blocking_integrity_issues(assembled_md, base_resume)
+    if trusted_material_text:
+        import re as _re
+
+        allowed = {
+            tok.strip().lower()
+            for tok in _re.split(r"[\s,，、;；.。/()（）\-]+", trusted_material_text)
+            if len(tok.strip()) >= 2
+        }
+        blocking.extend(
+            issue for issue in raw_issues
+            if not any(tok in issue.lower() for tok in allowed)
+        )
+    else:
+        blocking.extend(raw_issues)
 
     # 过程性措辞
     artifacts = _find_resume_artifacts(assembled_md)

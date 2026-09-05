@@ -127,6 +127,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_2(conn)
     _migrate_v2_3(conn)
     _migrate_v2_4(conn)
+    _migrate_v2_5(conn)
 
 
 def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
@@ -685,6 +686,15 @@ def _migrate_v2_4(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_v2_5(conn: sqlite3.Connection) -> None:
+    """resumes 素材库审计字段：库哈希、选中素材快照与候选快照。"""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(resumes)").fetchall()}
+    for column in ("material_library_sha256", "material_selection_json", "material_candidates_json"):
+        if column not in cols:
+            conn.execute(f"ALTER TABLE resumes ADD COLUMN {column} TEXT")
+    conn.commit()
+
+
 def _migrate_platform_access_events(conn: sqlite3.Connection) -> None:
     """Scope PR #66 access counters to a platform without losing old BOSS events."""
     cols = {row[1] for row in conn.execute("PRAGMA table_info(platform_access_events)").fetchall()}
@@ -1210,6 +1220,9 @@ def update_resume_version(
     docx_path: str | None = None,
     risk_flags_json: str | None = None,
     error: str | None = None,
+    material_library_sha256: str | None = None,
+    material_selection_json: str | None = None,
+    material_candidates_json: str | None = None,
 ) -> None:
     """Update mutable resume fields; None leaves the column untouched."""
     assignments = ["updated_at = CURRENT_TIMESTAMP"]
@@ -1226,6 +1239,9 @@ def update_resume_version(
         ("docx_path", docx_path),
         ("risk_flags_json", risk_flags_json),
         ("error", error),
+        ("material_library_sha256", material_library_sha256),
+        ("material_selection_json", material_selection_json),
+        ("material_candidates_json", material_candidates_json),
     ):
         if value is not None:
             assignments.append(f"{column} = ?")

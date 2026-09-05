@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 
 # BOSS直聘城市编码映射

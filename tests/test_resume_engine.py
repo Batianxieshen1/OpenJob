@@ -712,3 +712,130 @@ class ResumeApiTests(_EngineCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MaterialLibraryPipelineTests(_EngineCase):
+    """素材库接入回归：审计快照、拒非候选、关闭兼容。"""
+
+    def _make_materials(self):
+        from openjob.resume_materials import parse_workbook, save_library_atomically
+        from tests.test_resume_materials import build_workbook
+
+        rows = [{
+            "id": "m1", "type": "project", "title": "用户增长看板",
+            "description": "使用 SQL 和 Python 搭建增长看板", "achievements": "覆盖 3 条业务线",
+            "keywords": "SQL,Python,看板", "target_directions": "数据分析",
+            "resume_allowed": "是", "priority": 5,
+        }]
+        content = build_workbook(rows)
+        library = parse_workbook(content, filename="素材.xlsx")
+        materials_path = self.root / "data" / "resume_materials.xlsx"
+        index_path = self.root / "data" / "resume_materials.index.json"
+        save_library_atomically(library, content, xlsx_path=materials_path, index_path=index_path)
+        return materials_path, index_path
+
+    def _enable_materials(self):
+        from openjob.ai.resume_engine import engine
+
+        engine.RUNTIME_DATA_DIR = self.root / "data"
+        self.addCleanup(setattr, engine, "RUNTIME_DATA_DIR", None)
+        self.config = {
+            **self.config,
+            "profile": {**self.config["profile"], "resume_materials_enabled": True},
+        }
+
+    def _payload_with_material_ids(self, material_ids):
+        payload = _rewrite_payload()
+        payload["changes"][0]["material_ids"] = material_ids
+        return payload
+
+    def _patched_stages(self, rewrite_payload=None):
+        from openjob.ai.resume_engine import engine
+
+        return (
+            patch.object(engine, "parse_jd", return_value=_jd_profile()),
+            patch.object(engine, "analyze_match", return_value=_match()),
+            patch.object(engine, "rewrite_sections", return_value=_rewrite(rewrite_payload)),
+        )
+
+    def test_material_facts_can_be_used_only_when_selected_and_are_audited(self):
+        from openjob.ai.resume_engine import engine, generate_resume
+
+        self._seed_job()
+        materials_path, _ = self._make_materials()
+        self._enable_materials()
+
+        payload = self._payload_with_material_ids(["m1"])
+        # after 引用素材事实（可_parse_resume），确保通过可信事实校验
+        payload["changes"][0]["after"] = "三年新媒体运营经验，熟悉用户增长看板与 SQL 数据分析。"
+        p1, p2, p3 = self._patched_stages(payload)
+        with p1, p2, p3:
+            result = generate_resume("job-engine-1", self.config)
+
+        self.assertTrue(result.ok, result.reason)
+        conn = self._connect()
+        try:
+            record = dict(conn.execute(
+                "SELECT * FROM resumes WHERE job_id = ?", ("job-engine-1",)
+            ).fetchone())
+            self.assertTrue(record["material_library_sha256"])
+            selection = json.loads(record["material_selection_json"])
+            self.assertEqual(selection[0]["id"], "m1")
+            self.assertNotIn("source", selection[0])
+            candidates = json.loads(record["material_candidates_json"])
+            self.assertTrue(candidates)
+            diff = json.loads(record["diff_json"])
+            self.assertEqual(diff[0]["material_ids"], ["m1"])
+        finally:
+            conn.close()
+
+    def test_material_generation_rejects_ai_reference_to_non_candidate(self):
+        from openjob.ai.resume_engine import engine, generate_resume
+
+        self._seed_job()
+        self._make_materials()
+        self._enable_materials()
+
+        payload = self._payload_with_material_ids(["not-a-candidate"])
+        p1, p2, p3 = self._patched_stages(payload)
+        with p1, p2, p3:
+            result = generate_resume("job-engine-1", self.config)
+
+        self.assertFalse(result.ok)
+        conn = self._connect()
+        try:
+            record = dict(conn.execute(
+                "SELECT status, error FROM resumes WHERE job_id = ?", ("job-engine-1",)
+            ).fetchone())
+            self.assertEqual(record["status"], "failed")
+            self.assertIn("候选素材", record["error"] or "")
+        finally:
+            conn.close()
+
+    def test_materials_disabled_preserves_existing_pipeline(self):
+        from openjob.ai.resume_engine import engine, generate_resume
+
+        self._seed_job()
+        materials_path, _ = self._make_materials()
+        self.config = {
+            **self.config,
+            "profile": {**self.config["profile"], "resume_materials_enabled": False},
+        }
+
+        with patch.object(engine, "RUNTIME_DATA_DIR", self.root / "data"):
+            p1, p2, p3 = self._patched_stages()
+            with p1, p2, p3:
+                result = generate_resume("job-engine-1", self.config)
+
+        self.assertTrue(result.ok)
+        conn = self._connect()
+        try:
+            record = dict(conn.execute(
+                "SELECT material_library_sha256, material_candidates_json, status FROM resumes WHERE job_id = ?",
+                ("job-engine-1",),
+            ).fetchone())
+            self.assertIsNone(record["material_library_sha256"])
+            self.assertIsNone(record["material_candidates_json"])
+            self.assertEqual(record["status"], "review")
+        finally:
+            conn.close()

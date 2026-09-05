@@ -15,7 +15,7 @@ from rich.console import Console
 from openjob.ai.credentials import AIRequestError
 from openjob.ai.resume import _pdf_page_count, _render_pdf
 from openjob.cancellation import OperationCancelled, run_cancellable, stop_requested
-from openjob.config import load_config
+from openjob.config import DATA_DIR, load_config
 from openjob.db import (
     latest_resume_version,
     next_resume_version,
@@ -42,6 +42,7 @@ LAST_RESUME_ERROR: dict[str, str] = {}
 # Web 服务运行时注入（server.set_base_dir），保证引擎与面板读写同一个库；
 # CLI/监听场景保持默认 ./data/openjob.db。
 RUNTIME_DB_PATH: Path | None = None
+RUNTIME_DATA_DIR: Path | None = None
 
 
 def _db():
@@ -161,15 +162,93 @@ def generate_resume(
                 db, resume_id, match_report_json=json.dumps(match.to_dict(), ensure_ascii=False)
             )
 
+            # ②.5 素材库：启用时加载已校验索引并筛候选
+            materials_enabled = bool((config.get("profile") or {}).get("resume_materials_enabled", True))
+            candidates: list = []
+            material_library_sha = None
+            material_selection_json = None
+            material_candidates_json = None
+            if materials_enabled:
+                from openjob.ai.resume_engine.materials import material_prompt, rank_materials
+                from openjob.resume_materials import MaterialLibraryError, load_or_refresh_library
+
+                data_dir = RUNTIME_DATA_DIR or Path("data")
+                materials_path = (data_dir / "resume_materials.xlsx").resolve()
+                index_path = (data_dir / "resume_materials.index.json").resolve()
+                library = None
+                try:
+                    library = load_or_refresh_library(materials_path, index_path)
+                except MaterialLibraryError as exc:
+                    # 未上传素材库 = 用户尚未使用该功能：跳过素材走旧流程，不阻断生成；
+                    # 文件存在但解析失败 = 用户更新出错：明确失败，不静默用旧索引。
+                    if "未找到" not in str(exc):
+                        update_resume_version(db, resume_id, status="failed", error=str(exc))
+                        set_job_resume_pointer(db, job_id, resume_id=resume_id, resume_status="failed")
+                        return _fail(job_id, str(exc))
+                    console.print(f"[dim]素材库未上传，跳过素材匹配（{exc}）[/dim]")
+                if library is not None:
+                    material_library_sha = library.sha256
+                    candidates = rank_materials(library.items, jd, limit=8)
+                minimal = [
+                    {
+                        "id": c.material.get("id"),
+                        "type": c.material.get("type"),
+                        "title": c.material.get("title"),
+                        "organization": c.material.get("organization"),
+                        "role": c.material.get("role"),
+                        "dates": "-".join(x for x in (c.material.get("start_date"), c.material.get("end_date")) if x),
+                        "description": c.material.get("description"),
+                        "achievements": c.material.get("achievements"),
+                        "skills": c.material.get("skills"),
+                        "keywords": c.material.get("keywords"),
+                        "target_directions": c.material.get("target_directions"),
+                        "priority": c.material.get("priority"),
+                        "score": c.score,
+                        "reasons": c.reasons,
+                    }
+                    for c in candidates
+                ]
+                material_candidates_json = json.dumps(minimal, ensure_ascii=False)
+                console.print(f"[dim]素材候选：{len(candidates)} 条[/dim]")
+
             # ③ 分段改写
-            rewrite = run_cancellable(lambda: rewrite_sections(base_resume, jd, match, config), config)
+            rewrite = run_cancellable(
+                lambda: rewrite_sections(base_resume, jd, match, config, candidates=candidates),
+                config,
+            )
             if stop_requested(config):
                 raise OperationCancelled("用户已请求停止")
 
+            # ③.5 素材 ID 校验：只允许引用候选集；选中素材快照用于审计与可信事实
+            selected_materials: list[dict] = []
+            if candidates:
+                from openjob.ai.resume_engine.materials import validate_material_ids
+
+                for change in rewrite.changes:
+                    validated = validate_material_ids(change.material_ids, candidates)
+                    change.material_ids = validated
+                used_ids = {mid for c in rewrite.changes for mid in c.material_ids}
+                selected_materials = [
+                    {k: v for k, v in c.material.items() if k not in ("source", "notes")}
+                    for c in candidates
+                    if c.material.get("id") in used_ids
+                ]
+                if selected_materials:
+                    material_selection_json = json.dumps(selected_materials, ensure_ascii=False)
+
             # ④ 汇总校验
             assembled = apply_changes(base_resume, rewrite.changes)
+            trusted_material_text = " ".join(
+                " ".join(str(v) for v in (m.get("title"), m.get("organization"), m.get("role"),
+                                          m.get("start_date"), m.get("end_date"),
+                                          m.get("description"), m.get("achievements"),
+                                          " ".join(m.get("skills") or [])))
+                for m in selected_materials
+            )
             # 第一遍校验：只查编造/占位符/删减（零容忍，先于长度兜底防止被回退掩盖）
-            blocking, warnings = validate_assembled(base_resume, assembled, include_layout=False)
+            blocking, warnings = validate_assembled(
+                base_resume, assembled, include_layout=False, trusted_material_text=trusted_material_text
+            )
             if not blocking:
                 from openjob.ai.resume_engine.optimizer import sanitize_line_lengths
 
@@ -177,7 +256,9 @@ def generate_resume(
                 if sanitized != assembled:
                     warnings.append("部分改写行超长，已回退原文保住一页排版")
                     assembled = sanitized
-                blocking, warnings2 = validate_assembled(base_resume, assembled)
+                blocking, warnings2 = validate_assembled(
+                    base_resume, assembled, trusted_material_text=trusted_material_text
+                )
                 warnings.extend(warnings2)
             if blocking:
                 update_resume_version(db, resume_id, status="failed", error="；".join(blocking))
@@ -193,6 +274,7 @@ def generate_resume(
                     "reason": c.reason,
                     "risk": c.risk,
                     "adopted": True,
+                    "material_ids": c.material_ids,
                 }
                 for c in rewrite.changes
             ]
@@ -204,6 +286,9 @@ def generate_resume(
                 content_md=assembled,
                 risk_flags_json=json.dumps(risk_flags, ensure_ascii=False),
                 error=None,
+                material_library_sha256=material_library_sha,
+                material_selection_json=material_selection_json,
+                material_candidates_json=material_candidates_json,
             )
             set_job_resume_pointer(db, job_id, resume_id=resume_id, resume_status="review")
             console.print(
