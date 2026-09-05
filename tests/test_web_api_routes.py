@@ -2097,6 +2097,173 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class MaterialPatchAuditTests(unittest.TestCase):
+    """PATCH material_ids 必须是本版本选中素材子集（防伪造素材引用）。"""
+
+    def setUp(self):
+        import tempfile
+
+        self.original_base_dir = server.BASE_DIR
+        self._tmp = tempfile.TemporaryDirectory()
+        server.set_base_dir(self._tmp.name)
+        self.data_dir = Path(self._tmp.name) / "data"
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.db_path = self.data_dir / "openjob.db"
+        self._engine = None
+
+        from openjob.db import _init_tables, get_db, insert_job
+
+        conn = get_db(self.db_path)
+        try:
+            _init_tables(conn)
+            conn.commit()
+            conn.execute(
+                "INSERT INTO resumes (id, job_id, version, status, base_md, content_md, material_library_sha256, material_selection_json)"
+                " VALUES (?, ?, 1, 'review', ?, ?, ?, ?)",
+                (
+                    "resume-mat", "job-mat",
+                    "三年新媒体运营经验，熟悉数据驱动增长。",
+                    "三年新媒体运营经验，熟悉数据驱动增长。",
+                    "sha-abc123",
+                    json.dumps([{"id": "m1", "type": "project", "title": "增长看板", "description": "SQL 看板"}], ensure_ascii=False),
+                ),
+            )
+            insert_job(conn, {
+                "id": "job-mat", "title": "运营", "company": "示例", "salary": "", "city": "",
+                "experience": "", "education": "", "jd": "", "hr_name": "", "hr_title": "",
+                "hr_active": "", "company_size": "", "company_industry": "", "url": "",
+            })
+            conn.commit()
+        finally:
+            conn.close()
+        self.original_data_dir = server.DATA_DIR
+        server.DATA_DIR = self.data_dir
+
+    def tearDown(self):
+        server.DATA_DIR = self.original_data_dir
+        server.set_base_dir(self.original_base_dir)
+        self._tmp.cleanup()
+
+    def _request_json(self, path, method="GET", json_body=None):
+        status_headers = {}
+
+        def start_response(status, headers, exc_info=None):
+            status_headers["status"] = status
+            status_headers["headers"] = dict(headers)
+
+        request_body = json.dumps(json_body).encode("utf-8") if json_body is not None else b""
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path,
+            "QUERY_STRING": "",
+            "SERVER_NAME": "127.0.0.1",
+            "SERVER_PORT": "8686",
+            "wsgi.version": (1, 0),
+            "wsgi.url_scheme": "http",
+            "wsgi.input": io.BytesIO(request_body),
+            "wsgi.errors": io.StringIO(),
+            "wsgi.multithread": False,
+            "wsgi.multiprocess": False,
+            "wsgi.run_once": False,
+        }
+        if json_body is not None:
+            environ["CONTENT_LENGTH"] = str(len(request_body))
+            environ["CONTENT_TYPE"] = "application/json"
+        response_iter = server.app(environ, start_response)
+        body = b"".join(response_iter)
+        close = getattr(response_iter, "close", None)
+        if close:
+            close()
+        return status_headers["status"], body
+
+    def test_patch_rejects_material_id_outside_selection(self):
+        status, body = self._request_json(
+            "/api/resume/version/resume-mat",
+            method="PATCH",
+            json_body={"diff": [{
+                "section": "个人优势",
+                "before": "三年新媒体运营经验，熟悉数据驱动增长。",
+                "after": "改写内容引用了未审计素材 m2。",
+                "reason": "r",
+                "risk": "",
+                "adopted": True,
+                "material_ids": ["m2"],
+            }]},
+        )
+        self.assertIn("400", status)
+        self.assertIn("本版本选中素材", body.decode("utf-8"))
+
+    def test_patch_accepts_audited_material_id(self):
+        status, body = self._request_json(
+            "/api/resume/version/resume-mat",
+            method="PATCH",
+            json_body={"diff": [{
+                "section": "个人优势",
+                    "before": "三年新媒体运营经验，熟悉数据驱动增长。",
+                    "after": "三年新媒体运营经验，数据看板驱动增长。",
+                "reason": "r",
+                "risk": "",
+                "adopted": True,
+                "material_ids": ["m1"],
+            }]},
+        )
+        self.assertIn("200", status)
+        from openjob.db import get_db
+
+        conn = get_db(server.DATA_DIR / "openjob.db")
+        try:
+            diff = json.loads(conn.execute(
+                "SELECT diff_json FROM resumes WHERE id = 'resume-mat'"
+            ).fetchone()[0])
+        finally:
+            conn.close()
+        self.assertEqual(diff[0]["material_ids"], ["m1"])
+
+    def test_patch_legacy_version_only_allows_empty_material_ids(self):
+        from pathlib import Path as P
+
+        from openjob.db import get_db, insert_job
+
+        legacy_db = P(self._tmp.name) / "legacy" / "openjob.db"
+        legacy_db.parent.mkdir(parents=True, exist_ok=True)
+        conn = get_db(legacy_db)
+        try:
+            conn.execute(
+                "INSERT INTO resumes (id, job_id, version, status, base_md, content_md)"
+                " VALUES ('resume-legacy', 'job-legacy', 1, 'review', ?, ?)",
+                ("三年新媒体运营经验。", "三年新媒体运营经验。"),
+            )
+            insert_job(conn, {
+                "id": "job-legacy", "title": "运营", "company": "示例", "salary": "", "city": "",
+                "experience": "", "education": "", "jd": "", "hr_name": "", "hr_title": "",
+                "hr_active": "", "company_size": "", "company_industry": "", "url": "",
+            })
+            conn.commit()
+        finally:
+            conn.close()
+
+        original_data_dir = server.DATA_DIR
+        server.DATA_DIR = legacy_db.parent
+        try:
+            status, body = self._request_json(
+                "/api/resume/version/resume-legacy",
+                method="PATCH",
+                json_body={"diff": [{
+                    "section": "个人优势",
+                    "before": "三年新媒体运营经验。",
+                    "after": "改写并引用 m1。",
+                    "reason": "r",
+                    "risk": "",
+                    "adopted": True,
+                    "material_ids": ["m1"],
+                }]},
+            )
+        finally:
+            server.DATA_DIR = original_data_dir
+        self.assertIn("400", status)
+        self.assertIn("本版本选中素材", body.decode("utf-8"))
+
+
 class MaterialsApiTests(unittest.TestCase):
     """素材库 API：上传/替换/预览/模板/删除 + 损坏文件保护。"""
 

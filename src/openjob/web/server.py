@@ -2141,10 +2141,31 @@ def api_resume_version_patch(resume_id):
 			return _json_response({"error": f"当前状态 {record['status']} 不可编辑"}, 409)
 
 		base_md = record["base_md"] or ""
+		# 素材审计：material_ids 必须是本版本已审计选中素材的子集（旧版本只允许空数组）
+		allowed_material_ids: set[str] = set()
+		if record["material_selection_json"]:
+			try:
+				selection = json.loads(record["material_selection_json"])
+				allowed_material_ids = {str(m.get("id")) for m in selection if isinstance(m, dict)}
+			except (json.JSONDecodeError, TypeError):
+				allowed_material_ids = set()
+
 		diff = []
 		for item in data["diff"]:
 			if not isinstance(item, dict):
 				return _json_response({"error": "diff 项必须是对象"}, 400)
+			material_ids_raw = item.get("material_ids", [])
+			if not isinstance(material_ids_raw, list):
+				return _json_response({"error": "material_ids 必须是字符串数组"}, 400)
+			material_ids = []
+			for raw_id in material_ids_raw:
+				value = str(raw_id or "").strip()
+				if not value:
+					continue
+				if value not in allowed_material_ids:
+					return _json_response({"error": f"material_ids 引用了本版本选中素材之外的素材：{value}"}, 400)
+				if value not in material_ids:
+					material_ids.append(value)
 			diff.append({
 				"section": str(item.get("section") or ""),
 				"before": str(item.get("before") or ""),
@@ -2152,12 +2173,14 @@ def api_resume_version_patch(resume_id):
 				"reason": str(item.get("reason") or ""),
 				"risk": str(item.get("risk") or ""),
 				"adopted": bool(item.get("adopted", True)),
+				"material_ids": material_ids,
 			})
 
 		from openjob.ai.resume_engine import reassemble_from_diff
 		from openjob.ai.resume_engine.optimizer import validate_assembled
 
 		assembled = reassemble_from_diff(base_md, diff)
+		# PATCH 时素材事实已经过生成期审计，此处不做重复放宽
 		blocking, warnings = validate_assembled(base_md, assembled)
 		if blocking:
 			return _json_response({"error": "；".join(blocking), "blocking": blocking}, 400)

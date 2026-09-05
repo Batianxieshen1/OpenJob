@@ -323,6 +323,7 @@ def reassemble_from_diff(resume_md_base: str, diff: list[dict]) -> str:
             after=item.get("after", ""),
             reason=item.get("reason", ""),
             risk=item.get("risk", ""),
+            material_ids=list(item.get("material_ids") or []),
         )
         for item in diff
         if item.get("adopted", True)

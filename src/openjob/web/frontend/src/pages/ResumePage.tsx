@@ -10,6 +10,18 @@ interface JobLite {
   resume_status?: string | null
 }
 
+const MATERIAL_TYPE_LABELS: Record<string, string> = {
+  experience: '经历',
+  project: '项目',
+  award: '奖项',
+  student_work: '学生工作',
+  campus_activity: '校园活动',
+  skill_evidence: '技能佐证',
+  certification: '证书',
+  other: '其他',
+}
+const TYPE_LABEL = (t: string) => MATERIAL_TYPE_LABELS[t] || t
+
 interface DiffBlock {
   section: string
   before: string
@@ -17,6 +29,7 @@ interface DiffBlock {
   reason: string
   risk: string
   adopted: boolean
+  material_ids?: string[]
 }
 
 interface ResumeVersion {
@@ -28,7 +41,19 @@ interface ResumeVersion {
   error: string | null
 }
 
+interface MaterialSnapshot {
+  id: string
+  type: string
+  title: string
+  organization?: string
+  role?: string
+  target_directions?: string[]
+}
+
 interface VersionDetail extends ResumeVersion {
+  material_library_sha256?: string | null
+  material_selection_json?: string | null
+  material_candidates_json?: string | null
   base_resume_id?: string | null
   jd_analysis_json: string | null
   match_report_json: string | null
@@ -396,6 +421,32 @@ export default function ResumePage() {
 
           {/* 中：diff 逐块审阅 */}
           <div className="space-y-3">
+            {(() => {
+              try {
+                const selection = detail?.material_selection_json ? (JSON.parse(detail.material_selection_json) as MaterialSnapshot[]) : []
+                if (!selection.length) return null
+                return (
+                  <section className="rounded-card border border-card-border bg-card p-4">
+                    <h3 className="text-xs font-bold text-muted">本版本素材（可追溯，AI 只引用以下真实素材）</h3>
+                    <ul className="mt-2 space-y-1">
+                      {selection.map(m => {
+                        const usedCount = diff.filter(b => (b.material_ids || []).includes(m.id)).length
+                        return (
+                          <li key={m.id} className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="rounded-full bg-accent-soft px-2 py-0.5 font-semibold text-primary">{m.id}</span>
+                            <span className="text-foreground">{m.title}</span>
+                            <span className="text-muted-3">{TYPE_LABEL(m.type)}</span>
+                            {usedCount > 0 && <span className="text-success">已引用 {usedCount} 处</span>}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </section>
+                )
+              } catch {
+                return null
+              }
+            })()}
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold">修改对照（{diff.length} 处）</h2>
               <div className="flex items-center gap-2">
@@ -441,6 +492,7 @@ export default function ResumePage() {
                   {block.before}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap leading-5">{block.after}</p>
+                <p className="mt-1 text-[11px] text-primary">来源素材：{block.material_ids?.join("、") || "无"}</p>
                 <p className="mt-1.5 text-muted">理由：{block.reason}</p>
                 {block.risk && (
                   <p className="mt-1 rounded-control bg-warning/10 px-2 py-1 text-warning">待核实：{block.risk}</p>
