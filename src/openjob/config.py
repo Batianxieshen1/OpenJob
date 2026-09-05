@@ -65,6 +65,8 @@ DEFAULTS: dict[str, Any] = {
     "profile": {
         "resume_path": "./resume.md",
         "resume_output_dir": "./data/resumes",
+        "resume_materials_enabled": True,
+        "resume_materials_path": "./data/resume_materials.xlsx",
         "target_cities": ["北京"],
         "education": "",
         "recruitment_type": "",
