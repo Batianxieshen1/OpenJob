@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider'
 import { TagsInput } from '@/components/ui/tags-input'
 import { CityMultiSelect, type CityOption } from '@/components/config/CityMultiSelect'
 import { BaseResumes } from '@/components/config/BaseResumes'
+import { ResumeMaterials } from '@/components/config/ResumeMaterials'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Save, RotateCcw, Upload, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -308,6 +309,7 @@ export default function ConfigPage() {
               )}
             </div>
             <BaseResumes />
+            <ResumeMaterials config={config} updateConfig={updateConfig} />
             <div className="grid grid-cols-2 gap-4">
               <Field label="最高学历">
                 <Select value={config.profile?.education || ''} onChange={e => updateConfig('profile.education', e.target.value)}>
