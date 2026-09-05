@@ -184,6 +184,7 @@ class SectionChange:
     after: str
     reason: str
     risk: str = ""  # 非空 = 风险标记，需人工核实
+    material_ids: list[str] = field(default_factory=list)  # 引用的素材库 ID（须为候选集子集）
 
     @staticmethod
     def from_payload(data: object) -> "SectionChange":
@@ -201,12 +202,23 @@ class SectionChange:
             raise ValueError("修改块缺少 after（改写）")
         if not reason.strip():
             raise ValueError("修改块缺少 reason（修改理由）")
+        material_ids_raw = data.get("material_ids", [])
+        if not isinstance(material_ids_raw, list):
+            raise ValueError("material_ids 必须是字符串数组")
+        material_ids = []
+        for raw_id in material_ids_raw:
+            value = str(raw_id or "").strip()
+            if not value:
+                continue
+            if value not in material_ids:
+                material_ids.append(value)
         return SectionChange(
             section=section.strip(),
             before=before,
             after=after,
             reason=reason.strip(),
             risk=_require_str(data, "risk"),
+            material_ids=material_ids,
         )
 
 
