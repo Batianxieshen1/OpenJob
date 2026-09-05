@@ -1,4 +1,5 @@
 import io
+from io import BytesIO
 import json
 import tempfile
 import time
@@ -2094,3 +2095,180 @@ class WebApiRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MaterialsApiTests(unittest.TestCase):
+    """素材库 API：上传/替换/预览/模板/删除 + 损坏文件保护。"""
+
+    ALL_HEADERS = [
+        "id", "type", "title", "organization", "role", "start_date", "end_date",
+        "description", "achievements", "skills", "keywords", "target_directions",
+        "source", "resume_allowed", "priority", "notes",
+    ]
+
+    def setUp(self):
+        self.original_base_dir = server.BASE_DIR
+        self._tmp = tempfile.TemporaryDirectory()
+        server.set_base_dir(self._tmp.name)
+
+    def tearDown(self):
+        server.set_base_dir(self.original_base_dir)
+        self._tmp.cleanup()
+
+    def _request(self, path, method="GET", body=None, content_type=None):
+        if "?" in path:
+            path, query = path.split("?", 1)
+        else:
+            query = ""
+        status_headers = {}
+
+        def start_response(status, headers, exc_info=None):
+            status_headers["status"] = status
+            status_headers["headers"] = dict(headers)
+
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path,
+            "QUERY_STRING": query,
+            "SERVER_NAME": "127.0.0.1",
+            "SERVER_PORT": "8686",
+            "wsgi.version": (1, 0),
+            "wsgi.url_scheme": "http",
+            "wsgi.input": io.BytesIO(body or b""),
+            "wsgi.errors": io.StringIO(),
+            "wsgi.multithread": False,
+            "wsgi.multiprocess": False,
+            "wsgi.run_once": False,
+        }
+        if body is not None:
+            environ["CONTENT_LENGTH"] = str(len(body))
+        if content_type:
+            environ["CONTENT_TYPE"] = content_type
+        response_iter = server.app(environ, start_response)
+        payload = b"".join(response_iter)
+        close = getattr(response_iter, "close", None)
+        if close:
+            close()
+        return status_headers["status"], payload
+
+    def _json(self, status_payload_pair):
+        status, body = status_payload_pair
+        try:
+            return status, json.loads(body)
+        except (json.JSONDecodeError, TypeError):
+            return status, body
+
+    def _build_xlsx(self, rows, headers=None):
+        from openpyxl import Workbook
+
+        headers = headers or self.ALL_HEADERS
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "素材库"
+        ws.append(headers)
+        for row in rows:
+            ws.append([row.get(h, "") for h in headers])
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    def _upload_xlsx(self, content, filename="materials.xlsx"):
+        boundary = "----OpenJobMaterials"
+        crlf = "\r\n"
+        disposition = (
+            f"--{boundary}{crlf}"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"{crlf}'
+            f"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{crlf}{crlf}"
+        )
+        body = disposition.encode("utf-8") + content + (crlf + f"--{boundary}--" + crlf).encode("utf-8")
+        return self._request(
+            "/api/resume/materials/upload",
+            method="POST",
+            body=body,
+            content_type=f"multipart/form-data; boundary={boundary}",
+        )
+
+    def test_materials_upload_status_preview_and_replace(self):
+        content = self._build_xlsx([
+            {"id": "m1", "type": "award", "title": "一等奖", "description": "市级调研作品", "resume_allowed": "是"},
+            {"id": "m2", "type": "experience", "title": "运营实习", "description": "公众号运营", "resume_allowed": "是"},
+        ])
+        status, data = self._json(self._upload_xlsx(content))
+        self.assertEqual(status, "200 OK")
+        self.assertTrue(data["success"])
+        self.assertEqual(data["count"], 2)
+
+        status, payload = self._json(self._request("/api/resume/materials/status"))
+        self.assertTrue(payload["valid"])
+        self.assertEqual(payload["count"], 2)
+        self.assertTrue(payload["sha256"])
+
+        status, payload = self._json(self._request("/api/resume/materials?type=award&q=" + quote("一等奖")))
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["items"][0]["id"], "m1")
+        self.assertNotIn("source", payload["items"][0])
+        self.assertNotIn("notes", payload["items"][0])
+
+        new_content = self._build_xlsx([
+            {"id": "n1", "type": "project", "title": "新项目", "description": "新描述", "resume_allowed": "是"},
+        ])
+        status, data = self._json(self._upload_xlsx(new_content))
+        self.assertEqual(data["count"], 1)
+        status, payload = self._json(self._request("/api/resume/materials/status"))
+        self.assertEqual(payload["count"], 1)
+        self.assertNotIn("m1", json.dumps(payload))
+
+    def test_materials_upload_rejects_bad_workbook_without_replacing_existing_file(self):
+        good = self._build_xlsx([
+            {"id": "m1", "type": "award", "title": "一等奖", "description": "市级", "resume_allowed": "是"},
+        ])
+        status, data = self._json(self._upload_xlsx(good))
+        self.assertTrue(data["success"])
+        _, payload = self._json(self._request("/api/resume/materials/status"))
+        first_hash = payload["sha256"]
+
+        bad = self._build_xlsx([], headers=["id", "title"])
+        status, body = self._request(
+            "/api/resume/materials/upload",
+            method="POST",
+            body=None,
+        )
+        # 用坏文件重传（复用上传 helper 的 multipart 构造，仅替换内容）
+        boundary = "----OpenJobMaterials"
+        crlf = "\r\n"
+        disposition = (
+            f"--{boundary}{crlf}"
+            f'Content-Disposition: form-data; name="file"; filename="bad.xlsx"{crlf}'
+            f"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{crlf}{crlf}"
+        )
+        multipart = disposition.encode("utf-8") + bad + (crlf + f"--{boundary}--" + crlf).encode("utf-8")
+        status, body = self._request(
+            "/api/resume/materials/upload",
+            method="POST",
+            body=multipart,
+            content_type=f"multipart/form-data; boundary={boundary}",
+        )
+        self.assertIn("400", status)
+        self.assertIn("缺少必需列", body.decode("utf-8"))
+
+        status, payload = self._json(self._request("/api/resume/materials/status"))
+        self.assertTrue(payload["valid"])
+        self.assertEqual(payload["sha256"], first_hash)
+
+    def test_materials_template_and_delete(self):
+        from openpyxl import load_workbook
+
+        status, body = self._request("/api/resume/materials/template")
+        self.assertEqual(status, "200 OK")
+        self.assertTrue(body.startswith(b"PK"))
+        self.assertIn("素材库", load_workbook(BytesIO(body)).sheetnames)
+
+        good = self._build_xlsx([
+            {"id": "m1", "type": "award", "title": "一等奖", "description": "市级", "resume_allowed": "是"},
+        ])
+        self._upload_xlsx(good)
+        status, payload = self._json(self._request("/api/resume/materials", method="DELETE"))
+        self.assertTrue(payload["success"])
+        status, payload = self._json(self._request("/api/resume/materials/status"))
+        self.assertFalse(payload["valid"])
+        self.assertEqual(payload["count"], 0)

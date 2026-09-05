@@ -1799,6 +1799,135 @@ def api_job_resume_download(job_id):
 
 
 
+# ---------- 简历素材库 API（本地数据；source/notes 不出索引） ----------
+
+MATERIALS_DATA_DIR = DATA_DIR  # set_base_dir 后随 BASE_DIR 走
+
+
+def _materials_paths():
+    from openjob.config import load_config
+
+    config = load_config()
+    enabled = bool((config.get("profile") or {}).get("resume_materials_enabled", True))
+    raw = (config.get("profile") or {}).get("resume_materials_path") or "./data/resume_materials.xlsx"
+    resolved = Path(raw).resolve()
+    xlsx_path = resolved if resolved.is_file() or raw.startswith("./data") or "data" in resolved.parts else DATA_DIR / "resume_materials.xlsx"
+    if not str(xlsx_path).startswith(str(DATA_DIR)):
+        xlsx_path = DATA_DIR / "resume_materials.xlsx"
+    index_path = xlsx_path.with_name(xlsx_path.stem + ".index.json")
+    return enabled, xlsx_path, index_path
+
+
+def _materials_status_payload() -> dict:
+    enabled, xlsx_path, index_path = _materials_paths()
+    payload = {"enabled": enabled, "valid": False, "filename": xlsx_path.name, "count": 0, "sha256": "", "updated_at": "", "errors": []}
+    if not xlsx_path.exists() or not index_path.exists():
+        return payload
+    try:
+        from openjob.resume_materials import load_index
+
+        library = load_index(index_path)
+        payload.update(valid=True, count=library.count, sha256=library.sha256[:12], updated_at=library.updated_at)
+    except Exception as exc:
+        payload["errors"] = [str(exc)]
+    return payload
+
+
+@app.route("/api/resume/materials/status")
+def api_materials_status():
+    return _json_response(_materials_status_payload())
+
+
+@app.route("/api/resume/materials")
+def api_materials_list():
+    def _fix_query_mojibake(value: str) -> str:
+        """bottle 对 QUERY_STRING 的中文按 latin-1 解码产生 mojibake，转回 utf-8。"""
+        try:
+            return value.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return value
+
+    payload = _materials_status_payload()
+    if not payload["valid"]:
+        return _json_response({"items": [], "total": 0, **payload})
+    from openjob.resume_materials import load_index
+
+    _, _, index_path = _materials_paths()
+    library = load_index(index_path)
+    type_filter = _fix_query_mojibake(request.params.get("type", "")).strip().lower()
+    query = _fix_query_mojibake(request.params.get("q", "")).strip().lower()
+    try:
+        limit = max(1, min(200, int(request.params.get("limit", "50"))))
+    except ValueError:
+        limit = 50
+    items = []
+    for item in library.items:
+        if type_filter and item.get("type") != type_filter:
+            continue
+        blob = " ".join(str(item.get(k) or "") for k in ("title", "organization", "role", "description", "skills", "keywords")).lower()
+        if query and query not in blob:
+            continue
+        items.append({k: v for k, v in item.items() if k not in ("source", "notes")})
+    return _json_response({"items": items[:limit], "total": len(items), **payload})
+
+
+@app.route("/api/resume/materials/upload", method="POST")
+def api_materials_upload():
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return _json_response({"error": "请选择 .xlsx 素材文件"}, 400)
+    content = upload.file.read()
+    from openjob.resume_materials import MaterialLibraryError, parse_workbook, save_library_atomically
+
+    try:
+        library = parse_workbook(content, filename=upload.filename)
+    except MaterialLibraryError as exc:
+        return _json_response({"error": str(exc)}, 400)
+    except Exception as exc:
+        return _json_response({"error": f"素材文件处理失败：{exc}"}, 500)
+
+    _, xlsx_path, index_path = _materials_paths()
+    try:
+        save_library_atomically(library, content, xlsx_path=xlsx_path, index_path=index_path)
+    except OSError as exc:
+        return _json_response({"error": f"保存失败：{exc}"}, 500)
+    return _json_response({"success": True, "filename": upload.filename, "count": library.count, "sha256": library.sha256[:12]})
+
+
+@app.route("/api/resume/materials/refresh", method="POST")
+def api_materials_refresh():
+    from openjob.resume_materials import MaterialLibraryError, load_or_refresh_library
+
+    _, xlsx_path, index_path = _materials_paths()
+    if not xlsx_path.exists():
+        return _json_response({"error": "未找到素材库文件，请先上传"}, 400)
+    try:
+        library = load_or_refresh_library(xlsx_path, index_path)
+    except MaterialLibraryError as exc:
+        return _json_response({"error": str(exc)}, 400)
+    return _json_response({"success": True, "count": library.count, "sha256": library.sha256[:12]})
+
+
+@app.route("/api/resume/materials/template")
+def api_materials_template():
+    from openjob.resume_materials import build_template_workbook
+
+    content = build_template_workbook()
+    response.set_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response.set_header("Content-Disposition", 'attachment; filename="openjob-resume-materials-template.xlsx"')
+    return content
+
+
+@app.route("/api/resume/materials", method="DELETE")
+def api_materials_delete():
+    _, xlsx_path, index_path = _materials_paths()
+    # 只允许删除标准位置且位于 DATA_DIR 内的文件，不接受请求传入的任意路径
+    for path in (xlsx_path, index_path):
+        if path.exists() and str(path).startswith(str(DATA_DIR)):
+            path.unlink()
+    return _json_response({"success": True})
+
+
 @app.route("/api/resume/bases")
 def api_resume_bases_list():
 	db = _get_web_db()
