@@ -222,11 +222,20 @@ def generate_resume(
             # ③.5 素材 ID 校验：只允许引用候选集；选中素材快照用于审计与可信事实
             selected_materials: list[dict] = []
             if candidates:
-                from openjob.ai.resume_engine.materials import validate_material_ids
+                from openjob.ai.resume_engine.materials import (
+                    MAX_MATERIAL_BACKED_CHANGES,
+                    validate_material_ids,
+                )
 
                 for change in rewrite.changes:
                     validated = validate_material_ids(change.material_ids, candidates)
                     change.material_ids = validated
+                material_backed = [c for c in rewrite.changes if c.material_ids]
+                if len(material_backed) > MAX_MATERIAL_BACKED_CHANGES:
+                    reason = f"本次改写最多只能让 {MAX_MATERIAL_BACKED_CHANGES} 个简历变量行使用新增素材"
+                    update_resume_version(db, resume_id, status="failed", error=reason)
+                    set_job_resume_pointer(db, job_id, resume_id=resume_id, resume_status="failed")
+                    return _fail(job_id, reason)
                 used_ids = {mid for c in rewrite.changes for mid in c.material_ids}
                 selected_materials = [
                     {k: v for k, v in c.material.items() if k not in ("source", "notes")}

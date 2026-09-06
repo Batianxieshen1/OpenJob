@@ -317,6 +317,27 @@ def save_library_atomically(
         os.replace(tmp, target)
 
 
+def resolve_library_paths(config: dict, data_dir: Path) -> tuple[Path, Path]:
+    """解析并校验素材 XLSX 与索引路径，二者必须位于 data_dir 内。
+
+    - 从 config["profile"]["resume_materials_path"] 读取，未配置用默认；
+    - 相对路径按 data_dir.parent（项目根目录）解析，不按进程工作目录；
+    - 越界路径抛 MaterialLibraryError，不静默切换文件。
+    """
+    raw = str((config.get("profile") or {}).get("resume_materials_path") or "./data/resume_materials.xlsx")
+    data_root = Path(data_dir).resolve()
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        candidate = data_root.parent / candidate
+    candidate = candidate.resolve()
+    try:
+        candidate.relative_to(data_root)
+    except ValueError as exc:
+        raise MaterialLibraryError("简历素材库路径必须位于项目 data 目录内") from exc
+    index_path = candidate.parent / (candidate.stem + ".index.json")
+    return candidate, index_path
+
+
 def load_or_refresh_library(materials_path: Path, index_path: Path) -> MaterialLibrary:
     """生成期入口：文件存在但索引缺失/哈希不一致/索引损坏时重新解析当前 XLSX。"""
     if not materials_path.exists():

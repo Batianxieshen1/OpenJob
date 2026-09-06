@@ -28,6 +28,7 @@ from openjob.ai.credentials import get_ai_api_key
 from openjob.cancellation import OperationCancelled
 from openjob.cities import CityRefreshError, get_city_map, load_city_snapshot, refresh_city_cache
 from openjob.config import AI_SERVICE_PRESETS, load_config, remove_retired_collection_settings
+from openjob.ai.resume_engine.materials import MAX_MATERIAL_BACKED_CHANGES, MAX_SELECTED_MATERIALS
 from openjob.db import (
 	JobDeletionConflictError,
 	JobManualSentConflictError,
@@ -1806,28 +1807,35 @@ MATERIALS_DATA_DIR = DATA_DIR  # set_base_dir 后随 BASE_DIR 走
 
 def _materials_paths():
     from openjob.config import load_config
+    from openjob.resume_materials import resolve_library_paths
 
     config = load_config()
     enabled = bool((config.get("profile") or {}).get("resume_materials_enabled", True))
-    raw = (config.get("profile") or {}).get("resume_materials_path") or "./data/resume_materials.xlsx"
-    resolved = Path(raw).resolve()
-    xlsx_path = resolved if resolved.is_file() or raw.startswith("./data") or "data" in resolved.parts else DATA_DIR / "resume_materials.xlsx"
-    if not str(xlsx_path).startswith(str(DATA_DIR)):
-        xlsx_path = DATA_DIR / "resume_materials.xlsx"
-    index_path = xlsx_path.with_name(xlsx_path.stem + ".index.json")
+    xlsx_path, index_path = resolve_library_paths(config, DATA_DIR)
     return enabled, xlsx_path, index_path
 
 
 def _materials_status_payload() -> dict:
+    import hashlib
+
     enabled, xlsx_path, index_path = _materials_paths()
-    payload = {"enabled": enabled, "valid": False, "filename": xlsx_path.name, "count": 0, "sha256": "", "updated_at": "", "errors": []}
+    payload = {
+        "enabled": enabled, "valid": False, "stale": False, "source_sha256": "",
+        "filename": xlsx_path.name, "count": 0, "sha256": "", "updated_at": "", "errors": [],
+    }
     if not xlsx_path.exists() or not index_path.exists():
         return payload
     try:
         from openjob.resume_materials import load_index
 
         library = load_index(index_path)
-        payload.update(valid=True, count=library.count, sha256=library.sha256[:12], updated_at=library.updated_at)
+        source_sha = hashlib.sha256(xlsx_path.read_bytes()).hexdigest()
+        stale = source_sha != library.sha256
+        payload.update(
+            valid=True, stale=stale, count=library.count,
+            sha256=library.sha256[:12], source_sha256=source_sha[:12],
+            updated_at=library.updated_at,
+        )
     except Exception as exc:
         payload["errors"] = [str(exc)]
     return payload
@@ -2151,6 +2159,8 @@ def api_resume_version_patch(resume_id):
 				allowed_material_ids = set()
 
 		diff = []
+		used_material_ids: list[str] = []
+		material_backed_changes = 0
 		for item in data["diff"]:
 			if not isinstance(item, dict):
 				return _json_response({"error": "diff 项必须是对象"}, 400)
@@ -2166,6 +2176,14 @@ def api_resume_version_patch(resume_id):
 					return _json_response({"error": f"material_ids 引用了本版本选中素材之外的素材：{value}"}, 400)
 				if value not in material_ids:
 					material_ids.append(value)
+				if value not in used_material_ids:
+					used_material_ids.append(value)
+			if material_ids:
+				material_backed_changes += 1
+			if len(used_material_ids) > MAX_SELECTED_MATERIALS:
+				return _json_response({"error": f"本次改写最多只能引用 {MAX_SELECTED_MATERIALS} 条素材"}, 400)
+			if material_backed_changes > MAX_MATERIAL_BACKED_CHANGES:
+				return _json_response({"error": f"本次改写最多只能让 {MAX_MATERIAL_BACKED_CHANGES} 个简历变量行使用新增素材"}, 400)
 			diff.append({
 				"section": str(item.get("section") or ""),
 				"before": str(item.get("before") or ""),

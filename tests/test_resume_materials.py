@@ -158,3 +158,42 @@ def test_load_or_refresh_reuses_index_and_reparses_on_hash_change(tmp_path):
     missing = tmp_path / "nope.xlsx"
     with pytest.raises(MaterialLibraryError, match="未找到简历素材库"):
         load_or_refresh_library(missing, index_path)
+
+
+def test_resolve_library_paths_default_custom_and_out_of_bounds(tmp_path):
+    from openjob.resume_materials import resolve_library_paths
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    # 默认：./data/resume_materials.xlsx 相对项目根解析，落在 data_dir 内
+    x, i = resolve_library_paths({"profile": {}}, data_dir)
+    assert x == data_dir / "resume_materials.xlsx"
+    assert i == data_dir / "resume_materials.index.json"
+
+    # 自定义文件名：data/ 内
+    x, i = resolve_library_paths(
+        {"profile": {"resume_materials_path": "./data/custom-materials.xlsx"}}, data_dir
+    )
+    assert x == data_dir / "custom-materials.xlsx"
+    assert i == data_dir / "custom-materials.index.json"
+
+    # 相对越界：../outside.xlsx 拒绝
+    with pytest.raises(MaterialLibraryError, match="data 目录"):
+        resolve_library_paths(
+            {"profile": {"resume_materials_path": "../outside.xlsx"}}, data_dir
+        )
+
+    # 绝对路径越界：拒绝
+    outside = tmp_path / "outside" / "m.xlsx"
+    outside.parent.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(MaterialLibraryError, match="data 目录"):
+        resolve_library_paths(
+            {"profile": {"resume_materials_path": str(outside)}}, data_dir
+        )
+
+    # data 内子目录：允许
+    x, i = resolve_library_paths(
+        {"profile": {"resume_materials_path": "./data/sub/dir/m.xlsx"}}, data_dir
+    )
+    assert x == data_dir / "sub" / "dir" / "m.xlsx"

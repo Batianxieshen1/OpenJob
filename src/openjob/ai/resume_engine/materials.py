@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 
 from openjob.ai.resume_engine.models import JdProfile
 
+MAX_SELECTED_MATERIALS = 4
+MAX_MATERIAL_BACKED_CHANGES = 3
+
 _TOKEN_SPLIT = re.compile(r"[,，、/\s]+")
 
 
@@ -115,7 +118,7 @@ def rank_materials(items: list[dict], jd: JdProfile, *, limit: int = 8) -> list[
 
 
 def validate_material_ids(ids: list[str], candidates: list[Candidate]) -> list[str]:
-    """校验 AI 选择的素材 ID 必须属于本次候选集；非法 ID 直接抛错。"""
+    """校验 AI 选择的素材 ID：必须属于候选集，去重后最多 4 条。"""
     allowed = {c.material.get("id") for c in candidates}
     cleaned: list[str] = []
     for raw in ids:
@@ -126,6 +129,8 @@ def validate_material_ids(ids: list[str], candidates: list[Candidate]) -> list[s
             raise ValueError(f"AI 引用了候选素材之外的素材：{value}")
         if value not in cleaned:
             cleaned.append(value)
+    if len(cleaned) > MAX_SELECTED_MATERIALS:
+        raise ValueError(f"本次改写最多只能引用 {MAX_SELECTED_MATERIALS} 条素材")
     return cleaned
 
 

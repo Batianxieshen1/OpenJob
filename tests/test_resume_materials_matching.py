@@ -96,3 +96,20 @@ def test_material_prompt_hides_source_and_notes():
 
 def test_material_prompt_empty_candidates_returns_empty_string():
     assert material_prompt([]) == ""
+
+
+def test_validate_material_ids_enforces_max_four():
+    from openjob.ai.resume_engine.materials import MAX_SELECTED_MATERIALS
+
+    candidates = [
+        Candidate(material={"id": f"m{i}"}, score=10, reasons=[]) for i in range(6)
+    ]
+    four = validate_material_ids(["m0", "m1", "m2", "m3"], candidates)
+    assert len(four) == 4
+
+    # 重复去重后 5 条仍拒绝
+    with pytest.raises(ValueError, match="最多只能引用"):
+        validate_material_ids(["m0", "m0", "m1", "m2", "m3", "m4"], candidates)
+
+    with pytest.raises(ValueError, match="候选素材"):
+        validate_material_ids(["nope"], candidates)

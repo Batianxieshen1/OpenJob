@@ -21,6 +21,8 @@ interface MaterialItem {
 interface StatusPayload {
   enabled: boolean
   valid: boolean
+  stale?: boolean
+  source_sha256?: string
   filename: string
   count: number
   sha256: string
@@ -145,18 +147,24 @@ export function ResumeMaterials({ config, updateConfig }: {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted">
-        本地 XLSX 素材库（经历/奖项/学生工作/项目）。生成定制简历时，AI 只允许引用你勾选可用的真实素材，杜绝虚构；
-        素材只保存在本机，不会自动发送。
-      </p>
+      <div className="space-y-1 text-xs leading-5 text-muted">
+        <p>启用后，生成定制简历时会根据 JD 匹配本地素材并记录引用来源。</p>
+        <p>素材库未上传时，系统会继续使用底稿原文，不会阻断生成。</p>
+        <p>关闭后，生成流程只使用简历底稿。素材只保存在本机，不会自动发送。</p>
+      </div>
 
       {/* 状态行 */}
       <div className="flex flex-wrap items-center gap-2 rounded-control border border-card-border bg-surface-hover px-3 py-2.5 text-xs">
         <FileSpreadsheet className="h-4 w-4 text-primary" />
         {status?.valid ? (
-          <span className="text-foreground">
+          <span className="flex flex-wrap items-center gap-2 text-foreground">
+            <span
+              className={`rounded-full px-2 py-0.5 font-semibold ${status.stale ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success'}`}
+            >
+              {status.stale ? '索引过期' : '已同步'}
+            </span>
             <span className="font-semibold">{status.filename}</span>
-            <span className="ml-2 text-muted tabular-nums">{status.count} 条素材 · {status.updated_at} · {status.sha256}</span>
+            <span className="text-muted tabular-nums">{status.count} 条素材 · {status.updated_at} · {status.sha256}</span>
           </span>
         ) : (
           <span className="text-muted">
@@ -164,6 +172,12 @@ export function ResumeMaterials({ config, updateConfig }: {
           </span>
         )}
       </div>
+
+      {status?.stale && (
+        <div className="rounded-control border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+          检测到 XLSX 源文件已更新，当前预览是旧索引，请点击「刷新索引」。
+        </div>
+      )}
 
       {status?.errors?.length ? (
         <div className="rounded-control border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
@@ -201,13 +215,13 @@ export function ResumeMaterials({ config, updateConfig }: {
           下载模板
         </Button>
         <Button
-          variant="secondary"
+          variant={status?.stale ? 'default' : 'secondary'}
           size="sm"
           disabled={busy !== null || !status?.filename}
           onClick={() => void handleRefresh()}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />
-          刷新索引
+          刷新索引{status?.stale ? '（源文件已更新）' : ''}
         </Button>
         <Button
           variant="secondary"

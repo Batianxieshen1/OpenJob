@@ -1,11 +1,23 @@
-# -*- coding: utf-8 -*-
-"""用户自维护素材表 → 标准素材库格式转换器（一次性适配，不改动原文件）"""
+"""用户自维护素材表（多工作表中文格式）→ 标准素材库格式转换器。
+
+用法：
+    python scripts/convert_user_materials.py --input "源.xlsx" --output "目标.xlsx"
+    python scripts/convert_user_materials.py --input 源.xlsx --output 目标.xlsx --dry-run
+    python scripts/convert_user_materials.py --input 源.xlsx --output 目标.xlsx --force
+
+规则：
+- 源文件需包含 📋 经历 / 🏆 奖项 / 📜 证明 三张工作表；
+- 不修改源文件；输出先写临时文件，成功后替换目标；
+- 默认拒绝覆盖已存在的目标（--force 覆盖）；
+- 缺少描述的事实素材会直接失败（可先用 --dry-run 查看统计）。
+"""
+from __future__ import annotations
+
+import argparse
+import io
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
-
-SRC = Path(r'C:\Users\暴龙战士wink\Desktop\个人简历\简历素材库.xlsx')
-OUT = Path(r'C:\Users\暴龙战士wink\Desktop\agent\OpenJob\data\resume_materials.xlsx')
 
 HEADERS = [
     "id", "type", "title", "organization", "role", "start_date", "end_date",
@@ -13,13 +25,15 @@ HEADERS = [
     "source", "resume_allowed", "priority", "notes",
 ]
 
+REQUIRED_SHEETS = ("📋 经历", "🏆 奖项", "📜 证明")
+
 
 def cell(row, header_map, name):
     idx = header_map.get(name)
     if idx is None or idx >= len(row):
         return ""
-    v = row[idx]
-    return str(v).strip() if v is not None else ""
+    value = row[idx]
+    return str(value).strip() if value is not None else ""
 
 
 def norm_date(raw):
@@ -30,12 +44,8 @@ def norm_date(raw):
     parts = raw.replace("-", ".").split(".")
     if len(parts) == 1 and parts[0].isdigit():
         return parts[0]
-    if len(parts) >= 2 and parts[0].isdigit():
-        year = parts[0]
-        month = parts[1].zfill(2) if parts[1].isdigit() else ""
-        if month:
-            return f"{year}-{month}"
-        return year
+    if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+        return f"{parts[0]}-{parts[1].zfill(2)}"
     return raw
 
 
@@ -56,29 +66,42 @@ def classify_experience(category):
     return "experience"
 
 
-def main():
-    wb = load_workbook(SRC, data_only=True, read_only=True)
-    materials = []
+def parse_source(src: Path):
+    """解析三张中文工作表，返回 (materials, warnings)。缺表/缺列/重复 id 直接失败。"""
+    if not src.exists():
+        raise SystemExit(f"失败：源文件不存在：{src}")
+    wb = load_workbook(src, data_only=True, read_only=True)
+    missing_sheets = [s for s in REQUIRED_SHEETS if s not in wb.sheetnames]
+    if missing_sheets:
+        raise SystemExit(f"失败：源文件缺少工作表：{'、'.join(missing_sheets)}")
+
+    materials: list[dict] = []
+    warnings: list[str] = []
 
     # ---------- 📋 经历 ----------
     sheet = wb["📋 经历"]
     rows = list(sheet.iter_rows(values_only=True))
     hm = {h.strip(): i for i, h in enumerate(rows[0]) if h}
+    for col in ("名称 / 标题", "详细描述（STAR 法则", "关键技能", "适用岗位"):
+        if col not in hm:
+            raise SystemExit(f"失败：📋 经历表缺少列「{col}」")
     for row in rows[1:]:
-        if not cell(row, hm, "名称 / 标题"):
+        title = cell(row, hm, "名称 / 标题")
+        if not title:
             continue
         seq = cell(row, hm, "序号") or len(materials) + 1
         category = cell(row, hm, "类别")
         description = cell(row, hm, "详细描述（STAR 法则")
         achievements = cell(row, hm, "量化成果")
         if not description:
-            description = f"{cell(row, hm, '名称 / 标题')}：{cell(row, hm, '角色 / 职位') or '参与'}，{achievements or '详见成果'}"
+            warnings.append(f"经历「{title}」缺少详细描述，已用角色/成果兜底（建议补齐）")
+            description = f"{title}：{cell(row, hm, '角色 / 职位') or '参与'}，{achievements or '详见成果'}"
         skills = cell(row, hm, "关键技能")
         target = cell(row, hm, "适用岗位")
         materials.append({
             "id": f"exp_{seq}",
             "type": classify_experience(category),
-            "title": cell(row, hm, "名称 / 标题"),
+            "title": title,
             "organization": cell(row, hm, "组织 / 机构"),
             "role": cell(row, hm, "角色 / 职位"),
             "start_date": norm_date(cell(row, hm, "开始时间")),
@@ -98,6 +121,9 @@ def main():
     sheet = wb["🏆 奖项"]
     rows = list(sheet.iter_rows(values_only=True))
     hm = {h.strip(): i for i, h in enumerate(rows[0]) if h}
+    for col in ("奖项全称", "获奖时间"):
+        if col not in hm:
+            raise SystemExit(f"失败：🏆 奖项表缺少列「{col}」")
     for row in rows[1:]:
         title = cell(row, hm, "奖项全称")
         if not title:
@@ -109,7 +135,9 @@ def main():
         description = cell(row, hm, "描述 / 参赛作品")
         if not description:
             description = f"{title}（{level or '奖项'}）"
-        achievements = "；".join(x for x in (level, f"排名/等级：{rank}" if rank else "", f"获奖比例：{ratio}" if ratio else "") if x)
+        achievements = "；".join(
+            x for x in (level, f"排名/等级：{rank}" if rank else "", f"获奖比例：{ratio}" if ratio else "") if x
+        )
         materials.append({
             "id": f"awd_{seq}",
             "type": "award",
@@ -129,10 +157,12 @@ def main():
             "notes": cell(row, hm, "备注")[:500],
         })
 
-    # ---------- 📜 证明 → certification ----------
+    # ---------- 📜 证明 ----------
     sheet = wb["📜 证明"]
     rows = list(sheet.iter_rows(values_only=True))
     hm = {h.strip(): i for i, h in enumerate(rows[0]) if h}
+    if "证书全称" not in hm:
+        raise SystemExit("失败：📜 证明表缺少列「证书全称」")
     for row in rows[1:]:
         title = cell(row, hm, "证书全称")
         if not title:
@@ -167,7 +197,20 @@ def main():
 
     wb.close()
 
-    # ---------- 生成标准 XLSX ----------
+    # ---------- 校验 ----------
+    ids = [m["id"] for m in materials]
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    if duplicates:
+        raise SystemExit(f"失败：存在重复 id：{'、'.join(duplicates)}")
+    missing_desc = [m["id"] for m in materials if not m["description"]]
+    if missing_desc:
+        raise SystemExit(
+            f"失败：以下 {len(missing_desc)} 条素材缺少描述（事实必须完整，请补齐后重试）：{'、'.join(missing_desc)}"
+        )
+    return materials, warnings
+
+
+def build_output(materials) -> bytes:
     out = Workbook()
     sheet = out.active
     sheet.title = "素材库"
@@ -179,12 +222,47 @@ def main():
             m["skills"], m["keywords"], m["target_directions"], m["source"],
             m["resume_allowed"], m["priority"], m["notes"],
         ])
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    out.save(OUT)
-    print(f"✓ 转换完成：{len(materials)} 条素材 → {OUT}")
-    print("  类型分布:", {t: sum(1 for m in materials if m['type'] == t) for t in set(m['type'] for m in materials)})
+    buf = io.BytesIO()
+    out.save(buf)
+    return buf.getvalue()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="用户自维护素材表 → 标准素材库格式")
+    parser.add_argument("--input", required=True, help="源 XLSX（📋 经历/🏆 奖项/📜 证明 三表）")
+    parser.add_argument("--output", required=True, help="目标 XLSX（标准素材库）")
+    parser.add_argument("--force", action="store_true", help="目标已存在时允许覆盖")
+    parser.add_argument("--dry-run", action="store_true", help="只解析并输出统计，不写文件")
+    args = parser.parse_args()
+
+    src = Path(args.input)
+    dst = Path(args.output)
+    if dst.exists() and not args.force and not args.dry_run:
+        raise SystemExit(f"失败：目标已存在：{dst}（使用 --force 覆盖）")
+
+    materials, warnings = parse_source(src)
+
+    for w in warnings:
+        print(f"⚠ {w}")
+    type_dist: dict[str, int] = {}
+    for m in materials:
+        type_dist[m["type"]] = type_dist.get(m["type"], 0) + 1
+    print(f"解析成功：{len(materials)} 条素材")
+    print(f"  类型分布: {type_dist}")
+
+    if args.dry_run:
+        print("dry-run：未写文件")
+        return
+
+    payload = build_output(materials)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_suffix(dst.suffix + ".tmp")
+    with open(tmp, "wb") as handle:
+        handle.write(payload)
+        handle.flush()
+    tmp.replace(dst)
+    print(f"✓ 转换完成：{len(materials)} 条素材 → {dst}")
 
 
 if __name__ == "__main__":
-    from openpyxl import Workbook  # noqa: F401
     main()
