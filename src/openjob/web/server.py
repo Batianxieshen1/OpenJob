@@ -1815,6 +1815,9 @@ def _materials_paths():
     return enabled, xlsx_path, index_path
 
 
+material_library_lock = Lock()
+
+
 def _materials_import_in_progress() -> bool:
     base = DATA_DIR / "resume_material_imports"
     return base.exists() and any(p.is_dir() for p in base.iterdir())
@@ -1888,6 +1891,9 @@ def api_materials_list():
 @app.route("/api/resume/materials/analyze", method="POST")
 def api_materials_analyze():
     """智能导入第一步：扫描任意 Excel，生成导入会话（不覆盖正式库）。"""
+    from openjob.resume_materials_import import cleanup_expired_import_sessions
+
+    cleanup_expired_import_sessions(DATA_DIR / "resume_material_imports")
     upload = request.files.get("file")
     if upload is None or not upload.filename:
         return _json_response({"error": "请选择 .xlsx 文件"}, 400)
@@ -1902,7 +1908,91 @@ def api_materials_analyze():
         if "10MB" in message or "xlsx" in message or "XLSX" in message or "ZIP" in message:
             return _json_response({"error": message}, 400)
         return _json_response({"error": f"分析失败：{message}"}, 400)
-    return _json_response({"success": True, **session.to_dict(), "requires_confirmation": True})
+    return _json_response({"success": True, **session.to_public_dict(), "requires_confirmation": True})
+
+
+@app.route("/api/resume/materials/preview", method="POST")
+def api_materials_preview():
+    """确认前预览：重新读取暂存文件，返回行级验证结果（分页）。"""
+    try:
+        data = request.json
+    except Exception:
+        return _json_response({"error": "请求体必须是 JSON"}, 400)
+    if not isinstance(data, dict) or not data.get("import_id"):
+        return _json_response({"error": "缺少 import_id"}, 400)
+
+    from openjob.resume_materials_import import ImportSession, validate_import_sheet
+
+    session_dir = DATA_DIR / "resume_material_imports" / str(data["import_id"])
+    imports_base = (DATA_DIR / "resume_material_imports").resolve()
+    try:
+        session_dir.resolve().relative_to(imports_base)
+    except ValueError:
+        return _json_response({"error": "非法 import_id"}, 400)
+    staged = session_dir / "source.xlsx"
+    analysis_path = session_dir / "analysis.json"
+    if not staged.exists() or not analysis_path.exists():
+        return _json_response({"error": "导入会话不存在或已过期，请重新分析"}, 404)
+
+    session = ImportSession.from_storage_dict(json.loads(analysis_path.read_text(encoding="utf-8")))
+    if data.get("source_sha256") and data["source_sha256"] != session.source_sha256:
+        return _json_response({"error": "源文件在分析后已被替换，请重新分析"}, 400)
+
+    sheet_config = dict(data.get("sheet") or {})
+    name = str(sheet_config.get("name") or "")
+    if not name:
+        return _json_response({"error": "缺少 sheet.name"}, 400)
+
+    defaults = data.get("defaults") or {"resume_allowed": True, "priority": 3}
+    try:
+        result = validate_import_sheet(
+            staged.read_bytes(), session=session, sheet_config=sheet_config, defaults=defaults,
+        )
+    except ValueError as exc:
+        return _json_response({"error": str(exc)}, 400)
+    except MaterialLibraryError as exc:
+        return _json_response({"error": str(exc)}, 400)
+
+    try:
+        page = max(1, int(data.get("page", 1)))
+        page_size = max(1, min(200, int(data.get("page_size", 50))))
+    except (TypeError, ValueError):
+        page, page_size = 1, 50
+
+    rows_payload = [
+        {
+            "excel_row": row.excel_row,
+            "generated_id": row.generated_id,
+            "type": row.material.get("type", "other"),
+            "title": row.material.get("title", ""),
+            "description": (row.material.get("description") or "")[:80],
+            "status": row.status,
+            "issues": list(row.issues),
+            "excluded": row.excluded,
+        }
+        for row in result.rows
+    ]
+    total_rows = len(rows_payload)
+    total_pages = max(1, -(-total_rows // page_size))
+    page = min(max(1, page), total_pages)
+    paged = rows_payload[(page - 1) * page_size : page * page_size]
+
+    return _json_response({
+        "success": True,
+        "sheet": {
+            "name": result.name,
+            "columns": list(result.columns),
+            "mapping": [dict(m) for m in result.mapping],
+            "total_rows": total_rows,
+            "valid_rows": len(result.valid_rows),
+            "invalid_rows": len(result.invalid_rows),
+            "excluded_rows": sum(1 for r in result.rows if r.excluded),
+        },
+        "rows": paged,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    })
 
 
 @app.route("/api/resume/materials/confirm", method="POST")
@@ -1928,25 +2018,71 @@ def api_materials_confirm():
     if not staged.exists() or not analysis_path.exists():
         return _json_response({"error": "导入会话不存在或已过期，请重新分析"}, 404)
 
-    session = ImportSession.from_dict(json.loads(analysis_path.read_text(encoding="utf-8")))
-    confirm = {**data, "session": session.to_dict()}
+    session = ImportSession.from_storage_dict(json.loads(analysis_path.read_text(encoding="utf-8")))
+    confirm = {**data, "session": session.to_storage_dict()}
 
     if data.get("source_sha256") and data["source_sha256"] != session.source_sha256:
         return _json_response({"error": "源文件在分析后已被替换，请重新分析"}, 400)
 
     enabled, official_xlsx, official_index = _materials_paths()
+    defaults = data.get("defaults") or {"resume_allowed": True, "priority": 3}
     from openjob.resume_materials import MaterialLibraryError
+    from openjob.resume_materials_import import cleanup_expired_import_sessions, validate_import_sheet
+
+    cleanup_expired_import_sessions(DATA_DIR / "resume_material_imports")
 
     warnings: list = []
+    invalid_summary: list[dict] = []
+    excluded_total = 0
+    all_items: list[dict] = []
     try:
-        items, warnings = normalize_import_rows(staged.read_bytes(), confirm)
-        if not items:
+        for sheet_conf in confirm["sheets"]:
+            if not sheet_conf.get("include", True):
+                warnings.append(f"Sheet「{sheet_conf.get('name')}」已按你的选择跳过")
+                continue
+            result = validate_import_sheet(
+                staged.read_bytes(), session=session, sheet_config=sheet_conf, defaults=defaults,
+            )
+            for row in result.rows:
+                if row.status == "example":
+                    excluded_total += 1
+                    warnings.append(f"Sheet「{result.name}」第 {row.excel_row} 行为模板示例行，已忽略")
+                    continue
+                if row.excluded:
+                    excluded_total += 1
+                    warnings.append(f"Sheet「{result.name}」第 {row.excel_row} 行已按你的选择排除")
+                    continue
+                if row.status == "invalid":
+                    invalid_summary.append({
+                        "sheet": result.name, "excel_row": row.excel_row,
+                        "issues": list(row.issues),
+                    })
+                    continue
+                all_items.append(row.material)
+        if invalid_summary:
+            return _json_response({
+                "error": f"仍有 {len(invalid_summary)} 个未排除的错误行，请先在预览中排除或修正映射",
+                "invalid_rows": invalid_summary,
+                "warnings": warnings,
+            }, 422)
+        if not all_items:
             return _json_response({"error": "没有可导入的有效素材行", "warnings": warnings}, 400)
-        library = commit_import(staged.read_bytes(), items, xlsx_path=official_xlsx, index_path=official_index)
+    except ValueError as exc:
+        return _json_response({"error": str(exc), "warnings": warnings}, 400)
     except MaterialLibraryError as exc:
         return _json_response({"error": str(exc), "warnings": warnings}, 400)
     except Exception as exc:
         return _json_response({"error": f"导入失败：{exc}", "warnings": warnings}, 400)
+
+    with material_library_lock:
+        try:
+            from openjob.resume_materials_import import commit_import
+
+            library = commit_import(staged.read_bytes(), all_items, xlsx_path=official_xlsx, index_path=official_index)
+        except MaterialLibraryError as exc:
+            return _json_response({"error": str(exc), "warnings": warnings}, 400)
+        except Exception as exc:
+            return _json_response({"error": f"写入正式库失败：{exc}", "warnings": warnings}, 400)
 
     # 成功后清理暂存
     import shutil
@@ -1957,7 +2093,7 @@ def api_materials_confirm():
         "count": library.count,
         "sha256": library.sha256[:12],
         "warnings": warnings,
-        "excluded_rows": sum(1 for w in warnings if "已排除" in w or "已忽略" in w),
+        "excluded_rows": excluded_total,
     })
 
 
@@ -1995,7 +2131,8 @@ def api_materials_upload():
 
     _, xlsx_path, index_path = _materials_paths()
     try:
-        save_library_atomically(library, content, xlsx_path=xlsx_path, index_path=index_path)
+        with material_library_lock:
+            save_library_atomically(library, content, xlsx_path=xlsx_path, index_path=index_path)
     except OSError as exc:
         return _json_response({"error": f"保存失败：{exc}"}, 500)
     return _json_response({"success": True, "filename": upload.filename, "count": library.count, "sha256": library.sha256[:12]})
@@ -2009,7 +2146,8 @@ def api_materials_refresh():
     if not xlsx_path.exists():
         return _json_response({"error": "未找到素材库文件，请先上传"}, 400)
     try:
-        library = load_or_refresh_library(xlsx_path, index_path)
+        with material_library_lock:
+            library = load_or_refresh_library(xlsx_path, index_path)
     except MaterialLibraryError as exc:
         return _json_response({"error": str(exc)}, 400)
     return _json_response({"success": True, "count": library.count, "sha256": library.sha256[:12]})
@@ -2029,14 +2167,15 @@ def api_materials_template():
 def api_materials_delete():
     _, xlsx_path, index_path = _materials_paths()
     # 只允许删除位于 DATA_DIR 内的文件；边界用 resolve()+relative_to 校验，不用字符串前缀
-    for path in (xlsx_path, index_path):
-        if not path.exists():
-            continue
-        try:
-            path.resolve().relative_to(DATA_DIR.resolve())
-        except ValueError as exc:
-            raise _json_response({"error": "素材库路径越界，拒绝删除"}, 400) from exc
-        path.unlink()
+    with material_library_lock:
+        for path in (xlsx_path, index_path):
+            if not path.exists():
+                continue
+            try:
+                path.resolve().relative_to(DATA_DIR.resolve())
+            except ValueError as exc:
+                raise _json_response({"error": "素材库路径越界，拒绝删除"}, 400) from exc
+            path.unlink()
     return _json_response({"success": True})
 
 

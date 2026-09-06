@@ -4,7 +4,9 @@ import io
 import json
 from pathlib import Path
 
+import io
 import pytest
+import unittest
 from openpyxl import Workbook
 
 from openjob.resume_materials_import import (
@@ -164,7 +166,7 @@ class TestNormalizeAndCommit:
         content = make_excel(sheets)
         session = analyze_workbook(content, filename="我的.xlsx", imports_dir=tmp_path)
         confirm = {
-            "session": session.to_dict(),
+            "session": session.to_storage_dict(),
             "sheets": [
                 {
                     "name": s["name"],
@@ -300,3 +302,178 @@ class TestNormalizeAndCommit:
 
         with pytest.raises(MaterialLibraryError, match="至少需要一条"):
             commit_import(content, items, xlsx_path=tmp_path / "o.xlsx", index_path=tmp_path / "o.json")
+
+
+class ResourceLimitTests(unittest.TestCase):
+    """Task 1：250 行完整导入、超限拒绝、不创建会话/不覆盖正式库。"""
+
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _build_250(self):
+        rows = [
+            {"项目名称": f"项目{i:03d}", "项目内容": f"描述{i}：SQL 与 Python 数据处理",
+             "成果": f"成果{i}", "类别": "项目"}
+            for i in range(250)
+        ]
+        content = make_excel({"项目经历": (["项目名称", "项目内容", "成果"], rows)})
+        return content
+
+    def test_analyze_and_normalize_all_250_rows_without_truncation(self):
+        from openjob.resume_materials_import import analyze_workbook, normalize_import_rows
+
+        content = self._build_250()
+        session = analyze_workbook(content, filename="250.xlsx")
+        sheet = session.sheets[0]
+        self.assertEqual(sheet["row_count"], 250)
+
+        confirm = {
+            "session": session.to_storage_dict(),
+            "sheets": [{
+                "name": "项目经历", "include": True, "header_row": sheet["header_row"],
+                "field_mapping": {m["source_column"]: m["target_field"] for m in sheet["mapping"]},
+                "type_override": "project", "excluded_rows": [],
+            }],
+            "defaults": {"resume_allowed": True, "priority": 3},
+        }
+        items, _ = normalize_import_rows(content, confirm)
+        self.assertEqual(len(items), 250)
+        self.assertEqual(items[0]["title"], "项目000")
+        self.assertEqual(items[-1]["title"], "项目249")
+
+        from openjob.resume_materials_import import commit_import
+        xlsx = self.tmp / "official.xlsx"
+        index = self.tmp / "official.index.json"
+        library = commit_import(content, items, xlsx_path=xlsx, index_path=index)
+        self.assertEqual(library.count, 250)
+
+    def test_over_row_limit_is_rejected_instead_of_partially_imported(self):
+        from openjob.resume_materials import MaterialLibraryError
+        from openjob.resume_materials_import import analyze_workbook
+
+        rows = [
+            {"项目名称": f"项目{i}", "项目内容": f"描述{i}", "成果": f"成果{i}", "类别": "项目"}
+            for i in range(5001)
+        ]
+        content = make_excel({"项目经历": (["项目名称", "项目内容", "成果"], rows)})
+        with self.assertRaises(MaterialLibraryError) as ctx:
+            analyze_workbook(content, filename="5001.xlsx")
+        message = str(ctx.exception)
+        self.assertIn("5001", message)
+        self.assertIn("5000", message)
+
+    def test_over_column_limit_is_rejected(self):
+        from openjob.resume_materials import MaterialLibraryError
+        from openjob.resume_materials_import import analyze_workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "项目经历"
+        ws.append([f"列{i}" for i in range(101)])
+        ws.append(["值" for _ in range(101)])
+        buf = io.BytesIO()
+        wb.save(buf)
+        with self.assertRaises(MaterialLibraryError) as ctx:
+            analyze_workbook(buf.getvalue(), filename="101cols.xlsx")
+        self.assertIn("101", str(ctx.exception))
+        self.assertIn("100", str(ctx.exception))
+
+    def test_over_limit_analysis_does_not_create_session_or_replace_library(self):
+        from openjob.resume_materials import MaterialLibraryError
+        from openjob.resume_materials_import import analyze_workbook
+
+        imports_dir = self.tmp / "imports"
+        imports_dir.mkdir()
+        before = imports_dir.exists()
+
+        # 先建立一份正式库（走 normalize+commit 的标准路径）
+        from openjob.resume_materials_import import commit_import
+
+        official_xlsx = self.tmp / "official.xlsx"
+        official_index = self.tmp / "official.index.json"
+        base_content = make_excel({"项目经历": (["项目名称", "项目内容", "成果"], [{"项目名称": "P", "项目内容": "C"}])})
+        session = analyze_workbook(base_content, filename="base.xlsx")
+        items, _ = normalize_import_rows(base_content, {
+            "session": session.to_storage_dict(),
+            "sheets": [{"name": s["name"], "include": True,
+                        "header_row": s["header_row"],
+                        "field_mapping": {m["source_column"]: m["target_field"] for m in s["mapping"]},
+                        "type_override": s.get("inferred_type") or "other", "excluded_rows": []}
+                       for s in session.sheets],
+            "defaults": {"resume_allowed": True, "priority": 3},
+        })
+        commit_import(base_content, items, xlsx_path=official_xlsx, index_path=official_index)
+        xlsx_before = official_xlsx.read_bytes()
+        index_before = official_index.read_bytes()
+
+        rows = [
+            {"项目名称": f"项目{i}", "项目内容": f"描述{i}", "成果": f"成果{i}", "类别": "项目"}
+            for i in range(5001)
+        ]
+        over = make_excel({"项目经历": (["项目名称", "项目内容", "成果"], rows)})
+        with self.assertRaises(MaterialLibraryError):
+            analyze_workbook(over, filename="over.xlsx", imports_dir=imports_dir)
+
+        sessions = [d for d in imports_dir.iterdir() if d.is_dir()] if imports_dir.exists() else []
+        self.assertEqual(len(sessions), 0)
+        self.assertEqual(official_xlsx.read_bytes(), xlsx_before)
+        self.assertEqual(official_index.read_bytes(), index_before)
+
+
+class SessionCleanupTests(unittest.TestCase):
+    """TTL 清理：只删过期合法会话，不动哨兵/越界目录/有效会话。"""
+
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.imports_dir = Path(self._tmp.name) / "resume_material_imports"
+        self.imports_dir.mkdir(parents=True)
+        self.sentinel = Path(self._tmp.name) / "哨兵.txt"
+        self.sentinel.write_text("keep", encoding="utf-8")
+        self.outside = Path(self._tmp.name) / "outside-dir"
+        self.outside.mkdir()
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_cleanup_removes_only_expired_sessions_inside_import_root(self):
+        from datetime import datetime, timedelta, timezone
+
+        from openjob.resume_materials_import import cleanup_expired_import_sessions
+
+        expired = self.imports_dir / ("a" * 32)
+        expired.mkdir()
+        created = datetime.now(timezone.utc) - timedelta(hours=25)
+        (expired / "analysis.json").write_text(json.dumps({
+            "import_id": "a" * 32, "created_at": created.isoformat(),
+        }), encoding="utf-8")
+
+        removed = cleanup_expired_import_sessions(self.imports_dir)
+        self.assertGreaterEqual(removed, 1)
+        self.assertFalse(expired.exists())
+        self.assertTrue(self.sentinel.exists())
+        # 哨兵文件（imports 根外）必须仍然存在——清理不越界
+        self.assertTrue((self.imports_dir.parent / self.sentinel.name).exists())
+
+    def test_cleanup_keeps_active_sessions(self):
+        from datetime import datetime, timedelta, timezone
+
+        from openjob.resume_materials_import import cleanup_expired_import_sessions
+
+        # 23h59m 前创建的会话应保留
+        active = self.imports_dir / ("d" * 32)
+        active.mkdir()
+        created = datetime.now(timezone.utc) - timedelta(hours=23, minutes=59)
+        (active / "analysis.json").write_text(json.dumps({
+            "import_id": "d" * 32, "created_at": created.isoformat(),
+        }), encoding="utf-8")
+        removed = cleanup_expired_import_sessions(self.imports_dir)
+        self.assertTrue(active.exists())
+        self.assertEqual(removed, 0)
