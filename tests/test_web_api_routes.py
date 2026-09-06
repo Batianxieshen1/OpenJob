@@ -2439,3 +2439,162 @@ class MaterialsApiTests(unittest.TestCase):
         status, payload = self._json(self._request("/api/resume/materials/status"))
         self.assertFalse(payload["valid"])
         self.assertEqual(payload["count"], 0)
+
+
+class MaterialImportFlowTests(unittest.TestCase):
+    """智能导入 API：analyze → confirm 全流程 + hash/越界防护。"""
+
+    ALL_HEADERS = [
+        "id", "type", "title", "organization", "role", "start_date", "end_date",
+        "description", "achievements", "skills", "keywords", "target_directions",
+        "source", "resume_allowed", "priority", "notes",
+    ]
+
+    def setUp(self):
+        self.original_base_dir = server.BASE_DIR
+        self._tmp = tempfile.TemporaryDirectory()
+        server.set_base_dir(self._tmp.name)
+
+    def tearDown(self):
+        server.set_base_dir(self.original_base_dir)
+        self._tmp.cleanup()
+
+    def _request(self, path, method="GET", json_body=None, body=None, content_type=None):
+        status_headers = {}
+
+        def start_response(status, headers, exc_info=None):
+            status_headers["status"] = status
+            status_headers["headers"] = dict(headers)
+
+        request_body = json.dumps(json_body).encode("utf-8") if json_body is not None else (body or b"")
+        path_info, _, query = (path.partition("?"))
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path_info,
+            "QUERY_STRING": query,
+            "SERVER_NAME": "127.0.0.1",
+            "SERVER_PORT": "8686",
+            "wsgi.version": (1, 0),
+            "wsgi.url_scheme": "http",
+            "wsgi.input": io.BytesIO(request_body),
+            "wsgi.errors": io.StringIO(),
+            "wsgi.multithread": False,
+            "wsgi.multiprocess": False,
+            "wsgi.run_once": False,
+            "CONTENT_LENGTH": str(len(request_body)),
+        }
+        if json_body is not None:
+            environ["CONTENT_TYPE"] = "application/json"
+        elif content_type:
+            environ["CONTENT_TYPE"] = content_type
+        response_iter = server.app(environ, start_response)
+        payload = b"".join(response_iter)
+        close = getattr(response_iter, "close", None)
+        if close:
+            close()
+        try:
+            return status_headers["status"], json.loads(payload)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return status_headers["status"], payload
+
+    def _nonstandard_xlsx(self):
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.create_sheet("项目经历")
+        ws.append(["项目名称", "项目内容", "成果"])
+        ws.append(["电商分析框架", "SQL 与 Python 驱动增长分析", "GitHub 开源"])
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    def _multipart(self, content, filename="wode-jingli.xlsx"):
+        boundary = "----OJImport"
+        parts = (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+        ).encode("utf-8") + content + f"\r\n--{boundary}--\r\n".encode("utf-8")
+        return parts, f"multipart/form-data; boundary={boundary}"
+
+    def test_analyze_nonstandard_chinese_workbook(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        status, data = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        self.assertIn("200", status)
+        self.assertTrue(data["success"])
+        self.assertTrue(data["requires_confirmation"])
+        sheet = next(s for s in data["sheets"] if s["name"] == "项目经历")
+        self.assertEqual(sheet["row_count"], 1)
+        self.assertEqual(sheet["inferred_type"], "project")
+        targets = {m["source_column"]: m["target_field"] for m in sheet["mapping"]}
+        self.assertEqual(targets["项目名称"], "title")
+        self.assertEqual(targets["项目内容"], "description")
+
+    def test_confirm_imports_and_replaces_library(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        status, data = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        sheet = next(s for s in data["sheets"] if s["name"] == "项目经历")
+
+        confirm = {
+            "import_id": data["import_id"],
+            "source_sha256": data["source_sha256"],
+            "sheets": [{
+                "name": "项目经历",
+                "include": True,
+                "header_row": sheet["header_row"],
+                "field_mapping": {
+                    "项目名称": "title",
+                    "项目内容": "description",
+                    "成果": "achievements",
+                },
+                "type_override": "project",
+                "excluded_rows": [],
+            }],
+            "defaults": {"resume_allowed": True, "priority": 3},
+        }
+        status, data = self._request("/api/resume/materials/confirm", method="POST", json_body=confirm)
+        self.assertIn("200", status)
+        self.assertTrue(data["success"])
+        self.assertEqual(data["count"], 1)
+
+        status, payload = self._request("/api/resume/materials")
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["items"][0]["title"], "电商分析框架")
+        self.assertNotIn("source", payload["items"][0])
+
+    def test_confirm_hash_mismatch_rejected(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        _, data = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        confirm = {
+            "import_id": data["import_id"],
+            "source_sha256": "0" * 12,
+            "sheets": data["sheets"],
+            "defaults": {"resume_allowed": True, "priority": 3},
+        }
+        status, data = self._request("/api/resume/materials/confirm", method="POST", json_body=confirm)
+        self.assertIn("400", status)
+        self.assertIn("重新分析", data["error"])
+
+    def test_cancel_removes_session(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        _, data = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        import_id = data["import_id"]
+        status, data = self._request(f"/api/resume/materials/import/{import_id}", method="DELETE")
+        self.assertTrue(data["success"])
+        # 确认时 session 已不存在
+        confirm = {
+            "import_id": import_id, "source_sha256": data.get("source_sha256", ""),
+            "sheets": [], "defaults": {},
+        }
+        status, data = self._request("/api/resume/materials/confirm", method="POST", json_body=confirm)
+        self.assertIn("404", status)
+
+    def test_status_reports_import_in_progress(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        _, data = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        status, payload = self._request("/api/resume/materials/status")
+        self.assertTrue(payload["import_in_progress"])

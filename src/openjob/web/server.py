@@ -1815,12 +1815,18 @@ def _materials_paths():
     return enabled, xlsx_path, index_path
 
 
+def _materials_import_in_progress() -> bool:
+    base = DATA_DIR / "resume_material_imports"
+    return base.exists() and any(p.is_dir() for p in base.iterdir())
+
+
 def _materials_status_payload() -> dict:
     import hashlib
 
     enabled, xlsx_path, index_path = _materials_paths()
     payload = {
         "enabled": enabled, "valid": False, "stale": False, "source_sha256": "",
+        "import_in_progress": _materials_import_in_progress(),
         "filename": xlsx_path.name, "count": 0, "sha256": "", "updated_at": "", "errors": [],
     }
     if not xlsx_path.exists() or not index_path.exists():
@@ -1879,6 +1885,99 @@ def api_materials_list():
     return _json_response({"items": items[:limit], "total": len(items), **payload})
 
 
+@app.route("/api/resume/materials/analyze", method="POST")
+def api_materials_analyze():
+    """智能导入第一步：扫描任意 Excel，生成导入会话（不覆盖正式库）。"""
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return _json_response({"error": "请选择 .xlsx 文件"}, 400)
+    content = upload.file.read()
+    from openjob.resume_materials_import import analyze_workbook
+
+    imports_dir = DATA_DIR / "resume_material_imports"
+    try:
+        session = analyze_workbook(content, filename=upload.filename, imports_dir=imports_dir)
+    except Exception as exc:
+        message = str(exc)
+        if "10MB" in message or "xlsx" in message or "XLSX" in message or "ZIP" in message:
+            return _json_response({"error": message}, 400)
+        return _json_response({"error": f"分析失败：{message}"}, 400)
+    return _json_response({"success": True, **session.to_dict(), "requires_confirmation": True})
+
+
+@app.route("/api/resume/materials/confirm", method="POST")
+def api_materials_confirm():
+    """智能导入第二步：按用户确认的映射严格转换并原子落盘。"""
+    try:
+        data = request.json
+    except Exception:
+        return _json_response({"error": "请求体必须是 JSON"}, 400)
+    if not isinstance(data, dict) or not data.get("import_id"):
+        return _json_response({"error": "缺少 import_id"}, 400)
+
+    from openjob.resume_materials_import import ImportSession, commit_import, normalize_import_rows
+
+    session_dir = DATA_DIR / "resume_material_imports" / str(data["import_id"])
+    imports_base = (DATA_DIR / "resume_material_imports").resolve()
+    try:
+        session_dir.resolve().relative_to(imports_base)
+    except ValueError:
+        return _json_response({"error": "非法 import_id"}, 400)
+    staged = session_dir / "source.xlsx"
+    analysis_path = session_dir / "analysis.json"
+    if not staged.exists() or not analysis_path.exists():
+        return _json_response({"error": "导入会话不存在或已过期，请重新分析"}, 404)
+
+    session = ImportSession.from_dict(json.loads(analysis_path.read_text(encoding="utf-8")))
+    confirm = {**data, "session": session.to_dict()}
+
+    if data.get("source_sha256") and data["source_sha256"] != session.source_sha256:
+        return _json_response({"error": "源文件在分析后已被替换，请重新分析"}, 400)
+
+    enabled, official_xlsx, official_index = _materials_paths()
+    from openjob.resume_materials import MaterialLibraryError
+
+    warnings: list = []
+    try:
+        items, warnings = normalize_import_rows(staged.read_bytes(), confirm)
+        if not items:
+            return _json_response({"error": "没有可导入的有效素材行", "warnings": warnings}, 400)
+        library = commit_import(staged.read_bytes(), items, xlsx_path=official_xlsx, index_path=official_index)
+    except MaterialLibraryError as exc:
+        return _json_response({"error": str(exc), "warnings": warnings}, 400)
+    except Exception as exc:
+        return _json_response({"error": f"导入失败：{exc}", "warnings": warnings}, 400)
+
+    # 成功后清理暂存
+    import shutil
+
+    shutil.rmtree(session_dir, ignore_errors=True)
+    return _json_response({
+        "success": True,
+        "count": library.count,
+        "sha256": library.sha256[:12],
+        "warnings": warnings,
+        "excluded_rows": sum(1 for w in warnings if "已排除" in w or "已忽略" in w),
+    })
+
+
+@app.route("/api/resume/materials/import/<import_id>", method="DELETE")
+def api_materials_import_cancel(import_id):
+    """取消并删除暂存导入会话；不影响正式素材库。"""
+    import shutil
+
+    base = (DATA_DIR / "resume_material_imports").resolve()
+    if not base.exists() or import_id not in [p.name for p in base.iterdir()]:
+        return _json_response({"error": "导入会话不存在"}, 404)
+    target = (base / import_id).resolve()
+    try:
+        target.relative_to(base)
+    except ValueError:
+        return _json_response({"error": "非法 import_id"}, 400)
+    shutil.rmtree(target, ignore_errors=True)
+    return _json_response({"success": True})
+
+
 @app.route("/api/resume/materials/upload", method="POST")
 def api_materials_upload():
     upload = request.files.get("file")
@@ -1929,10 +2028,15 @@ def api_materials_template():
 @app.route("/api/resume/materials", method="DELETE")
 def api_materials_delete():
     _, xlsx_path, index_path = _materials_paths()
-    # 只允许删除标准位置且位于 DATA_DIR 内的文件，不接受请求传入的任意路径
+    # 只允许删除位于 DATA_DIR 内的文件；边界用 resolve()+relative_to 校验，不用字符串前缀
     for path in (xlsx_path, index_path):
-        if path.exists() and str(path).startswith(str(DATA_DIR)):
-            path.unlink()
+        if not path.exists():
+            continue
+        try:
+            path.resolve().relative_to(DATA_DIR.resolve())
+        except ValueError as exc:
+            raise _json_response({"error": "素材库路径越界，拒绝删除"}, 400) from exc
+        path.unlink()
     return _json_response({"success": True})
 
 

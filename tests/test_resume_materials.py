@@ -103,10 +103,11 @@ def test_parse_rejects_invalid_id_and_oversize_text():
         }]), filename="素材.xlsx")
 
 
-def test_template_workbook_parses_as_example_library():
+def test_template_example_row_excluded_from_library():
     template = build_template_workbook()
-    library = parse_workbook(template, filename="template.xlsx")
-    assert library.count == 1  # 示例行可解析，用户替换后即为正式素材
+    # 示例行（__openjob_example__）默认排除；只剩表头时按空素材库处理
+    with pytest.raises(MaterialLibraryError, match="至少需要一条"):
+        parse_workbook(template, filename="template.xlsx")
 
 
 def test_atomic_save_writes_xlsx_and_index(tmp_path):

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, FileSpreadsheet, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { MaterialImportWizard } from '@/components/config/MaterialImportWizard'
 
 interface MaterialItem {
   id: string
@@ -185,6 +186,9 @@ export function ResumeMaterials({ config, updateConfig }: {
         </div>
       ) : null}
 
+      {/* 智能导入向导：任意 Excel → 分析 → 映射 → 确认 */}
+      <MaterialImportWizard onChanged={() => { void loadStatus(); void loadItems() }} />
+
       {/* 操作行 */}
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -198,12 +202,13 @@ export function ResumeMaterials({ config, updateConfig }: {
           }}
         />
         <Button
+          variant="secondary"
           size="sm"
           disabled={busy !== null}
           onClick={() => fileRef.current?.click()}
         >
           <Upload className="mr-2 h-4 w-4" />
-          {busy === 'upload' ? '上传中…' : status?.valid ? '替换素材库' : '上传素材库 (.xlsx)'}
+          {busy === 'upload' ? '上传中…' : '上传标准模板'}
         </Button>
         <Button
           variant="secondary"

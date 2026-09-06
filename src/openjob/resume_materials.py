@@ -25,6 +25,8 @@ DEFAULT_HEADERS = [
 
 SHEET_NAME = "素材库"
 
+EXAMPLE_ROW_MARKERS = ("__openjob_example__",)
+
 MATERIAL_TYPES = {
     "experience", "project", "award", "student_work",
     "campus_activity", "skill_evidence", "certification", "other",
@@ -61,13 +63,13 @@ class MaterialLibrary:
 
 
 def split_cell_list(value: object) -> list[str]:
-    """拆分逗号/中文逗号/顿号/斜杠分隔的单元格为去空白列表。"""
-    import re
+    """拆分逗号/中文逗号/顿号/分号/换行分隔的单元格；不按斜杠拆（保护版本号与短语）。"""
+    import re as _re
 
     raw = str(value or "").strip()
     if not raw:
         return []
-    parts = re.split(r"[,，、/]+", raw)
+    parts = _re.split(r"[,，、;；\n\r]+", raw)
     return [p.strip() for p in parts if p.strip()]
 
 
@@ -173,6 +175,8 @@ def parse_workbook(content: bytes, *, filename: str) -> MaterialLibrary:
 
         item: dict = {}
         item["id"] = _validate_id(_cell(cells[index_of["id"]]) if index_of["id"] < len(cells) else "", row_no)
+        if item["id"] in EXAMPLE_ROW_MARKERS:
+            continue  # 模板示例行永不进入正式素材库
         if item["id"] in seen_ids:
             raise MaterialLibraryError(f"第 {row_no} 行：重复 id「{item['id']}」")
         seen_ids.add(item["id"])
@@ -244,9 +248,9 @@ def build_template_workbook() -> bytes:
     sheet.title = SHEET_NAME
     sheet.append(DEFAULT_HEADERS)
     sheet.append([
-        "exp_001",
+        "__openjob_example__",
         "experience",
-        "示例：某项目/实习名称",
+        "示例：某项目/实习名称（上传前请删除此示例行）",
         "示例公司或组织",
         "实习生",
         "2024-03",

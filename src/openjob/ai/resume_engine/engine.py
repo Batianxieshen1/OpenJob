@@ -170,11 +170,14 @@ def generate_resume(
             material_candidates_json = None
             if materials_enabled:
                 from openjob.ai.resume_engine.materials import material_prompt, rank_materials
-                from openjob.resume_materials import MaterialLibraryError, load_or_refresh_library
+                from openjob.resume_materials import (
+                    MaterialLibraryError,
+                    load_or_refresh_library,
+                    resolve_library_paths,
+                )
 
                 data_dir = RUNTIME_DATA_DIR or Path("data")
-                materials_path = (data_dir / "resume_materials.xlsx").resolve()
-                index_path = (data_dir / "resume_materials.index.json").resolve()
+                materials_path, index_path = resolve_library_paths(config, data_dir)
                 library = None
                 try:
                     library = load_or_refresh_library(materials_path, index_path)
