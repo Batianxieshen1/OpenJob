@@ -41,6 +41,7 @@ import { DashboardHero } from '@/components/dashboard/DashboardHero'
 const WeeklyActivityChart = lazy(() => import('@/components/dashboard/WeeklyActivityChart').then(m => ({ default: m.WeeklyActivityChart })))
 import { AutomationControlCard } from '@/components/dashboard/AutomationControlCard'
 import { PipelineProgress } from '@/components/dashboard/PipelineProgress'
+import { ScheduledCollectionCard } from '@/components/dashboard/ScheduledCollectionCard'
 
 type WorkbenchMode = 'full' | 'collect' | 'rescore' | 'monitor'
 type DashboardView = 'workbench' | 'jobs' | 'monitor'
@@ -168,6 +169,8 @@ const taskMetricItems = [
   { key: 'collect_filtered', label: '过滤' },
   { key: 'collect_parse_failed', label: '解析失败' },
   { key: 'collect_save_failed', label: '保存失败' },
+  { key: 'ai_completed', label: '已评分' },
+  { key: 'ai_total', label: '待评分总数' },
   { key: 'ai_passed', label: 'AI通过' },
   { key: 'ai_filtered', label: 'AI过滤' },
   { key: 'ai_failed', label: 'AI失败' },
@@ -443,6 +446,9 @@ export default function DashboardPage() {
             onStopTask={() => { if (activeTask) void handleModeClick(activeTask.mode as WorkbenchMode) }}
           />
         </div>
+        <div className="xl:col-span-4">
+          <ScheduledCollectionCard schedule={workbench.scheduled_collection} />
+        </div>
         <div className="xl:col-span-8">
           <PipelineProgress funnelToday={workbench.funnel_today} pendingCount={workbench.pending_confirmation.length} />
         </div>
@@ -496,7 +502,7 @@ export default function DashboardPage() {
             )}
             {activeTask.metrics && taskMetricItems.some(item => item.key in activeTask.metrics!) && (
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {taskMetricItems.map(item => (
+                {taskMetricItems.filter(item => item.key in activeTask.metrics!).map(item => (
                   <div key={item.key} className="rounded-xl border border-card-border bg-card px-3 py-2">
                     <div className="text-[10px] text-muted">{item.label}</div>
                     <div className="mt-0.5 text-lg font-semibold text-foreground tabular-nums">{activeTask.metrics?.[item.key] ?? 0}</div>
@@ -505,7 +511,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          {activeTask.progress?.platforms && <CollectionProgressPanel progress={activeTask.progress} />}
+          {activeTask.progress?.platforms && <CollectionProgressPanel progress={activeTask.progress} metrics={activeTask.metrics} />}
           {activeTask.error && taskErrorFeedback(activeTask.error) && (
             <div className="mt-3 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
               <div className="font-semibold">{taskErrorFeedback(activeTask.error).title}</div>
@@ -607,13 +613,17 @@ export default function DashboardPage() {
   )
 }
 
-function CollectionProgressPanel({ progress }: { progress: CollectionProgress }) {
+function CollectionProgressPanel({ progress, metrics }: { progress: CollectionProgress, metrics?: Record<string, number> }) {
+  const isScoring = progress.outcome === 'scoring'
+  const scoreSummary = `已评分 ${metrics?.ai_completed ?? 0}/${metrics?.ai_total ?? 0} · 通过 ${metrics?.ai_passed ?? 0} · 过滤 ${metrics?.ai_filtered ?? 0} · 失败 ${metrics?.ai_failed ?? 0}`
+
   return (
     <div className="mt-3 rounded-2xl border border-primary/20 bg-accent-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-semibold text-primary">多平台采集进度</div>
-        <div className="text-xs font-bold text-muted">{progress.outcome === 'running' ? '执行中' : progress.outcome || '已结束'}</div>
+        <div className="text-sm font-semibold text-primary">{isScoring ? 'AI 评分进度' : '多平台采集进度'}</div>
+        <div className="text-xs font-bold text-muted">{isScoring ? 'AI 评分中' : progress.outcome === 'running' ? '执行中' : progress.outcome || '已结束'}</div>
       </div>
+      {isScoring && <div className="mt-2 text-xs font-medium text-primary">{scoreSummary}</div>}
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         {Object.entries(progress.platforms || {}).map(([platform, state]) => (
           <div key={platform} className="rounded-xl border border-card-border bg-card p-3">

@@ -141,6 +141,12 @@ class WorkbenchTaskRunner:
                 "tasks": tasks,
             }
 
+    def get(self, task_id: str) -> dict | None:
+        """Return a task snapshot by id without exposing mutable task internals."""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            return task.snapshot() if task else None
+
     def stop(self, task_id: str, reason: str = "用户已请求停止") -> dict:
         with self._lock:
             task = self._tasks.get(task_id)

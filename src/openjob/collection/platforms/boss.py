@@ -365,9 +365,20 @@ class BossCollector:
                             if guard is not None: guard.reserve("detail_page", daily_limit=detail_limit)
                         except PlatformSafetyStop as exc:
                             return limited(exc.reason)
-                        if not self.browser.navigate(worker_target, detail_url):
+                        detail_opened = self.browser.navigate(worker_target, detail_url)
+                        if not detail_opened:
+                            hooks.on_event(phase="loading_detail", message="BOSS 详情页首次打开失败，正在重试一次")
+                            retry_delay = self.randint(1, 2) * delay_multiplier
+                            if _wait_or_stop(hooks.stop_event, retry_delay, self.sleep):
+                                return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
+                            try:
+                                if guard is not None: guard.reserve("detail_page", daily_limit=detail_limit)
+                            except PlatformSafetyStop as exc:
+                                return limited(exc.reason)
+                            detail_opened = self.browser.navigate(worker_target, detail_url)
+                        if not detail_opened:
                             page_failures += 1
-                            hooks.on_parse_failed("无法打开 BOSS 详情页")
+                            hooks.on_parse_failed("无法打开 BOSS 详情页（已重试一次）")
                             if page_failures >= failure_limit: return page_failure_stop()
                             continue
                         if _wait_or_stop(hooks.stop_event, 2 * delay_multiplier, self.sleep):

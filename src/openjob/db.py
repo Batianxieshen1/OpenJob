@@ -122,6 +122,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_platform_access_events(conn)
     _init_scoring_runs(conn)
     _init_collection_runs(conn)
+    _init_scheduled_collection_runs(conn)
     _migrate_v2_0(conn)
     _migrate_v2_1(conn)
     _migrate_v2_2(conn)
@@ -747,6 +748,31 @@ def _init_collection_runs(conn: sqlite3.Connection) -> None:
             finished_at TIMESTAMP NULL
         );
         CREATE INDEX IF NOT EXISTS idx_collection_runs_status ON collection_runs(status);
+        """
+    )
+    conn.commit()
+
+
+def _init_scheduled_collection_runs(conn: sqlite3.Connection) -> None:
+    """Keep scheduled-workbench executions separate from collection recovery data."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS scheduled_collection_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            schedule_date TEXT NOT NULL,
+            schedule_time TEXT NOT NULL,
+            status TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            task_id TEXT,
+            new_jobs_count INTEGER NOT NULL DEFAULT 0,
+            high_score_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            finished_at TIMESTAMP NULL,
+            UNIQUE(schedule_date, schedule_time)
+        );
+        CREATE INDEX IF NOT EXISTS idx_scheduled_collection_runs_date
+            ON scheduled_collection_runs(schedule_date, schedule_time);
         """
     )
     conn.commit()

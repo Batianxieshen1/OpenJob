@@ -52,6 +52,11 @@ docs/superpowers/
 AGENTS.md
 pytest_*.log
 
+# Local workbench runtime and browser QA artifacts
+.openjob-web-runtime.*.log
+.codex-*/
+src/openjob/web/frontend/ui-acceptance-screenshots/
+
 # Local tool session data
 .reasonix/
 # Temp scripts

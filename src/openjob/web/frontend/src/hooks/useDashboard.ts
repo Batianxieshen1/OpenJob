@@ -91,7 +91,29 @@ export interface CollectionProgress {
   collected_job_ids?: string[]
 }
 
-interface WorkbenchData {
+export interface ScheduledCollectionRun {
+  schedule_date: string
+  schedule_time: string
+  status: 'claimed' | 'running' | 'completed' | 'failed' | 'stopped' | 'skipped' | string
+  reason: string
+  task_id?: string | null
+  new_jobs_count: number
+  high_score_count: number
+  created_at?: string
+  finished_at?: string | null
+}
+
+export interface ScheduledCollectionSummary {
+  enabled: boolean
+  next_run_at: string | null
+  today_executed: number
+  last_run: ScheduledCollectionRun | null
+  last_skip_reason: string
+  pause_today: boolean
+  times: string[]
+}
+
+export interface WorkbenchData {
   funnel: FunnelData
   funnel_today: FunnelData
   pending_confirmation: Job[]
@@ -101,6 +123,7 @@ interface WorkbenchData {
   send_quota: { daily_limit: number; sent: number; remaining: number; exhausted: boolean }
   task: WorkbenchTask | null
   last_task: WorkbenchTask | null
+  scheduled_collection: ScheduledCollectionSummary
 }
 
 interface HistoryDetailPayload {
@@ -137,6 +160,15 @@ const emptyWorkbench: WorkbenchData = {
   send_quota: { daily_limit: 30, sent: 0, remaining: 30, exhausted: false },
   task: null,
   last_task: null,
+  scheduled_collection: {
+    enabled: false,
+    next_run_at: null,
+    today_executed: 0,
+    last_run: null,
+    last_skip_reason: '',
+    pause_today: false,
+    times: [],
+  },
 }
 
 type DashboardDataScope = 'workbench' | 'jobs' | 'monitor' | 'all'
@@ -229,4 +261,4 @@ export function useDashboard(scope: DashboardDataScope = 'all') {
   }
 }
 
-export type { FunnelData, ActivityData, Job, TopCompany, WorkbenchData, HistoryDetailPayload, HistoryItem }
+export type { FunnelData, ActivityData, Job, TopCompany, HistoryDetailPayload, HistoryItem }

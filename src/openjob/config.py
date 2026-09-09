@@ -98,6 +98,16 @@ DEFAULTS: dict[str, Any] = {
         "delivery_cooldown_min_minutes": 5,
         "delivery_cooldown_max_minutes": 15,
     },
+    "collection_schedule": {
+        # This is intentionally a process-local schedule. It runs only while
+        # the Web workbench is open and it can only collect + score.
+        "enabled": False,
+        "times": [],
+        "weekdays_only": True,
+        "max_pages": 1,
+        "platforms": ["boss"],
+        "pause_today_date": "",
+    },
     "platforms": {
         "boss": {
             "enabled": True,

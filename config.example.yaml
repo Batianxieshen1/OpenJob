@@ -42,6 +42,16 @@ collection:
   delivery_cooldown_min_minutes: 5   # BOSS 采集结束到 BOSS 投递的随机冷却下限
   delivery_cooldown_max_minutes: 15  # BOSS 采集结束到 BOSS 投递的随机冷却上限
 
+# 仅在 OpenJob Web 工作台正在运行时，按时执行“采集 + AI 评分”。
+# 不投递、不发招呼语、不回复；错过时间、Chrome 未连接或风控锁生效时只记录跳过，不补跑。
+collection_schedule:
+  enabled: false
+  times: []                # 例如 ["09:30", "19:30"]，24 小时制 HH:MM
+  weekdays_only: true
+  max_pages: 1             # 每轮、每个平台的最大搜索页数（1-10）
+  platforms: [boss]
+  pause_today_date: ""     # 配置页“今日暂停”会写入当天日期，隔日自动失效
+
 platforms:
   boss:
     enabled: true

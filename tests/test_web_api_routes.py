@@ -220,6 +220,39 @@ class WebApiRouteTests(unittest.TestCase):
         self.assertIn("application/json", headers["Content-Type"])
         self.assertEqual(json.loads(body), {"ok": True, "messages": [], "checks": ready_checks})
 
+    def test_collect_task_forwards_auto_score_progress_to_workbench(self):
+        task = WorkbenchTask(id="collect-score-progress", mode="collect", label="单独采集")
+        observed: dict[str, object] = {}
+
+        class FakeOrchestrator:
+            def __init__(self, config, **_kwargs):
+                self.config = config
+
+            def run(self, _options):
+                self.config["_workbench_score_progress"]({
+                    "completed": 2,
+                    "total": 3,
+                    "scored": 1,
+                    "filtered": 1,
+                    "failed": 0,
+                })
+                self.config["_workbench_log"]("AI 评分已开始")
+                observed["metrics"] = dict(task.metrics)
+                observed["logs"] = list(task.logs)
+                return {"status": "completed", "platforms": {}, "collected_job_ids": ["new-1"]}
+
+        with patch.object(server, "CollectionOrchestrator", FakeOrchestrator):
+            server._execute_collect(task, {"_collection_options": {}})
+
+        self.assertEqual(observed["metrics"], {
+            "ai_completed": 2,
+            "ai_total": 3,
+            "ai_passed": 1,
+            "ai_filtered": 1,
+            "ai_failed": 0,
+        })
+        self.assertIn("AI 评分已开始", observed["logs"])
+
     def test_web_api_workbench_preflight_supports_rescore_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             base_dir = Path(tmp)
@@ -2575,7 +2608,55 @@ class MaterialImportFlowTests(unittest.TestCase):
         }
         status, data = self._request("/api/resume/materials/confirm", method="POST", json_body=confirm)
         self.assertIn("400", status)
-        self.assertIn("重新分析", data["error"])
+        self.assertIn("source_sha256", data["error"])
+
+    def test_preview_and_confirm_require_a_complete_source_hash(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        _, analyzed = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        sheet = next(s for s in analyzed["sheets"] if s["name"] == "项目经历")
+        payload = {
+            "import_id": analyzed["import_id"],
+            "sheets": [],
+            "defaults": {"resume_allowed": True, "priority": 3},
+        }
+        for bad_hash in (None, "", "0" * 63, "g" * 64):
+            payload["source_sha256"] = bad_hash
+            status, response = self._request("/api/resume/materials/confirm", method="POST", json_body=payload)
+            self.assertIn("400", status)
+            self.assertIn("source_sha256", response["error"])
+
+        status, response = self._request("/api/resume/materials/preview", method="POST", json_body={
+            "import_id": analyzed["import_id"], "source_sha256": "", "sheet": {
+                "name": sheet["name"], "header_row": sheet["header_row"], "field_mapping": {},
+                "type_override": None, "excluded_rows": [],
+            },
+        })
+        self.assertIn("400", status)
+        self.assertIn("source_sha256", response["error"])
+
+    def test_confirm_rejects_replaced_staged_source_and_duplicate_sheet_config(self):
+        content = self._nonstandard_xlsx()
+        parts, ctype = self._multipart(content)
+        _, analyzed = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
+        sheet = next(s for s in analyzed["sheets"] if s["name"] == "项目经历")
+        config = {
+            "name": sheet["name"], "include": True, "header_row": sheet["header_row"],
+            "field_mapping": {"项目名称": "title", "项目内容": "description"},
+            "type_override": None, "excluded_rows": [],
+        }
+        payload = {"import_id": analyzed["import_id"], "source_sha256": analyzed["source_sha256"],
+                   "sheets": [config, dict(config)], "defaults": {"resume_allowed": True, "priority": 3}}
+        status, response = self._request("/api/resume/materials/confirm", method="POST", json_body=payload)
+        self.assertIn("400", status)
+        self.assertIn("重复", response["error"])
+
+        staged = server.DATA_DIR / "resume_material_imports" / analyzed["import_id"] / "source.xlsx"
+        staged.write_bytes(self._nonstandard_xlsx() + b"changed")
+        payload["sheets"] = [config]
+        status, response = self._request("/api/resume/materials/confirm", method="POST", json_body=payload)
+        self.assertIn("400", status)
+        self.assertIn("变化", response["error"])
 
     def test_cancel_removes_session(self):
         content = self._nonstandard_xlsx()

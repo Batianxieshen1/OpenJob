@@ -46,6 +46,11 @@ const AI_SERVICES = {
 
 type AiService = keyof typeof AI_SERVICES
 type PlatformId = 'boss' | 'zhilian' | '51job'
+const SCHEDULE_PLATFORMS: Array<{ id: PlatformId; label: string }> = [
+  { id: 'boss', label: 'BOSS 直聘' },
+  { id: 'zhilian', label: '智联招聘' },
+  { id: '51job', label: '前程无忧' },
+]
 
 export default function ConfigPage() {
   const { config, schema, loading, saving, dirty, error, message, updateConfig, saveConfig, resetConfig } = useConfig()
@@ -228,6 +233,19 @@ export default function ConfigPage() {
     updateConfig('collection.default_order', next.length ? next : ['boss'])
   }
 
+  const setScheduledPlatform = (platform: PlatformId, enabled: boolean) => {
+    const current = Array.isArray(config?.collection_schedule?.platforms)
+      ? (config.collection_schedule.platforms as unknown[]).filter((item: unknown): item is PlatformId => item === 'boss' || item === 'zhilian' || item === '51job')
+      : ['boss'] as PlatformId[]
+    const next = enabled
+      ? [...current, ...(!current.includes(platform) ? [platform] : [])]
+      : current.filter(item => item !== platform)
+    updateConfig('collection_schedule.platforms', next.length ? next : ['boss'])
+  }
+
+  const localNow = new Date()
+  const todayLocal = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`
+
   if (loading) {
     return <div className="flex items-center justify-center h-full text-muted text-sm">加载中...</div>
   }
@@ -371,9 +389,22 @@ export default function ConfigPage() {
         {/* Search Section */}
         <SectionCard title="搜索设置" sectionKey="search" expanded={expandedSections} toggle={toggleSection}>
           <div className="space-y-4">
-            <p className="rounded-xl border border-card-border bg-surface-hover px-3 py-2 text-xs leading-5 text-muted">
-              智联和前程无忧只自动采集、评分和生成招呼语；岗位池会提供原平台链接，你完成投递后可手动标记“已发送”。OpenJob 不会替你在这两个平台发送、回复或监听。
-            </p>
+            <div className="overflow-x-auto rounded-2xl border border-card-border bg-surface-hover">
+              <table className="w-full min-w-[620px] text-left text-xs">
+                <caption className="px-3 pt-3 text-left text-sm font-semibold text-foreground">平台能力边界</caption>
+                <thead className="text-muted">
+                  <tr className="border-b border-card-border">
+                    <th className="px-3 py-2 font-medium">平台</th><th className="px-3 py-2 font-medium">采集</th><th className="px-3 py-2 font-medium">AI 评分</th><th className="px-3 py-2 font-medium">招呼语</th><th className="px-3 py-2 font-medium">发送</th><th className="px-3 py-2 font-medium">回复监听</th>
+                  </tr>
+                </thead>
+                <tbody className="text-foreground">
+                  <tr className="border-b border-card-border"><td className="px-3 py-2 font-medium">BOSS 直聘</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">人工确认后</td><td className="px-3 py-2">支持</td></tr>
+                  <tr className="border-b border-card-border"><td className="px-3 py-2 font-medium">智联招聘</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">生成文本</td><td className="px-3 py-2">不支持</td><td className="px-3 py-2">不支持</td></tr>
+                  <tr><td className="px-3 py-2 font-medium">前程无忧</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">支持</td><td className="px-3 py-2">生成文本</td><td className="px-3 py-2">不支持</td><td className="px-3 py-2">不支持</td></tr>
+                </tbody>
+              </table>
+              <p className="border-t border-card-border px-3 py-2 text-xs leading-5 text-muted">智联和前程无忧会提供原平台链接；请在原平台完成投递后，再手动标记“已发送”。“多平台”不代表全平台一键投递。</p>
+            </div>
             {(['boss', 'zhilian', '51job'] as PlatformId[]).map(platform => {
               const search = platformSearch(platform)
               const label = platform === 'boss' ? 'BOSS 直聘' : platform === 'zhilian' ? '智联招聘' : '前程无忧'
@@ -452,6 +483,67 @@ export default function ConfigPage() {
                 采集后自动评分
                 <Switch checked={config.collection?.auto_score_default ?? false} onChange={value => updateConfig('collection.auto_score_default', value)} />
               </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="定时采集" sectionKey="collection_schedule" expanded={expandedSections} toggle={toggleSection}>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-primary/20 bg-accent-soft px-3 py-2.5 text-xs leading-5 text-primary">
+              本功能只采集 + AI 评分，且仅在 OpenJob 工作台正在运行时按时执行。不会自动发送招呼语、简历、跟进或 HR 回复；错过时段、Chrome 未连接或风控锁生效时只记录跳过，不补跑。
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-card-border bg-surface-hover px-3 py-2.5">
+              <div>
+                <div className="text-xs font-bold text-foreground">启用工作台内定时采集</div>
+                <div className="mt-0.5 text-[11px] text-muted">关闭后不会创建任何计划任务。</div>
+              </div>
+              <Switch checked={config.collection_schedule?.enabled ?? false} onChange={value => updateConfig('collection_schedule.enabled', value)} />
+            </div>
+            <Field label="每日执行时间">
+              <TagsInput
+                value={Array.isArray(config.collection_schedule?.times) ? config.collection_schedule.times : []}
+                onChange={value => updateConfig('collection_schedule.times', value)}
+                placeholder="输入 09:30 后按回车添加"
+              />
+              <p className="mt-1 text-xs text-muted">使用 24 小时制 HH:MM；同一时间点每天最多执行一次。</p>
+            </Field>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex items-center justify-between rounded-xl border border-card-border bg-surface-hover px-3 py-2.5 text-xs font-bold text-muted">
+                仅工作日运行
+                <Switch checked={config.collection_schedule?.weekdays_only ?? true} onChange={value => updateConfig('collection_schedule.weekdays_only', value)} />
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-card-border bg-surface-hover px-3 py-2.5 text-xs font-bold text-muted">
+                今日暂停
+                <Switch
+                  checked={config.collection_schedule?.pause_today_date === todayLocal}
+                  onChange={value => updateConfig('collection_schedule.pause_today_date', value ? todayLocal : '')}
+                />
+              </div>
+            </div>
+            <Field label="每轮每平台最大搜索页数">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={config.collection_schedule?.max_pages ?? 1}
+                onChange={event => updateConfig('collection_schedule.max_pages', Number(event.target.value))}
+              />
+              <p className="mt-1 text-xs text-muted">只作用于计划任务，不会改动你手动采集时的页数设置。</p>
+            </Field>
+            <div>
+              <div className="text-xs font-semibold text-foreground">计划采集平台</div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {SCHEDULE_PLATFORMS.map(platform => {
+                  const selected = (config.collection_schedule?.platforms || ['boss']).includes(platform.id)
+                  return (
+                    <label key={platform.id} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-soft ${selected ? 'border-primary/30 bg-accent-soft text-primary' : 'border-card-border bg-card text-muted'}`}>
+                      <input type="checkbox" checked={selected} onChange={event => setScheduledPlatform(platform.id, event.target.checked)} className="h-3.5 w-3.5 accent-primary" />
+                      {platform.label}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted">平台仍需在“搜索设置”中填写关键词与城市；智联和前程无忧只采集、评分和生成文字，不会自动发送或监听。</p>
             </div>
           </div>
         </SectionCard>

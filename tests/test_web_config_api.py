@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+from io import BytesIO
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,6 +11,30 @@ from openjob.web import server
 
 
 class WebConfigApiTests(unittest.TestCase):
+	def test_invalid_schedule_time_returns_bad_request_not_server_error(self):
+		payload = b'{"collection_schedule":{"enabled":true,"times":["9:30"],"platforms":["boss"]}}'
+		environ = {
+			"REQUEST_METHOD": "POST",
+			"PATH_INFO": "/api/config",
+			"SERVER_NAME": "localhost",
+			"SERVER_PORT": "80",
+			"wsgi.url_scheme": "http",
+			"wsgi.input": BytesIO(payload),
+			"wsgi.errors": StringIO(),
+			"CONTENT_LENGTH": str(len(payload)),
+			"CONTENT_TYPE": "application/json",
+		}
+		status: list[str] = []
+
+		def start_response(response_status, _headers, _exc_info=None):
+			status.append(response_status)
+
+		with tempfile.TemporaryDirectory() as tmp, patch.object(server, "CONFIG_PATH", Path(tmp) / "config.yaml"):
+			body = b"".join(server.app(environ, start_response)).decode("utf-8")
+
+		self.assertTrue(status[0].startswith("400"))
+		self.assertIn("HH:MM", body)
+
 	def test_redacted_config_does_not_return_raw_api_key(self):
 		config = {"ai": {"api_key": "test-api-key-12345678", "model": "claude"}}
 

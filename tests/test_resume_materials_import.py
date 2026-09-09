@@ -15,6 +15,7 @@ from openjob.resume_materials_import import (
     infer_column_mapping,
     infer_header_row,
     normalize_import_rows,
+    validate_import_sheet,
 )
 
 
@@ -302,6 +303,61 @@ class TestNormalizeAndCommit:
 
         with pytest.raises(MaterialLibraryError, match="至少需要一条"):
             commit_import(content, items, xlsx_path=tmp_path / "o.xlsx", index_path=tmp_path / "o.json")
+
+    def test_preview_uses_the_configured_third_row_as_its_header(self, tmp_path):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "全部经历"
+        ws.append(["填写说明", "", ""])
+        ws.append(["更新于 2026", "", ""])
+        ws.append(["类别", "名称", "工作内容"])
+        ws.append(["实习经历", "数据运营实习", "用 SQL 整理并分析活动数据"])
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        content = buffer.getvalue()
+        session = analyze_workbook(content, filename="third-header.xlsx", imports_dir=tmp_path)
+
+        result = validate_import_sheet(
+            content,
+            session=session,
+            sheet_config={
+                "name": "全部经历", "include": True, "header_row": 3,
+                "field_mapping": {"类别": "type", "名称": "title", "工作内容": "description"},
+                "type_override": None, "excluded_rows": [],
+            },
+            defaults={"resume_allowed": True, "priority": 3},
+        )
+
+        assert result.columns == ("类别", "名称", "工作内容")
+        assert [(row.excel_row, row.status, row.material["title"]) for row in result.rows] == [
+            (4, "valid", "数据运营实习"),
+        ]
+
+    def test_row_type_and_notes_are_preserved_without_sheet_override(self, tmp_path):
+        content = make_excel({
+            "全部经历": (
+                ["类别", "名称", "工作内容", "备注"],
+                [
+                    {"类别": "实习经历", "名称": "数据实习", "工作内容": "完成数据周报", "备注": "仅本人可见"},
+                    {"类别": "奖项", "名称": "创新奖", "工作内容": "获得校级一等奖", "备注": "奖状在云盘"},
+                    {"类别": "学生工作", "名称": "学生会", "工作内容": "组织 20 人团队", "备注": "可补充证明"},
+                ],
+            ),
+        })
+        session = analyze_workbook(content, filename="mixed.xlsx", imports_dir=tmp_path)
+        sheet = session.sheets[0]
+        result = validate_import_sheet(
+            content,
+            session=session,
+            sheet_config={
+                "name": "全部经历", "include": True, "header_row": sheet["header_row"],
+                "field_mapping": {m["source_column"]: m["target_field"] for m in sheet["mapping"] if m["target_field"] != "__ignore__"},
+                "type_override": None, "excluded_rows": [],
+            },
+            defaults={"resume_allowed": True, "priority": 3},
+        )
+        assert [row.material["type"] for row in result.rows] == ["experience", "award", "student_work"]
+        assert result.rows[0].material["notes"] == "仅本人可见"
 
 
 class ResourceLimitTests(unittest.TestCase):

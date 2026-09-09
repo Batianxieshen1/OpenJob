@@ -134,6 +134,26 @@ class CollectionOrchestratorTests(TestCase):
                 )
         score_jobs.assert_not_called()
 
+    def test_auto_score_forwards_workbench_progress_and_log_callbacks(self):
+        candidates = [_candidate("boss", "new-1")]
+        registry = CollectorRegistry({"boss": lambda: _FakeCollector("boss", [], candidates)})
+        progress_events = []
+        logs = []
+        config = {
+            "_workbench_score_progress": progress_events.append,
+            "_workbench_log": logs.append,
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("openjob.ai.scorer.score_jobs") as score_jobs:
+                CollectionOrchestrator(config, db_path=Path(tmp) / "collection.db", registry=registry).run(
+                    _options(auto_score=True)
+                )
+
+        score_config = score_jobs.call_args.args[0]
+        self.assertIs(score_config["_workbench_score_progress"].__self__, progress_events)
+        self.assertIs(score_config["_workbench_log"].__self__, logs)
+
     def test_stop_event_does_not_start_the_next_platform_or_scoring(self):
         events = []
         stop_event = Event()

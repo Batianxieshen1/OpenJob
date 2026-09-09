@@ -25,6 +25,7 @@ from openjob.resume_materials import (
     MATERIAL_TYPES,
     MAX_XLSX_BYTES,
     SHEET_NAME,
+    MaterialLibrary,
     MaterialLibraryError,
     parse_workbook,
     save_library_atomically,
@@ -414,7 +415,12 @@ class SheetValidationResult:
         return tuple(row for row in self.rows if row.status == "invalid" and not row.excluded)
 
 
-def _read_workbook_rows(content: bytes, sheet_name: str) -> list[tuple[int, list]]:
+def _read_workbook_rows(
+    content: bytes,
+    sheet_name: str,
+    *,
+    header_row: int | None = None,
+) -> list[tuple[int, list]]:
     """读取指定 Sheet 全部物理行，返回 (Excel 行号, 行值) 列表；强制资源上限。"""
     wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
     try:
@@ -422,14 +428,18 @@ def _read_workbook_rows(content: bytes, sheet_name: str) -> list[tuple[int, list
             raise MaterialLibraryError(f"Sheet「{sheet_name}」不存在")
         sheet = wb[sheet_name]
         result: list[tuple[int, list]] = []
+        max_columns = 0
+        data_rows = 0
         for excel_row, row in enumerate(sheet.iter_rows(values_only=True), start=1):
-            if excel_row > MAX_IMPORT_ROWS_PER_SHEET + 1:
-                raise MaterialLibraryError(
-                    f"Sheet「{sheet_name}」数据行数超过单表上限 {MAX_IMPORT_ROWS_PER_SHEET}"
-                )
-            result.append((excel_row, list(row)))
-        if result:
-            _check_column_limit(len(result[0][1]), sheet_name=sheet_name)
+            cells = list(row)
+            max_columns = max(max_columns, len(cells))
+            if header_row is not None and excel_row > header_row and any(
+                cell is not None and str(cell).strip() for cell in cells
+            ):
+                data_rows += 1
+                _check_row_limit(data_rows, sheet_name=sheet_name)
+            result.append((excel_row, cells))
+        _check_column_limit(max_columns, sheet_name=sheet_name)
         return result
     finally:
         wb.close()
@@ -514,7 +524,7 @@ def validate_sheet_config(
 
 def read_configured_sheet_rows(source_content: bytes, *, sheet_name: str, header_row: int):
     """读取指定 Sheet 全部物理行（含真实 Excel 行号），强制资源上限。"""
-    return _read_workbook_rows(source_content, sheet_name)
+    return _read_workbook_rows(source_content, sheet_name, header_row=header_row)
 
 
 def normalize_and_validate_sheet_rows(
@@ -525,10 +535,13 @@ def normalize_and_validate_sheet_rows(
     inferred_type: str = "other",
 ) -> SheetValidationResult:
     """映射 + 类型归一 + 稳定 ID + 示例检测 + 行级预校验（preview/confirm 共用）。"""
-    headers = [h for _, row in sheet_rows[:1] for h in [_norm_header_raw(c) for c in row]] if sheet_rows else []
-    if sheet_rows:
-        headers = [_norm_header_raw(c) for c in sheet_rows[0][1]]
     header_excel_row = config.header_row
+    header_values = next((row for excel_row, row in sheet_rows if excel_row == header_excel_row), None)
+    if header_values is None:
+        raise ValueError(f"Sheet「{config.name}」不存在第 {header_excel_row} 行表头")
+    headers = [_norm_header_raw(c) for c in header_values]
+    if not any(headers):
+        raise ValueError(f"Sheet「{config.name}」第 {header_excel_row} 行表头为空")
     mapping = infer_column_mapping(headers, [], sheet_name=config.name) if not config.field_mapping else [
         {"source_column": col, "target_field": target, "confidence": 1.0, "reason": "用户确认"}
         for col, target in config.field_mapping.items()
@@ -579,15 +592,17 @@ def normalize_and_validate_sheet_rows(
             issues.append(f"id「{user_id}」重复")
         seen_ids.add(user_id)
 
+        raw_type = (mapped.get("type") or "").strip()
+        row_type = next(
+            (candidate for candidate in MATERIAL_TYPES if raw_type.lower() == candidate),
+            next((t for key, t in CATEGORY_TYPE_MAP.items() if key in raw_type), ""),
+        )
+        if raw_type and not row_type:
+            issues.append(f"类别「{raw_type[:40]}」无法识别，已使用 Sheet 类型推断")
+
         item = {
             "id": user_id,
-            "type": (
-                config.type_override
-                or next(
-                    (t for k, t in CATEGORY_TYPE_MAP.items() if k in (mapped.get("type") or "")),
-                    sheet_type_inferred or "other",
-                )
-            ),
+            "type": config.type_override or row_type or sheet_type_inferred or "other",
             "title": (mapped.get("title") or "")[:120],
             "organization": (mapped.get("organization") or "")[:120],
             "role": (mapped.get("role") or "")[:80],
@@ -601,7 +616,7 @@ def normalize_and_validate_sheet_rows(
             "source": (mapped.get("source") or "")[:500],
             "resume_allowed": default_allowed,
             "priority": default_priority,
-            "notes": "",
+            "notes": (mapped.get("notes") or "")[:500],
         }
         ra = (mapped.get("resume_allowed") or "").strip()
         if ra:
@@ -617,6 +632,17 @@ def normalize_and_validate_sheet_rows(
         if not item["description"]:
             status = "invalid"
             issues.append("缺少事实描述")
+
+        priority_raw = (mapped.get("priority") or "").strip()
+        if priority_raw:
+            try:
+                priority = int(priority_raw)
+                if not 1 <= priority <= 5:
+                    raise ValueError
+                item["priority"] = priority
+            except ValueError:
+                status = "invalid"
+                issues.append("priority 必须是 1-5 的整数")
 
         excluded = excel_row in config.excluded_rows
         rows.append(ImportRowValidation(
@@ -648,16 +674,35 @@ def validate_import_sheet(
     sheet_rows = read_configured_sheet_rows(
         source_content, sheet_name=validated.name, header_row=validated.header_row,
     )
+    header_values = next((row for excel_row, row in sheet_rows if excel_row == validated.header_row), None)
+    if header_values is None:
+        raise ValueError(f"Sheet「{validated.name}」不存在第 {validated.header_row} 行表头")
+    headers = [_norm_header_raw(cell) for cell in header_values]
+    unknown_columns = sorted(set(validated.field_mapping) - set(headers))
+    if unknown_columns:
+        raise ValueError(
+            f"Sheet「{validated.name}」第 {validated.header_row} 行不存在源列：{'、'.join(unknown_columns)}"
+        )
     inferred, _ = _infer_sheet_type(
         validated.name,
-        [{"target_field": t, "sample_values": []} for t in validated.field_mapping.values()],
+        infer_column_mapping(headers, [row for excel_row, row in sheet_rows if excel_row > validated.header_row][:3], sheet_name=validated.name),
     )
-    return normalize_and_validate_sheet_rows(
+    result = normalize_and_validate_sheet_rows(
         sheet_rows,
         config=validated,
         defaults=defaults,
         inferred_type=inferred,
     )
+    actual_data_rows = {
+        row.excel_row for row in result.rows if row.status != "example" or row.excel_row > validated.header_row
+    }
+    invalid_exclusions = sorted(validated.excluded_rows - actual_data_rows)
+    if invalid_exclusions:
+        raise ValueError(
+            f"Sheet「{validated.name}」excluded_rows 包含不存在的数据行："
+            f"{'、'.join(str(row) for row in invalid_exclusions)}"
+        )
+    return result
 
 
 # ---------- 会话分析（扫描） ----------

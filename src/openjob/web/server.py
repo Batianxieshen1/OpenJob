@@ -79,6 +79,7 @@ from openjob.scoring_run_store import (
 )
 from openjob.scoring_selection import preview_scoring, select_scoring_jobs, validate_options
 from openjob.web.preflight import check_ai_connection, collect_preflight_checks, error_messages
+from openjob.web.scheduled_collection import ScheduledCollectionScheduler, normalize_schedule_config
 from openjob.web.resume_upload import ResumeUploadError, prepare_resume_content
 from openjob.web.city_lookup import CityLookupError, lookup_city
 from openjob.web.tasks import (
@@ -142,6 +143,9 @@ def set_base_dir(base_dir: Path | str) -> None:
 	resume_engine.RUNTIME_DATA_DIR = DATA_DIR
 	mark_orphaned_scoring_runs_paused(DATA_DIR / "openjob.db")
 	mark_orphaned_collection_runs_stopped(DATA_DIR / "openjob.db")
+	# A server restart must not leave an old scheduled slot looking active.
+	from openjob.scheduled_collection_store import mark_orphaned_scheduled_runs_stopped
+	mark_orphaned_scheduled_runs_stopped(DATA_DIR / "openjob.db")
 
 
 def _get_web_db():
@@ -352,22 +356,59 @@ def _record_collect_progress(task: WorkbenchTask, state: dict) -> None:
 		"collect_save_failed": int(state.get("save_failed") or 0),
 		"collect_search_pages": int(state.get("search_pages") or 0),
 	})
-	if isinstance(state.get("progress"), dict):
-		task.progress = deepcopy(state["progress"])
+	progress = state.get("progress")
+	if not isinstance(progress, dict):
+		return
+
+	task.progress = deepcopy(progress)
+	platform = str(progress.get("current_platform") or "")
+	platforms = progress.get("platforms") if isinstance(progress.get("platforms"), dict) else {}
+	platform_state = platforms.get(platform) if isinstance(platforms.get(platform), dict) else {}
+	outcome = str(progress.get("outcome") or "")
+	marker = (
+		outcome,
+		platform,
+		str(platform_state.get("keyword") or ""),
+		str(platform_state.get("city") or ""),
+		int(platform_state.get("page") or 0),
+		int(platform_state.get("max_pages") or 0),
+	)
+	if marker == task.context.get("_last_collect_progress_log_marker"):
+		return
+	task.context["_last_collect_progress_log_marker"] = marker
+	if outcome == "scoring":
+		_log(task, "本轮采集完成，开始 AI 评分")
+		return
+	if platform and marker[2] and marker[3] and marker[4]:
+		labels = {"boss": "BOSS 直聘", "zhilian": "智联招聘", "51job": "前程无忧"}
+		page_total = marker[5] or "?"
+		_log(task, f"正在采集：{labels.get(platform, platform)} · {marker[2]} · {marker[3]} · 第 {marker[4]}/{page_total} 页")
 
 
 def _record_score_progress(task: WorkbenchTask, state: dict) -> None:
+	completed = int(state.get("completed") or 0)
+	total = int(state.get("total") or 0)
+	scored = int(state.get("scored") or 0)
+	filtered = int(state.get("filtered") or 0)
+	failed = int(state.get("failed") or 0)
 	task.metrics.update({
-		"ai_completed": int(state.get("completed") or 0),
-		"ai_total": int(state.get("total") or 0),
-		"ai_passed": int(state.get("scored") or 0),
-		"ai_filtered": int(state.get("filtered") or 0),
-		"ai_failed": int(state.get("failed") or 0),
+		"ai_completed": completed,
+		"ai_total": total,
+		"ai_passed": scored,
+		"ai_filtered": filtered,
+		"ai_failed": failed,
 	})
-	_log(
-		task,
-		f"AI 评分进度 {state['completed']}/{state['total']}：通过 {state['scored']}，过滤 {state['filtered']}，失败 {state['failed']}",
-	)
+	if task.progress:
+		task.progress = {**task.progress, "outcome": "scoring"}
+
+	if total <= 0:
+		return
+	bucket = min(10, completed * 10 // total)
+	should_log = completed in {1, total} or bucket != task.context.get("_last_score_progress_log_bucket")
+	if not should_log:
+		return
+	task.context["_last_score_progress_log_bucket"] = bucket
+	_log(task, f"AI 评分进度 {completed}/{total}：通过 {scored}，过滤 {filtered}，失败 {failed}")
 
 
 def _execute_collect(task: WorkbenchTask, config: dict) -> None:
@@ -375,6 +416,8 @@ def _execute_collect(task: WorkbenchTask, config: dict) -> None:
 	collect_config = dict(config)
 	collect_config["_workbench_stop_event"] = task.stop_requested
 	collect_config["_workbench_collect_progress"] = lambda state: _record_collect_progress(task, state)
+	collect_config["_workbench_score_progress"] = lambda state: _record_score_progress(task, state)
+	collect_config["_workbench_log"] = lambda message: _log(task, message)
 	if "_collection_options" not in config:
 		# Preserve the old private executor seam used by legacy callers. New Web
 		# collection tasks always inject normalized options before starting.
@@ -885,6 +928,39 @@ task_runner._executors.update({
 })
 
 
+def _scheduled_collection_preflight(mode: str, config: dict, options: dict) -> list[str]:
+	"""Run full due-time checks; a bad environment skips instead of retrying."""
+	messages = _preflight_messages(mode, config, options)
+	if messages:
+		return messages
+	db = _get_web_db()
+	try:
+		lock = get_active_platform_safety_lock(db)
+	finally:
+		db.close()
+	if lock:
+		return [f"平台风控锁生效：{lock.get('reason') or '请稍后再试'}"]
+	try:
+		return error_messages(collect_preflight_checks(mode, config, options))
+	except Exception:
+		return ["启动检查失败，请检查 Chrome、平台页面和 AI 配置"]
+
+
+def _scheduled_collection_notify(title: str, message: str, _task: dict) -> bool:
+	from openjob.notify import notify_desktop
+	return notify_desktop(title, message, load_config(CONFIG_PATH))
+
+
+scheduled_collection_scheduler = ScheduledCollectionScheduler(
+	db_path_provider=lambda: DATA_DIR / "openjob.db",
+	config_loader=lambda: load_config(CONFIG_PATH),
+	task_runner=task_runner,
+	task_config_builder=_task_config,
+	preflight=_scheduled_collection_preflight,
+	notify=_scheduled_collection_notify,
+)
+
+
 # ─── Health ───────────────────────────────────────────────
 
 @app.route("/api/market/stats")
@@ -1196,6 +1272,7 @@ def api_workbench():
 			},
 			"task": status["active"],
 			"last_task": status["last_task"],
+			"scheduled_collection": scheduled_collection_scheduler.summary(),
 		})
 	finally:
 		db.close()
@@ -1819,8 +1896,51 @@ material_library_lock = Lock()
 
 
 def _materials_import_in_progress() -> bool:
+    from openjob.resume_materials_import import cleanup_expired_import_sessions
+
     base = DATA_DIR / "resume_material_imports"
+    cleanup_expired_import_sessions(base)
     return base.exists() and any(p.is_dir() for p in base.iterdir())
+
+
+def _load_material_import_session(data: dict):
+    """加载并校验服务端暂存导入会话，绝不信任客户端的文件或 hash。"""
+    import hashlib
+    import re
+
+    from openjob.resume_materials_import import IMPORT_ID_PATTERN, ImportSession
+
+    import_id = data.get("import_id")
+    if not isinstance(import_id, str) or not IMPORT_ID_PATTERN.fullmatch(import_id):
+        raise ValueError("import_id 必须是 32 位小写十六进制")
+    imports_base = (DATA_DIR / "resume_material_imports").resolve()
+    session_dir = (imports_base / import_id).resolve()
+    try:
+        session_dir.relative_to(imports_base)
+    except ValueError as exc:
+        raise ValueError("非法 import_id") from exc
+    staged = session_dir / "source.xlsx"
+    analysis_path = session_dir / "analysis.json"
+    if not staged.is_file() or not analysis_path.is_file():
+        raise FileNotFoundError("导入会话不存在或已过期，请重新分析")
+    client_hash = data.get("source_sha256")
+    if not isinstance(client_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", client_hash):
+        raise ValueError("source_sha256 必须是完整的 64 位小写十六进制 SHA-256")
+    try:
+        stored = json.loads(analysis_path.read_text(encoding="utf-8"))
+        if not isinstance(stored, dict):
+            raise ValueError("analysis.json 不是对象")
+        session = ImportSession.from_storage_dict(stored)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("导入会话数据已损坏，请重新分析") from exc
+
+    if session.import_id != import_id or not re.fullmatch(r"[0-9a-f]{64}", session.source_sha256):
+        raise ValueError("导入会话完整性校验失败，请重新分析")
+    source_content = staged.read_bytes()
+    staged_hash = hashlib.sha256(source_content).hexdigest()
+    if client_hash != session.source_sha256 or staged_hash != session.source_sha256:
+        raise ValueError("源文件在分析后已变化，请重新分析")
+    return session_dir, session, source_content
 
 
 def _materials_status_payload() -> dict:
@@ -1914,6 +2034,9 @@ def api_materials_analyze():
 @app.route("/api/resume/materials/preview", method="POST")
 def api_materials_preview():
     """确认前预览：重新读取暂存文件，返回行级验证结果（分页）。"""
+    from openjob.resume_materials import MaterialLibraryError
+    from openjob.resume_materials_import import validate_import_sheet
+
     try:
         data = request.json
     except Exception:
@@ -1921,22 +2044,12 @@ def api_materials_preview():
     if not isinstance(data, dict) or not data.get("import_id"):
         return _json_response({"error": "缺少 import_id"}, 400)
 
-    from openjob.resume_materials_import import ImportSession, validate_import_sheet
-
-    session_dir = DATA_DIR / "resume_material_imports" / str(data["import_id"])
-    imports_base = (DATA_DIR / "resume_material_imports").resolve()
     try:
-        session_dir.resolve().relative_to(imports_base)
-    except ValueError:
-        return _json_response({"error": "非法 import_id"}, 400)
-    staged = session_dir / "source.xlsx"
-    analysis_path = session_dir / "analysis.json"
-    if not staged.exists() or not analysis_path.exists():
-        return _json_response({"error": "导入会话不存在或已过期，请重新分析"}, 404)
-
-    session = ImportSession.from_storage_dict(json.loads(analysis_path.read_text(encoding="utf-8")))
-    if data.get("source_sha256") and data["source_sha256"] != session.source_sha256:
-        return _json_response({"error": "源文件在分析后已被替换，请重新分析"}, 400)
+        _, session, source_content = _load_material_import_session(data)
+    except FileNotFoundError as exc:
+        return _json_response({"error": str(exc)}, 404)
+    except ValueError as exc:
+        return _json_response({"error": str(exc)}, 400)
 
     sheet_config = dict(data.get("sheet") or {})
     name = str(sheet_config.get("name") or "")
@@ -1946,7 +2059,7 @@ def api_materials_preview():
     defaults = data.get("defaults") or {"resume_allowed": True, "priority": 3}
     try:
         result = validate_import_sheet(
-            staged.read_bytes(), session=session, sheet_config=sheet_config, defaults=defaults,
+            source_content, session=session, sheet_config=sheet_config, defaults=defaults,
         )
     except ValueError as exc:
         return _json_response({"error": str(exc)}, 400)
@@ -2005,24 +2118,24 @@ def api_materials_confirm():
     if not isinstance(data, dict) or not data.get("import_id"):
         return _json_response({"error": "缺少 import_id"}, 400)
 
-    from openjob.resume_materials_import import ImportSession, commit_import, normalize_import_rows
-
-    session_dir = DATA_DIR / "resume_material_imports" / str(data["import_id"])
-    imports_base = (DATA_DIR / "resume_material_imports").resolve()
     try:
-        session_dir.resolve().relative_to(imports_base)
-    except ValueError:
-        return _json_response({"error": "非法 import_id"}, 400)
-    staged = session_dir / "source.xlsx"
-    analysis_path = session_dir / "analysis.json"
-    if not staged.exists() or not analysis_path.exists():
-        return _json_response({"error": "导入会话不存在或已过期，请重新分析"}, 404)
+        session_dir, session, source_content = _load_material_import_session(data)
+    except FileNotFoundError as exc:
+        return _json_response({"error": str(exc)}, 404)
+    except ValueError as exc:
+        return _json_response({"error": str(exc)}, 400)
 
-    session = ImportSession.from_storage_dict(json.loads(analysis_path.read_text(encoding="utf-8")))
-    confirm = {**data, "session": session.to_storage_dict()}
-
-    if data.get("source_sha256") and data["source_sha256"] != session.source_sha256:
-        return _json_response({"error": "源文件在分析后已被替换，请重新分析"}, 400)
+    sheets = data.get("sheets")
+    if not isinstance(sheets, list):
+        return _json_response({"error": "sheets 必须是数组"}, 400)
+    included_names: set[str] = set()
+    for sheet_conf in sheets:
+        if not isinstance(sheet_conf, dict):
+            return _json_response({"error": "sheets 的每项必须是对象"}, 400)
+        name = str(sheet_conf.get("name") or "")
+        if name in included_names:
+            return _json_response({"error": f"Sheet「{name}」重复提交"}, 400)
+        included_names.add(name)
 
     enabled, official_xlsx, official_index = _materials_paths()
     defaults = data.get("defaults") or {"resume_allowed": True, "priority": 3}
@@ -2035,13 +2148,17 @@ def api_materials_confirm():
     invalid_summary: list[dict] = []
     excluded_total = 0
     all_items: list[dict] = []
+    seen_item_ids: dict[str, tuple[str, int]] = {}
     try:
-        for sheet_conf in confirm["sheets"]:
+        for sheet_conf in sheets:
             if not sheet_conf.get("include", True):
+                # 即使用户选择跳过，也需要校验 Sheet 属于当前会话。
+                if not any(s.get("name") == sheet_conf.get("name") for s in session.sheets):
+                    raise ValueError(f"Sheet「{sheet_conf.get('name')}」不在分析会话中")
                 warnings.append(f"Sheet「{sheet_conf.get('name')}」已按你的选择跳过")
                 continue
             result = validate_import_sheet(
-                staged.read_bytes(), session=session, sheet_config=sheet_conf, defaults=defaults,
+                source_content, session=session, sheet_config=sheet_conf, defaults=defaults,
             )
             for row in result.rows:
                 if row.status == "example":
@@ -2058,6 +2175,16 @@ def api_materials_confirm():
                         "issues": list(row.issues),
                     })
                     continue
+                previous = seen_item_ids.get(row.generated_id)
+                if previous:
+                    invalid_summary.append({
+                        "sheet": result.name, "excel_row": row.excel_row,
+                        "issues": [
+                            f"id「{row.generated_id}」与 Sheet「{previous[0]}」第 {previous[1]} 行重复"
+                        ],
+                    })
+                    continue
+                seen_item_ids[row.generated_id] = (result.name, row.excel_row)
                 all_items.append(row.material)
         if invalid_summary:
             return _json_response({
@@ -2078,7 +2205,7 @@ def api_materials_confirm():
         try:
             from openjob.resume_materials_import import commit_import
 
-            library = commit_import(staged.read_bytes(), all_items, xlsx_path=official_xlsx, index_path=official_index)
+            library = commit_import(source_content, all_items, xlsx_path=official_xlsx, index_path=official_index)
         except MaterialLibraryError as exc:
             return _json_response({"error": str(exc), "warnings": warnings}, 400)
         except Exception as exc:
@@ -2102,14 +2229,21 @@ def api_materials_import_cancel(import_id):
     """取消并删除暂存导入会话；不影响正式素材库。"""
     import shutil
 
+    from openjob.resume_materials_import import IMPORT_ID_PATTERN, cleanup_expired_import_sessions
+
+    if not IMPORT_ID_PATTERN.fullmatch(import_id):
+        return _json_response({"error": "import_id 必须是 32 位小写十六进制"}, 400)
     base = (DATA_DIR / "resume_material_imports").resolve()
-    if not base.exists() or import_id not in [p.name for p in base.iterdir()]:
+    cleanup_expired_import_sessions(base)
+    if not base.exists():
         return _json_response({"error": "导入会话不存在"}, 404)
     target = (base / import_id).resolve()
     try:
         target.relative_to(base)
     except ValueError:
         return _json_response({"error": "非法 import_id"}, 400)
+    if not target.is_dir():
+        return _json_response({"error": "导入会话不存在"}, 404)
     shutil.rmtree(target, ignore_errors=True)
     return _json_response({"success": True})
 
@@ -2607,6 +2741,7 @@ def api_config_post():
 		if not isinstance(data, dict):
 			return _json_response({"error": "Config body must be an object"}, 400)
 		data = _sanitize_config_for_write(data)
+		normalize_schedule_config(data)
 
 		# Basic validation
 		profile = data.get("profile", {})
@@ -2617,6 +2752,8 @@ def api_config_post():
 		_write_config(data)
 
 		return _json_response({"success": True, "message": "配置已保存"})
+	except ValueError as e:
+		return _json_response({"error": str(e)}, 400)
 	except Exception as e:
 		return _json_response({"error": str(e)}, 500)
 
@@ -3068,4 +3205,8 @@ def run_server(host: str = "127.0.0.1", port: int = 8686, open_browser: bool = T
 	wrapped = _GzipMiddleware(app)
 	with make_server(host, port, wrapped, server_class=ThreadingWSGIServer) as httpd:
 		print(f"Serving on http://{host}:{port}")
-		httpd.serve_forever()
+		scheduled_collection_scheduler.start()
+		try:
+			httpd.serve_forever()
+		finally:
+			scheduled_collection_scheduler.stop()
