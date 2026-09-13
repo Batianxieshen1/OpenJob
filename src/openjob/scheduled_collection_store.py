@@ -90,13 +90,14 @@ def list_scheduled_runs(db_path: Path, *, limit: int = 20) -> list[dict[str, Any
         conn.close()
 
 
-def mark_orphaned_scheduled_runs_stopped(db_path: Path) -> int:
+def mark_orphaned_scheduled_runs_interrupted(db_path: Path) -> int:
+    """工作台重启收敛：无法确认完成的 running 统一标为 interrupted，不伪装成功。"""
     conn = get_db(db_path)
     try:
         cursor = conn.execute(
             """
             UPDATE scheduled_collection_runs
-            SET status = 'stopped', reason = '工作台重启，上一轮计划任务未完成',
+            SET status = 'interrupted', reason = '工作台重启，上一轮计划任务无法确认完成',
                 finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE status = 'running'
             """

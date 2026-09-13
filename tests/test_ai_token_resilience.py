@@ -176,7 +176,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             patch("openjob.ai.scorer._call_claude", side_effect=[first, review]) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score") as update_score,
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             scored, filtered = scorer.score_jobs(
                 {
@@ -220,7 +220,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             patch("openjob.ai.scorer._call_claude", side_effect=call_ai),
             patch("openjob.ai.scorer.update_job_quick_score", side_effect=record_write),
             patch("openjob.ai.scorer.update_job_score", side_effect=record_write),
-            patch("openjob.ai.scorer.update_job_status", side_effect=record_write),
+            patch("openjob.ai.scorer.transition_job_status", side_effect=record_write),
         ):
             scored, filtered = scorer.score_jobs(
                 {"ai": {"scoring_concurrency": 3}, "scoring": {"threshold": 71}}
@@ -263,7 +263,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             patch("openjob.ai.scorer._call_claude", side_effect=blocking_ai),
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             thread = Thread(target=run_scoring)
             thread.start()
@@ -291,7 +291,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             ) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score") as update_quick_score,
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             scored, filtered = scorer.score_jobs(
                 {"scoring": {"threshold": 70}},
@@ -323,7 +323,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             ) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             scored, filtered = scorer.score_jobs(
                 {
@@ -356,7 +356,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             ) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             scored, _ = scorer.score_jobs({
                 "ai": {"scoring_second_review": False},
@@ -390,7 +390,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             ) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             scored, filtered = scorer.score_jobs(
                 {
@@ -423,7 +423,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             ) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status"),
+            patch("openjob.ai.scorer.transition_job_status"),
         ):
             scored, filtered = scorer.score_jobs(
                 {
@@ -452,7 +452,7 @@ class ScorerTokenResilienceTests(unittest.TestCase):
             ) as call_ai,
             patch("openjob.ai.scorer.update_job_quick_score"),
             patch("openjob.ai.scorer.update_job_score"),
-            patch("openjob.ai.scorer.update_job_status") as update_status,
+            patch("openjob.ai.scorer.transition_job_status") as update_status,
         ):
             scored, filtered = scorer.score_jobs(
                 {
@@ -543,7 +543,7 @@ class GreeterTokenResilienceTests(unittest.TestCase):
                 ],
             ) as call_ai,
             patch("openjob.ai.greeter.update_job_greeting") as update_greeting,
-            patch("openjob.ai.greeter.update_job_status") as update_status,
+            patch("openjob.ai.greeter.transition_job_status") as update_status,
         ):
             count = greeter.generate_greetings(
                 {
@@ -579,7 +579,7 @@ class GreeterTokenResilienceTests(unittest.TestCase):
                 ],
             ) as call_ai,
             patch("openjob.ai.greeter.update_job_greeting") as update_greeting,
-            patch("openjob.ai.greeter.update_job_status"),
+            patch("openjob.ai.greeter.transition_job_status"),
         ):
             count = greeter.generate_greetings(
                 {"ai": {"greeting_max_iterations": 1}}
@@ -606,7 +606,7 @@ class GreeterTokenResilienceTests(unittest.TestCase):
                 side_effect=[None, "第二次生成成功的个性化招呼语"],
             ) as call_ai,
             patch("openjob.ai.greeter.update_job_greeting") as update_greeting,
-            patch("openjob.ai.greeter.update_job_status"),
+            patch("openjob.ai.greeter.transition_job_status"),
             patch("openjob.ai.greeter.add_history") as add_history,
         ):
             count = greeter.generate_greetings(
@@ -644,7 +644,7 @@ class GreeterTokenResilienceTests(unittest.TestCase):
                 ],
             ) as call_ai,
             patch("openjob.ai.greeter.update_job_greeting") as update_greeting,
-            patch("openjob.ai.greeter.update_job_status"),
+            patch("openjob.ai.greeter.transition_job_status"),
         ):
             count = greeter.generate_greetings(
                 {
@@ -679,7 +679,7 @@ class GreeterTokenResilienceTests(unittest.TestCase):
                 ],
             ) as call_ai,
             patch("openjob.ai.greeter.update_job_greeting") as update_greeting,
-            patch("openjob.ai.greeter.update_job_status"),
+            patch("openjob.ai.greeter.transition_job_status"),
         ):
             count = greeter.generate_greetings(
                 {
@@ -711,7 +711,7 @@ class GreeterTokenResilienceTests(unittest.TestCase):
                 ],
             ) as call_ai,
             patch("openjob.ai.greeter.update_job_greeting"),
-            patch("openjob.ai.greeter.update_job_status"),
+            patch("openjob.ai.greeter.transition_job_status"),
         ):
             count = greeter.generate_greetings(
                 {

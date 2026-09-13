@@ -17,7 +17,7 @@ from openjob.db import (
     get_jobs_by_status,
     reset_ai_filtered_jobs,
     update_job_score,
-    update_job_status,
+    transition_job_status,
     update_job_quick_score,
 )
 from openjob.ai.prefilter import quick_score
@@ -569,7 +569,7 @@ def score_jobs(
                 update_job_quick_score(db, job["id"], qs)
                 if qs == 0:
                     update_job_score(db, job["id"], qs, f"预筛不通过: {qs_reason}")
-                    update_job_status(db, job["id"], "filtered")
+                    transition_job_status(db, job["id"], "filtered")
                     filtered += 1
                     prefiltered += 1
                     processed += 1
@@ -629,10 +629,10 @@ def score_jobs(
                     if result is not None:
                         update_job_score(db, job["id"], result.score, result.reason)
                         if result.score >= threshold:
-                            update_job_status(db, job["id"], "ready")
+                            transition_job_status(db, job["id"], "ready")
                             scored += 1
                         else:
-                            update_job_status(db, job["id"], "filtered")
+                            transition_job_status(db, job["id"], "filtered")
                             filtered += 1
                         completed_job = True
                     elif outcome.failure_detail:

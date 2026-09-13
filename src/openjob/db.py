@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from openjob.contracts import GREETING_FACT_STATUSES, validate_job_status_transition
+
 
 DB_PATH = Path("./data/openjob.db")
 MAX_JOB_IDS = 1000
@@ -499,7 +501,7 @@ def update_job_greeting(
     cannot be sent until a verified OpenJob draft replaces them.
     """
     status = str(fact_status or "unverified").strip().lower()
-    if status not in {"verified", "unverified", "failed", "stale"}:
+    if status not in GREETING_FACT_STATUSES:
         raise ValueError("招呼语事实状态非法")
     conn.execute(
         "UPDATE jobs SET greeting = ?, greeting_fact_status = ?, greeting_source_json = ?, "
@@ -525,7 +527,7 @@ def update_job_greeting_facts(
     three-argument API.
     """
     status = str(fact_status or "unverified").strip().lower()
-    if status not in {"verified", "unverified", "failed", "stale"}:
+    if status not in GREETING_FACT_STATUSES:
         raise ValueError("招呼语事实状态非法")
     conn.execute(
         "UPDATE jobs SET greeting_fact_status = ?, greeting_source_json = ?, "
@@ -537,12 +539,32 @@ def update_job_greeting_facts(
 
 
 def update_job_status(conn: sqlite3.Connection, job_id: str, status: str) -> None:
-    """Update job status."""
+    """Raw status writer. Business code must use :func:`transition_job_status`."""
     conn.execute(
         "UPDATE jobs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL",
         (status, job_id)
     )
     conn.commit()
+
+
+def transition_job_status(
+    conn: sqlite3.Connection,
+    job_id: str,
+    status: str,
+    *,
+    via: str = "standard",
+) -> None:
+    """Whitelisted status transition (WP-S0).
+
+    Illegal transitions raise :class:`IllegalJobStatusTransition` and leave the
+    original status untouched; same-status rewrites stay idempotent.
+    """
+    row = conn.execute(
+        "SELECT status FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+    ).fetchone()
+    if row is not None:
+        validate_job_status_transition(str(row["status"] or ""), str(status), via=via)
+    update_job_status(conn, job_id, status)
 
 
 def add_history(conn: sqlite3.Connection, job_id: str, action: str, detail: str = "") -> None:

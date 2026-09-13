@@ -57,10 +57,23 @@ from openjob.db import (
 	set_job_resume_pointer,
 	soft_delete_jobs,
 	update_base_resume,
-	update_job_status,
+	transition_job_status,
+	update_job_greeting,
 	update_resume_version,
 )
 from openjob.collection.capabilities import platform_supports
+from openjob.contracts import (
+	FACT_SOURCE_TYPES_ALLOWED,
+	FACT_SOURCE_TYPES_FORBIDDEN,
+	IllegalJobStatusTransition,
+	JOB_STATUS_LABELS,
+	JOB_STATUS_TRANSITIONS,
+	MANUAL_EXTERNAL_SEND_SOURCES,
+	PLATFORM_CAPABILITIES,
+	PLATFORM_LABELS,
+	TASK_LIFECYCLE_TRANSITIONS,
+	TASK_STATUS_LABELS,
+)
 from openjob.collection.orchestrator import CollectionOrchestrator, normalize_collection_options
 from openjob.collection.platforms.zhilian import load_zhilian_city_snapshot
 from openjob.collection.platforms.job51 import load_51job_city_snapshot
@@ -145,8 +158,8 @@ def set_base_dir(base_dir: Path | str) -> None:
 	mark_orphaned_scoring_runs_paused(DATA_DIR / "openjob.db")
 	mark_orphaned_collection_runs_stopped(DATA_DIR / "openjob.db")
 	# A server restart must not leave an old scheduled slot looking active.
-	from openjob.scheduled_collection_store import mark_orphaned_scheduled_runs_stopped
-	mark_orphaned_scheduled_runs_stopped(DATA_DIR / "openjob.db")
+	from openjob.scheduled_collection_store import mark_orphaned_scheduled_runs_interrupted
+	mark_orphaned_scheduled_runs_interrupted(DATA_DIR / "openjob.db")
 
 
 def _get_web_db():
@@ -159,6 +172,35 @@ def _json_response(data, status_code=200):
 	response.content_type = "application/json; charset=utf-8"
 	response.status = status_code
 	return json.dumps(data, ensure_ascii=False, default=str)
+
+
+def _api_envelope(data=None, *, error=None, status_code=200):
+	"""WP-S0 标准响应封套 {success, data, error, request_id}：新增接口强制使用。"""
+	from uuid import uuid4
+
+	return _json_response(
+		{
+			"success": error is None,
+			"data": data,
+			"error": error,
+			"request_id": str(uuid4()),
+		},
+		status_code,
+	)
+
+
+def _api_error(code, message, *, retryable=False, status_code=400, details=None):
+	"""WP-S0 标准错误封套。"""
+	return _api_envelope(
+		None,
+		error={
+			"code": code,
+			"message": message,
+			"retryable": retryable,
+			"details": details or {},
+		},
+		status_code=status_code,
+	)
 
 
 def _serialize_history_items(items):
@@ -1715,7 +1757,7 @@ def api_workbench_deliver():
 		db = _get_web_db()
 		try:
 			for job_id in status_job_ids:
-				update_job_status(db, job_id, "approved")
+				transition_job_status(db, job_id, "approved")
 				if not direct_send:
 					add_history(db, job_id, "approved", "Web Dashboard 确认投递")
 		finally:
@@ -1748,6 +1790,8 @@ def api_workbench_deliver():
 		return _json_response(task)
 	except TaskAlreadyRunningError as e:
 		return _json_response({"error": str(e)}, 409)
+	except IllegalJobStatusTransition as e:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(e), status_code=409)
 	except Exception as e:
 		return _json_response({"error": str(e)}, 500)
 
@@ -1780,7 +1824,7 @@ def api_workbench_reject():
 			if invalid_ids:
 				return _json_response({"error": "所选岗位不存在或已进入回收站", "invalid_ids": invalid_ids}, 409)
 			for job_id in job_ids:
-				update_job_status(db, job_id, "rejected")
+				transition_job_status(db, job_id, "rejected")
 				add_history(db, job_id, "rejected", "Web Dashboard 放弃投递")
 		finally:
 			db.close()
@@ -1800,6 +1844,8 @@ def api_workbench_reject():
 			"blocked_companies": block_companies,
 			"blocked_new": blocked_new,
 		})
+	except IllegalJobStatusTransition as e:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(e), status_code=409)
 	except Exception as e:
 		return _json_response({"error": str(e)}, 500)
 
@@ -1816,9 +1862,105 @@ def api_job_approve(job_id):
 			return _json_response({"error": "岗位不存在"}, 404)
 		if str(row["status"]) != "filtered":
 			return _json_response({"error": "只有被 AI 过滤的岗位才需要放行"}, 409)
-		update_job_status(db, job_id, "ready")
+		transition_job_status(db, job_id, "ready")
 		add_history(db, job_id, "approved", "人工放行：用户判断优先于 AI 评分，岗位重新进入确认队列")
 		return _json_response({"success": True})
+	except IllegalJobStatusTransition as exc:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(exc), status_code=409)
+	finally:
+		db.close()
+
+
+@app.route("/api/contracts")
+def api_contracts():
+	"""WP-S0：契约单一来源查询接口（状态/迁移/能力/事实来源类型）。"""
+	return _api_envelope({
+		"job_status_labels": dict(JOB_STATUS_LABELS),
+		"job_status_transitions": {key: sorted(values) for key, values in JOB_STATUS_TRANSITIONS.items()},
+		"manual_external_send_sources": sorted(MANUAL_EXTERNAL_SEND_SOURCES),
+		"task_status_labels": dict(TASK_STATUS_LABELS),
+		"task_lifecycle_transitions": {key: sorted(values) for key, values in TASK_LIFECYCLE_TRANSITIONS.items()},
+		"platform_capabilities": {key: sorted(values) for key, values in PLATFORM_CAPABILITIES.items()},
+		"platform_labels": dict(PLATFORM_LABELS),
+		"fact_source_types": {
+			"allowed": sorted(FACT_SOURCE_TYPES_ALLOWED),
+			"forbidden": sorted(FACT_SOURCE_TYPES_FORBIDDEN),
+		},
+	})
+
+
+@app.route("/api/jobs/<job_id>/greeting", method="POST")
+def api_job_greeting_edit(job_id):
+	"""人工编辑招呼语：保存前重新走完整事实校验（WP-S1 用户编辑再校验）。
+
+	校验失败时拒绝保存并返回具体缺口，让用户把经历补进素材库，而不是绕过校验。
+	"""
+	try:
+		data = request.json
+	except Exception:
+		return _api_error("INVALID_JSON", "请求体必须是 JSON", status_code=400)
+	if not isinstance(data, dict):
+		return _api_error("INVALID_JSON", "请求体必须是对象", status_code=400)
+	greeting = str(data.get("greeting") or "").strip()
+	if not greeting:
+		return _api_error("EMPTY_GREETING", "招呼语不能为空", status_code=400)
+
+	db = _get_web_db()
+	try:
+		row = db.execute(
+			"SELECT id, greeting_source_json FROM jobs WHERE id = ? AND deleted_at IS NULL",
+			(job_id,),
+		).fetchone()
+		if not row:
+			return _api_error("JOB_NOT_FOUND", "岗位不存在或已进入回收站", status_code=404)
+		raw_source = str(row["greeting_source_json"] or "").strip()
+		try:
+			source = json.loads(raw_source) if raw_source else {}
+		except json.JSONDecodeError:
+			source = {}
+		if not isinstance(source, dict) or not (
+			source.get("base_resume_id")
+			or source.get("base_resume_name")
+			or source.get("candidate_material_ids")
+		):
+			return _api_error(
+				"FACT_PROVENANCE_MISSING",
+				"该岗位招呼语没有事实溯源记录，请先重新生成招呼语再编辑",
+				status_code=409,
+			)
+
+		from openjob.ai.fact_policy import rebuild_trusted_baseline, validate_generated_text
+		from datetime import datetime
+
+		source = {
+			**source,
+			"source_type": "user_confirmed_fact",
+			"edited_by": "web_dashboard",
+			"edited_at": datetime.now().isoformat(timespec="seconds"),
+		}
+		trusted, missing = rebuild_trusted_baseline(db, source, load_config(CONFIG_PATH), data_dir=DATA_DIR)
+		if missing:
+			return _api_error(
+				"FACT_SOURCES_MISSING",
+				"事实来源已不存在，拒绝编辑保存：" + "；".join(missing[:3]),
+				status_code=409,
+				details={"missing": missing},
+			)
+		issues = validate_generated_text(greeting, trusted)
+		if issues:
+			return _api_error(
+				"FACT_VALIDATION_FAILED",
+				"编辑内容包含真实底稿/素材库之外的事实，已拒绝保存；请先把这些经历补进素材库",
+				status_code=422,
+				details={"issues": issues},
+			)
+		update_job_greeting(
+			db, job_id, greeting,
+			fact_status="verified",
+			source_json=json.dumps(source, ensure_ascii=False),
+		)
+		add_history(db, job_id, "greeting_edited", "用户编辑招呼语并通过事实校验")
+		return _api_envelope({"job_id": job_id, "fact_status": "verified", "issues": []})
 	finally:
 		db.close()
 
@@ -1907,9 +2049,11 @@ def api_job_mark_resume_sent(job_id):
 			return _json_response({"error": "岗位不存在或已进入回收站"}, 404)
 		if not platform_supports(str(row["source_platform"] or "boss"), "deliver"):
 			return _json_response({"error": "该岗位来源平台当前不支持投递或简历发送链路"}, 403)
-		update_job_status(db, job_id, "resume_sent")
+		transition_job_status(db, job_id, "resume_sent")
 		add_history(db, job_id, "resume_sent", "Web Dashboard 标记定制简历已发送")
 		return _json_response({"success": True})
+	except IllegalJobStatusTransition as exc:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(exc), status_code=409)
 	finally:
 		db.close()
 
@@ -2746,8 +2890,10 @@ def api_history_reply(history_id):
 				int(row["id"]),
 			),
 		)
-		update_job_status(db, row["job_id"], "replied")
+		transition_job_status(db, row["job_id"], "replied")
 		return _json_response({"success": True, "message": "回复已记录，请在招聘平台手动发送。"})
+	except IllegalJobStatusTransition as e:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(e), status_code=409)
 	except Exception as e:
 		return _json_response({"error": str(e)}, 500)
 	finally:

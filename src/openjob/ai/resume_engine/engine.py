@@ -13,6 +13,7 @@ from pathlib import Path
 from rich.console import Console
 
 from openjob.ai.credentials import AIRequestError
+from openjob.ai.fact_policy import TEMPLATE_RESUME_MARKERS, sanitize_untrusted_text
 from openjob.ai.resume import _pdf_page_count, _render_pdf
 from openjob.cancellation import OperationCancelled, run_cancellable, stop_requested
 from openjob.config import DATA_DIR, load_config
@@ -33,8 +34,7 @@ from openjob.ai.resume_engine.optimizer import (
 
 console = Console()
 
-# 模板/占位简历特征：出现即拒绝生成（V1 铁律）
-TEMPLATE_RESUME_MARKERS = ("张三", "李四", "xxx@xx.com", "某某公司", "XX公司", "示例公司")
+# 模板/占位简历特征：出现即拒绝生成（V1 铁律）。标记清单由 fact_policy 统一提供。
 MIN_RESUME_CHARS = 100
 
 LAST_RESUME_ERROR: dict[str, str] = {}
@@ -126,6 +126,8 @@ def generate_resume(
         jd_text = job.get("jd") or ""
         if not jd_text.strip():
             return _fail(job_id, "岗位缺少 JD 原文，无法定向优化")
+        # JD 是外部不可信文本：进入 LLM 前先做注入中性化，风险标记进 risk_flags
+        jd_sanitized, jd_flags = sanitize_untrusted_text(jd_text, label="岗位描述")
 
         from openjob.ai.resume_engine.bases import select_base_for_job
 
@@ -155,7 +157,7 @@ def generate_resume(
 
         try:
             # ① JD 解析
-            jd = run_cancellable(lambda: parse_jd(jd_text, config), config)
+            jd = run_cancellable(lambda: parse_jd(jd_sanitized, config), config)
             update_resume_version(db, resume_id, jd_analysis_json=json.dumps(jd.to_dict(), ensure_ascii=False))
 
             # ② 匹配分析
@@ -283,7 +285,9 @@ def generate_resume(
                 set_job_resume_pointer(db, job_id, resume_id=resume_id, resume_status="failed")
                 return _fail(job_id, "；".join(blocking))
 
-            risk_flags = sorted({c.risk for c in rewrite.changes if c.risk} | set(warnings))
+            risk_flags = sorted(
+                {c.risk for c in rewrite.changes if c.risk} | set(warnings) | set(jd_flags)
+            )
             diff = [
                 {
                     "section": c.section,
