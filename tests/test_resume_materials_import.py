@@ -111,6 +111,91 @@ class TestColumnMapping:
         assert by_source["乱写的列"]["target_field"] == "__ignore__"
         assert by_source["标题"]["target_field"] == "title"
 
+    def test_resume_bullets_and_certificate_number_are_not_merged_or_misclassified(self):
+        mapping = infer_column_mapping([
+            "量化成果",
+            "简历速写（四字前缀 + 压缩STAR，可直接用于简历bullet）",
+            "证书全称",
+            "证书编号",
+        ], [[]])
+        by_source = {m["source_column"]: m for m in mapping}
+        assert by_source["量化成果"]["target_field"] == "achievements"
+        assert by_source["简历速写（四字前缀 + 压缩STAR，可直接用于简历bullet）"]["target_field"] == "resume_bullets"
+        assert by_source["证书全称"]["target_field"] == "title"
+        assert by_source["证书编号"]["target_field"] == "certificate_number"
+
+    def test_certificate_number_and_resume_bullets_survive_normalization(self):
+        content = make_excel({
+            "经历": (["名称", "描述", "量化成果", "简历速写"], [{
+                "名称": "数据分析实习", "描述": "完成数据清洗", "量化成果": "效率提升 20%",
+                "简历速写": "数据清洗｜效率提升 20%",
+            }]),
+            "证明": (["证书全称", "证书编号", "分数 / 等级"], [{
+                "证书全称": "英语证书", "证书编号": "CERT-2026-01", "分数 / 等级": "优秀",
+            }]),
+        })
+        session = analyze_workbook(content, filename="任意素材.xlsx")
+        confirm = {
+            "session": session.to_storage_dict(),
+            "defaults": {"resume_allowed": True, "priority": 3},
+            "sheets": [{
+                "name": sheet["name"], "include": True, "header_row": sheet["header_row"],
+                "field_mapping": {m["source_column"]: m["target_field"] for m in sheet["mapping"]},
+                "type_override": sheet.get("inferred_type") or "other", "excluded_rows": [],
+            } for sheet in session.sheets if sheet.get("header_row") is not None],
+        }
+        items, _ = normalize_import_rows(content, confirm)
+        experience = next(item for item in items if item["title"] == "数据分析实习")
+        certificate = next(item for item in items if item["title"] == "英语证书")
+        assert experience["achievements"] == "效率提升 20%"
+        assert experience["resume_bullets"] == "数据清洗｜效率提升 20%"
+        assert certificate["certificate_number"] == "CERT-2026-01"
+        assert certificate["title"] == "英语证书"
+
+    def test_commit_round_trip_preserves_optional_award_fields(self, tmp_path):
+        from openjob.resume_materials import parse_workbook
+        from openjob.resume_materials_import import commit_import
+
+        content = make_excel({
+            "奖项经历": (
+                ["奖项名称", "描述", "获奖级别", "获奖比例", "城市"],
+                [{
+                    "奖项名称": "全国大学生创新创业大赛",
+                    "描述": "负责项目数据分析与展示",
+                    "获奖级别": "国家级一等奖",
+                    "获奖比例": "前 1%",
+                    "城市": "杭州",
+                }],
+            ),
+        })
+        session = analyze_workbook(content, filename="奖项素材.xlsx")
+        sheet = session.sheets[0]
+        items, _ = normalize_import_rows(content, {
+            "session": session.to_storage_dict(),
+            "defaults": {"resume_allowed": True, "priority": 3},
+            "sheets": [{
+                "name": sheet["name"], "include": True, "header_row": sheet["header_row"],
+                "field_mapping": {m["source_column"]: m["target_field"] for m in sheet["mapping"]},
+                "type_override": "award", "excluded_rows": [],
+            }],
+        })
+        award = items[0]
+        assert award["award_level"] == "国家级一等奖"
+        assert award["award_ratio"] == "前 1%"
+        assert award["city"] == "杭州"
+
+        xlsx_path = tmp_path / "official.xlsx"
+        index_path = tmp_path / "official.index.json"
+        committed = commit_import(content, items, xlsx_path=xlsx_path, index_path=index_path)
+        assert committed.items[0]["award_level"] == "国家级一等奖"
+        assert committed.items[0]["award_ratio"] == "前 1%"
+        assert committed.items[0]["city"] == "杭州"
+
+        reloaded = parse_workbook(xlsx_path.read_bytes(), filename=xlsx_path.name)
+        assert reloaded.items[0]["award_level"] == "国家级一等奖"
+        assert reloaded.items[0]["award_ratio"] == "前 1%"
+        assert reloaded.items[0]["city"] == "杭州"
+
 
 class TestAnalyzeWorkbook:
     def test_analyze_multisheet_chinese_workbook(self):
@@ -272,6 +357,47 @@ class TestNormalizeAndCommit:
         assert items == []
         assert any("缺少事实描述" in w for w in warnings)
 
+    def test_numbered_empty_template_rows_are_ignored_without_error(self, tmp_path):
+        sheets = {
+            "经历": (
+                ["序号", "名称", "描述"],
+                [
+                    {"序号": "1", "名称": "真实经历", "描述": "真实事实"},
+                    {"序号": "2"},
+                    {"序号": "3"},
+                ],
+            ),
+        }
+        content, session, confirm = self._confirmed(tmp_path, sheets)
+        result = validate_import_sheet(
+            content, session=session, sheet_config=confirm["sheets"][0],
+            defaults=confirm["defaults"],
+        )
+        assert [row.status for row in result.rows] == ["valid", "blank", "blank"]
+        assert len(result.valid_rows) == 1
+        assert len(result.invalid_rows) == 0
+        assert len(result.blank_rows) == 2
+
+        items, warnings = normalize_import_rows(content, confirm)
+        assert [item["title"] for item in items] == ["真实经历"]
+        assert any("2 条模板预留空白行" in warning for warning in warnings)
+
+    def test_unknown_column_content_is_not_silently_treated_as_blank(self, tmp_path):
+        sheets = {
+            "经历": (
+                ["序号", "名称", "描述", "待确认字段"],
+                [{"序号": "1", "待确认字段": "这是真实内容"}],
+            ),
+        }
+        content, session, confirm = self._confirmed(tmp_path, sheets)
+        result = validate_import_sheet(
+            content, session=session, sheet_config=confirm["sheets"][0],
+            defaults=confirm["defaults"],
+        )
+        assert result.rows[0].status == "invalid"
+        assert "缺少标题" in result.rows[0].issues
+        assert "缺少事实描述" in result.rows[0].issues
+
     def test_commit_strict_and_atomic(self, tmp_path):
         sheets = {
             "项目经历": (
@@ -288,6 +414,42 @@ class TestNormalizeAndCommit:
         assert index_path.exists()
         # 原 XLSX 与索引均落盘
         assert xlsx_path.exists()
+
+    def test_same_numeric_sequence_across_chinese_sheets_gets_unique_ids(self, tmp_path):
+        """不同 Sheet 的序号从 1 重新开始时，仍应能导入为不同素材。"""
+        sheets = {
+            "经历": (
+                ["序号", "名称", "描述"],
+                [{"序号": 1, "名称": "数据分析实习", "描述": "完成数据清洗与周报分析"}],
+            ),
+            "奖项": (
+                ["序号", "奖项名称", "描述"],
+                [{"序号": 1, "奖项名称": "创新竞赛一等奖", "描述": "负责项目分析并获得一等奖"}],
+            ),
+            "证明": (
+                ["序号", "证书名称", "描述"],
+                [{"序号": 1, "证书名称": "英语证书", "描述": "通过英语能力考试"}],
+            ),
+        }
+        content, _, confirm = self._confirmed(tmp_path, sheets)
+        items, warnings = normalize_import_rows(content, confirm)
+
+        assert not [warning for warning in warnings if "重复" in warning]
+        assert len(items) == 3
+        assert len({item["id"] for item in items}) == 3
+        assert {item["id"].split("_")[0] for item in items} == {"sheet"}
+
+        library = commit_import(
+            content,
+            items,
+            xlsx_path=tmp_path / "resume_materials.xlsx",
+            index_path=tmp_path / "resume_materials.index.json",
+        )
+        assert library.count == 3
+        assert len({item["id"] for item in library.items}) == 3
+        assert {item["title"] for item in library.items} == {
+            "数据分析实习", "创新竞赛一等奖", "英语证书",
+        }
 
     def test_commit_missing_description_fails_strict(self, tmp_path):
         # normalize 排除缺描述行后 items 为空 → commit 报“至少需要一条”

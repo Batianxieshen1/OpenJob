@@ -17,10 +17,19 @@ from pathlib import Path
 
 MAX_XLSX_BYTES = 10 * 1024 * 1024
 
-DEFAULT_HEADERS = [
+# The original 16 columns remain the required compatibility contract.  The
+# optional columns preserve useful facts from arbitrary workbooks without
+# forcing existing user libraries to be rewritten before they can be read.
+REQUIRED_HEADERS = [
     "id", "type", "title", "organization", "role", "start_date", "end_date",
     "description", "achievements", "skills", "keywords", "target_directions",
     "source", "resume_allowed", "priority", "notes",
+]
+DEFAULT_HEADERS = [
+    "id", "type", "title", "organization", "city", "role", "start_date", "end_date",
+    "description", "achievements", "resume_bullets", "skills", "keywords", "target_directions",
+    "source", "resume_allowed", "priority", "notes", "certificate_number",
+    "award_level", "award_ratio",
 ]
 
 SHEET_NAME = "素材库"
@@ -40,7 +49,12 @@ _TEXT_LIMITS = {
     "source": (0, 500),
     "notes": (0, 500),
     "organization": (0, 120),
+    "city": (0, 120),
     "role": (0, 80),
+    "resume_bullets": (0, 2000),
+    "certificate_number": (0, 200),
+    "award_level": (0, 120),
+    "award_ratio": (0, 120),
 }
 
 _ID_PATTERN = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
@@ -159,10 +173,12 @@ def parse_workbook(content: bytes, *, filename: str) -> MaterialLibrary:
         raise MaterialLibraryError("工作表为空：第一行必须是列名")
 
     headers = [_cell(h) for h in header_row]
-    missing = [h for h in DEFAULT_HEADERS if h not in headers]
+    missing = [h for h in REQUIRED_HEADERS if h not in headers]
     if missing:
         raise MaterialLibraryError(f"缺少必需列：{'、'.join(missing)}")
-    index_of = {name: headers.index(name) for name in DEFAULT_HEADERS}
+    # Optional columns are read when present and default to empty for legacy
+    # 16-column libraries.
+    index_of = {name: headers.index(name) for name in headers}
 
     items: list[dict] = []
     seen_ids: set[str] = set()
@@ -190,8 +206,12 @@ def parse_workbook(content: bytes, *, filename: str) -> MaterialLibrary:
                 raise MaterialLibraryError(f"第 {row_no} 行：{field} 长度必须为 {low}-{high} 字符")
             item[field] = raw
 
-        for field in ("organization", "role", "source", "notes"):
-            raw = _cell(cells[index_of[field]]) if index_of[field] < len(cells) else ""
+        for field in (
+            "organization", "city", "role", "source", "notes",
+            "certificate_number", "award_level", "award_ratio",
+        ):
+            idx = index_of.get(field)
+            raw = _cell(cells[idx]) if idx is not None and idx < len(cells) else ""
             low, high = _TEXT_LIMITS[field]
             if len(raw) > high:
                 raise MaterialLibraryError(f"第 {row_no} 行：{field} 超过 {high} 字符上限")
@@ -212,6 +232,10 @@ def parse_workbook(content: bytes, *, filename: str) -> MaterialLibrary:
         item["achievements"] = _cell(cells[index_of["achievements"]]) if index_of["achievements"] < len(cells) else ""
         if len(item["achievements"]) > 2000:
             raise MaterialLibraryError(f"第 {row_no} 行：achievements 超过 2000 字符上限")
+        bullet_idx = index_of.get("resume_bullets")
+        item["resume_bullets"] = _cell(cells[bullet_idx]) if bullet_idx is not None and bullet_idx < len(cells) else ""
+        if len(item["resume_bullets"]) > 2000:
+            raise MaterialLibraryError(f"第 {row_no} 行：resume_bullets 超过 2000 字符上限")
 
         item["skills"] = split_cell_list(cells[index_of["skills"]] if index_of["skills"] < len(cells) else None)
         item["keywords"] = split_cell_list(cells[index_of["keywords"]] if index_of["keywords"] < len(cells) else None)
@@ -247,24 +271,29 @@ def build_template_workbook() -> bytes:
     sheet = workbook.active
     sheet.title = SHEET_NAME
     sheet.append(DEFAULT_HEADERS)
-    sheet.append([
-        "__openjob_example__",
-        "experience",
-        "示例：某项目/实习名称（上传前请删除此示例行）",
-        "示例公司或组织",
-        "实习生",
-        "2024-03",
-        "2024-08",
-        "示例：做了什么、怎么做的（必填，1-2000 字）",
-        "示例：量化结果，如 阅读量提升 30%",
-        "技能A, 技能B",
-        "用于匹配 JD 的关键词",
-        "数据分析, 运营",
-        "来源备注（不会进入简历和 AI）",
-        "是",
-        3,
-        "私有备注（不会进入简历和 AI）",
-    ])
+    example = {
+        "id": "__openjob_example__",
+        "type": "experience",
+        "title": "示例：某项目/实习名称（上传前请删除此示例行）",
+        "organization": "示例公司或组织",
+        "role": "实习生",
+        "start_date": "2024-03",
+        "end_date": "2024-08",
+        "description": "示例：做了什么、怎么做的（必填，1-2000 字）",
+        "achievements": "示例：量化结果，如 阅读量提升 30%",
+        "resume_bullets": "示例：四字前缀 + 压缩 STAR（上传前请替换）",
+        "skills": "技能A, 技能B",
+        "keywords": "用于匹配 JD 的关键词",
+        "target_directions": "数据分析, 运营",
+        "source": "来源备注（不会进入简历和 AI）",
+        "resume_allowed": "是",
+        "priority": 3,
+        "notes": "私有备注（不会进入简历和 AI）",
+        "certificate_number": "",
+        "award_level": "",
+        "award_ratio": "",
+    }
+    sheet.append([example.get(h, "") for h in DEFAULT_HEADERS])
     buf = BytesIO()
     workbook.save(buf)
     return buf.getvalue()

@@ -317,7 +317,7 @@ class EngineGuardTests(_EngineCase):
         self._seed_job()
         result = generate_resume("job-engine-1", self.config)
         self.assertFalse(result.ok)
-        self.assertIn("模板占位", result.reason)
+        self.assertIn("示例/占位", result.reason)
 
     def test_short_resume_rejected(self):
         from openjob.ai.resume_engine import generate_resume
@@ -495,7 +495,7 @@ class DelegationTests(_EngineCase):
         self._seed_job()
         path = resume_module.generate_tailored_resume("job-engine-1", self.config)
         self.assertIsNone(path)
-        self.assertIn("模板占位", resume_module.get_last_resume_failure_reason("job-engine-1"))
+        self.assertIn("示例/占位", resume_module.get_last_resume_failure_reason("job-engine-1"))
 
 
 class ResumeApiTests(_EngineCase):

@@ -2,7 +2,8 @@
 # 复制此文件为 config.yaml 并修改为你的实际配置
 
 profile:
-  resume_path: "./resume.md"
+  # 仅填写用户实际上传的真实简历底稿；项目示例 resume.md 不会作为事实来源
+  resume_path: ""
   # 用于校招/社招岗位筛选与 AI 评分；留空保持旧行为。
   education: ""
   recruitment_type: ""  # campus / experienced / both

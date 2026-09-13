@@ -570,7 +570,7 @@ class JobSelectionTests(unittest.TestCase):
             try:
                 insert_job(db, job)
                 update_job_status(db, job["id"], "ready")
-                update_job_greeting(db, job["id"], job["greeting"])
+                update_job_greeting(db, job["id"], job["greeting"], fact_status="verified", source_json="{}")
             finally:
                 db.close()
 
@@ -600,7 +600,7 @@ class JobSelectionTests(unittest.TestCase):
             try:
                 insert_job(db, job)
                 update_job_status(db, job["id"], "ready")
-                update_job_greeting(db, job["id"], job["greeting"])
+                update_job_greeting(db, job["id"], job["greeting"], fact_status="verified", source_json="{}")
             finally:
                 db.close()
 
@@ -635,7 +635,7 @@ class JobSelectionTests(unittest.TestCase):
                 for job in jobs:
                     insert_job(db, job)
                     update_job_status(db, job["id"], "ready")
-                    update_job_greeting(db, job["id"], job["greeting"])
+                    update_job_greeting(db, job["id"], job["greeting"], fact_status="verified", source_json="{}")
             finally:
                 db.close()
 
@@ -687,7 +687,7 @@ class JobSelectionTests(unittest.TestCase):
                 insert_job(db, _job("sendable"))
                 update_job_score(db, "sendable", 92, "great match")
                 update_job_status(db, "sendable", "ready")
-                update_job_greeting(db, "sendable", "Hi, this role looks like a strong fit.")
+                update_job_greeting(db, "sendable", "Hi, this role looks like a strong fit.", fact_status="verified", source_json="{}")
 
                 jobs = get_jobs_pending_confirmation(db)
             finally:
@@ -781,15 +781,15 @@ class JobSelectionTests(unittest.TestCase):
 
                 insert_job(db, _job("blank-greeting"))
                 update_job_status(db, "blank-greeting", "ready")
-                update_job_greeting(db, "blank-greeting", "   ")
+                update_job_greeting(db, "blank-greeting", "   ", fact_status="verified", source_json="{}")
 
                 insert_job(db, _job("sendable"))
                 update_job_status(db, "sendable", "ready")
-                update_job_greeting(db, "sendable", "Hi, this role looks like a strong fit.")
+                update_job_greeting(db, "sendable", "Hi, this role looks like a strong fit.", fact_status="verified", source_json="{}")
 
                 insert_job(db, _job("approved"))
                 update_job_status(db, "approved", "approved")
-                update_job_greeting(db, "approved", "Not ready for send status yet.")
+                update_job_greeting(db, "approved", "Not ready for send status yet.", fact_status="verified", source_json="{}")
 
                 jobs = get_jobs_ready_to_send(db)
             finally:
@@ -803,14 +803,14 @@ class JobSelectionTests(unittest.TestCase):
             try:
                 insert_job(db, _job("send-failed"))
                 update_job_status(db, "send-failed", "error")
-                update_job_greeting(db, "send-failed", "Hi, this role looks like a strong fit.")
+                update_job_greeting(db, "send-failed", "Hi, this role looks like a strong fit.", fact_status="verified", source_json="{}")
 
                 insert_job(db, _job("generation-failed"))
                 update_job_status(db, "generation-failed", "error")
 
                 insert_job(db, _job("sendable"))
                 update_job_status(db, "sendable", "ready")
-                update_job_greeting(db, "sendable", "Ready to send.")
+                update_job_greeting(db, "sendable", "Ready to send.", fact_status="verified", source_json="{}")
 
                 jobs = get_jobs_with_send_errors(db)
             finally:
@@ -826,7 +826,7 @@ class JobSelectionTests(unittest.TestCase):
             try:
                 insert_job(db, _job("sendable"))
                 update_job_status(db, "sendable", "ready")
-                update_job_greeting(db, "sendable", "Ready to send.")
+                update_job_greeting(db, "sendable", "Ready to send.", fact_status="verified", source_json="{}")
             finally:
                 db.close()
 

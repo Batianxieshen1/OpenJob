@@ -56,6 +56,7 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "organization", "公司", "单位", "学校", "组织/机构", "组织 机构", "颁发机构",
         "主办方", "机构",
     ],
+    "city": ["city", "城市", "所在城市", "地点", "所在地"],
     "role": ["role", "角色", "职位", "职务", "担任身份", "角色/职位", "角色 职位", "负责方向"],
     "start_date": ["start_date", "开始时间", "起始时间", "入职时间", "开始", "起始"],
     "end_date": ["end_date", "结束时间", "离职时间", "有效期至", "获奖时间", "结束"],
@@ -67,6 +68,14 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "achievements", "成果", "量化成果", "结果", "业绩", "排名", "获奖等级",
         "成果/影响", "分数/等级", "分数 等级",
     ],
+    "resume_bullets": [
+        "resume_bullets", "resume_bullet", "简历速写",
+        "简历速写（四字前缀 + 压缩STAR，可直接用于简历bullet）",
+        "简历bullet", "简历要点", "简历要点（bullet）", "简历表述",
+    ],
+    "award_level": ["award_level", "级别", "获奖级别", "等级"],
+    "award_ratio": ["award_ratio", "获奖比例", "获奖率", "获奖占比"],
+    "certificate_number": ["certificate_number", "证书编号", "证书号", "证书号码"],
     "skills": ["skills", "技能", "工具", "技术栈", "关键技能", "方法", "技能特长"],
     "keywords": ["keywords", "关键词", "标签", "tags"],
     "target_directions": [
@@ -269,6 +278,25 @@ def infer_header_row(rows: list[list[object]]) -> int | None:
     return best_row
 
 
+def _field_alias_score(field_name: str, header: str, aliases: list[str]) -> int:
+    """Score an alias while preventing generic aliases stealing specific columns."""
+    normalized = _norm_header(header)
+    # ``证书编号`` is a certificate attribute, never a material id/title.  The
+    # same guard covers common variants such as “证书号” and “奖状编号”.
+    if field_name in {"id", "title"} and any(token in normalized for token in ("证书编号", "证书号", "证书号码", "奖状编号")):
+        return 0
+    # Resume bullet text is deliberately separate from achievements/description;
+    # many workbooks contain both columns and merging them loses the author's
+    # selected, already-compressed STAR wording.
+    if field_name in {"description", "achievements"} and "简历速写" in normalized:
+        return 0
+    if field_name == "resume_bullets" and "简历速写" in normalized:
+        return 3
+    if field_name == "certificate_number" and any(token in normalized for token in ("证书编号", "证书号", "证书号码")):
+        return 3
+    return _alias_score(header, aliases)
+
+
 def infer_column_mapping(headers: list[str], sample_rows: list[list[object]], *, sheet_name: str = ""):
     """推断每个原始列 → 标准字段；输出映射列表（含置信度/原因/样例值）。"""
     taken: set[str] = set()
@@ -281,9 +309,11 @@ def infer_column_mapping(headers: list[str], sample_rows: list[list[object]], *,
         ][:3]
         best_field, best_score, reason = IGNORE_FIELD, 0, "未命中别名"
         for field_name, aliases in FIELD_ALIASES.items():
-            if field_name in taken:
+            # Text/list fields may intentionally receive multiple source columns
+            # (for example STAR results + “简历速写”); identity fields remain unique.
+            if field_name in taken and field_name in {"id", "type", "resume_allowed", "priority"}:
                 continue
-            score = _alias_score(header, aliases)
+            score = _field_alias_score(field_name, header, aliases)
             if score > best_score:
                 best_field, best_score = field_name, score
                 reason = "命中中文别名" if _norm_header(header) in [_norm_header(a) for a in aliases] else "别名包含匹配"
@@ -297,7 +327,7 @@ def infer_column_mapping(headers: list[str], sample_rows: list[list[object]], *,
                     best_field, best_score, reason = "start_date", 1, "样例值形如日期"
                 elif any(k in _norm_header(header) for k in ("结束", "离职", "有效")):
                     best_field, best_score, reason = "end_date", 1, "样例值形如日期"
-        if best_field != IGNORE_FIELD:
+        if best_field != IGNORE_FIELD and best_field in {"id", "type", "resume_allowed", "priority"}:
             taken.add(best_field)
         mapping.append({
             "source_column": str(header),
@@ -377,6 +407,26 @@ def _map_row_values(headers: list[str], mapping: list[dict], row) -> dict:
     return {k: "；".join(v) for k, v in mapped.items()}
 
 
+def _is_blank_material_row(mapped: dict, headers: list[str], mapping: list[dict], row: list) -> bool:
+    """Recognize pre-numbered empty template rows without dropping real data."""
+    control_fields = {"id", "type", "resume_allowed", "priority"}
+    if any(str(value).strip() for key, value in mapped.items() if key not in control_fields):
+        return False
+
+    mapped_columns = {
+        str(item.get("source_column") or "")
+        for item in mapping
+        if item.get("target_field") != IGNORE_FIELD
+    }
+    for index, value in enumerate(row or []):
+        if value is None or not str(value).strip():
+            continue
+        source_column = headers[index] if index < len(headers) else ""
+        if source_column not in mapped_columns:
+            return False
+    return True
+
+
 # ---------- 统一 Sheet 读取与行级验证（preview 与 confirm 共用） ----------
 
 @dataclass(frozen=True)
@@ -394,7 +444,7 @@ class ImportRowValidation:
     excel_row: int
     generated_id: str
     material: dict
-    status: str  # valid / invalid / example
+    status: str  # valid / invalid / example / blank
     issues: tuple[str, ...]
     excluded: bool
 
@@ -413,6 +463,11 @@ class SheetValidationResult:
     @property
     def invalid_rows(self) -> tuple[ImportRowValidation, ...]:
         return tuple(row for row in self.rows if row.status == "invalid" and not row.excluded)
+
+    @property
+    def blank_rows(self) -> tuple[ImportRowValidation, ...]:
+        """Reserved template rows; they are ignored, not validation errors."""
+        return tuple(row for row in self.rows if row.status == "blank")
 
 
 def _read_workbook_rows(
@@ -552,7 +607,13 @@ def normalize_and_validate_sheet_rows(
 
     rows: list[ImportRowValidation] = []
     seen_ids: set[str] = set()
-    slug = re.sub(r"[^a-z0-9]+", "", config.name.lower())[:12] or "sheet"
+    # A workbook may reuse numeric row numbers on each sheet. The old slug
+    # removed every non-ASCII character, so Chinese sheet names collapsed to
+    # ``sheet`` and produced cross-sheet IDs such as ``sheet_1``. Add a stable
+    # digest of the full name to keep generated IDs distinct.
+    slug_prefix = re.sub(r"[^a-z0-9]+", "", config.name.lower())[:8] or "sheet"
+    sheet_digest = hashlib.sha256(config.name.encode("utf-8")).hexdigest()[:8]
+    slug = f"{slug_prefix}_{sheet_digest}"
     default_priority = (defaults or {}).get("priority", 3)
     default_allowed = (defaults or {}).get("resume_allowed", True)
 
@@ -571,6 +632,14 @@ def normalize_and_validate_sheet_rows(
             rows.append(ImportRowValidation(
                 excel_row=excel_row, generated_id="", material={},
                 status="example", issues=("模板示例行",),
+                excluded=True,
+            ))
+            continue
+
+        if _is_blank_material_row(mapped, headers, mapping, row):
+            rows.append(ImportRowValidation(
+                excel_row=excel_row, generated_id="", material={},
+                status="blank", issues=("模板预留空白行",),
                 excluded=True,
             ))
             continue
@@ -605,11 +674,13 @@ def normalize_and_validate_sheet_rows(
             "type": config.type_override or row_type or sheet_type_inferred or "other",
             "title": (mapped.get("title") or "")[:120],
             "organization": (mapped.get("organization") or "")[:120],
+            "city": (mapped.get("city") or "")[:120],
             "role": (mapped.get("role") or "")[:80],
             "start_date": _norm_date_value(mapped.get("start_date")),
             "end_date": _norm_date_value(mapped.get("end_date")),
             "description": (mapped.get("description") or "")[:2000],
             "achievements": (mapped.get("achievements") or "")[:2000],
+            "resume_bullets": (mapped.get("resume_bullets") or "")[:2000],
             "skills": split_cell_list(mapped.get("skills")),
             "keywords": split_cell_list(mapped.get("keywords")),
             "target_directions": split_cell_list(mapped.get("target_directions")),
@@ -617,6 +688,9 @@ def normalize_and_validate_sheet_rows(
             "resume_allowed": default_allowed,
             "priority": default_priority,
             "notes": (mapped.get("notes") or "")[:500],
+            "certificate_number": (mapped.get("certificate_number") or "")[:200],
+            "award_level": (mapped.get("award_level") or "")[:120],
+            "award_ratio": (mapped.get("award_ratio") or "")[:120],
         }
         ra = (mapped.get("resume_allowed") or "").strip()
         if ra:
@@ -630,8 +704,16 @@ def normalize_and_validate_sheet_rows(
             status = "invalid"
             issues.append("缺少标题")
         if not item["description"]:
-            status = "invalid"
-            issues.append("缺少事实描述")
+            # Awards/certificates often have no separate description column;
+            # their title + result is still an auditable fact and must not be
+            # discarded merely because the source workbook is sparse.
+            if item["type"] in {"award", "certification", "skill_evidence"}:
+                item["description"] = "；".join(
+                    part for part in (item["title"], item["achievements"]) if part
+                )[:2000]
+            if not item["description"]:
+                status = "invalid"
+                issues.append("缺少事实描述")
 
         priority_raw = (mapped.get("priority") or "").strip()
         if priority_raw:
@@ -641,8 +723,18 @@ def normalize_and_validate_sheet_rows(
                     raise ValueError
                 item["priority"] = priority
             except ValueError:
-                status = "invalid"
-                issues.append("priority 必须是 1-5 的整数")
+                # Human-maintained workbooks commonly use stars/labels rather
+                # than a numeric 1-5 priority. Normalize conservatively.
+                star_count = priority_raw.count("⭐")
+                if star_count:
+                    item["priority"] = min(5, max(1, star_count + 1))
+                elif any(token in priority_raw for token in ("重要", "核心", "优先")):
+                    item["priority"] = 4
+                elif any(token in priority_raw for token in ("一般", "普通")):
+                    item["priority"] = 3
+                else:
+                    status = "invalid"
+                    issues.append("priority 必须是 1-5 的整数或星级/重要程度标签")
 
         excluded = excel_row in config.excluded_rows
         rows.append(ImportRowValidation(
@@ -741,10 +833,13 @@ def analyze_workbook(content: bytes, *, filename: str, imports_dir: Path | None 
             "row_count": 0,
             "valid_row_count": 0,
             "warning_count": 0,
+            # Guide/strategy sheets are reference material, not personal facts.
+            "suggested_include": False if hidden or header_row is None else True,
         }
         if header_row is None:
             info["warning_count"] = 1
-            info["warnings"] = ["无法可靠定位表头行，请在确认页手动指定表头行"]
+            info["suggested_include"] = False
+            info["warnings"] = ["无法可靠定位表头行；该 Sheet 默认跳过（通常是指南/策略，不是个人事实）"]
             sheets.append(info)
             continue
         headers = [str(c).strip() if c is not None else "" for c in rows[header_row]]
@@ -803,6 +898,7 @@ def normalize_import_rows(source_content: bytes, confirm: dict) -> tuple[list[di
     defaults = confirm.get("defaults") or {}
     warnings: list[str] = []
     items: list[dict] = []
+    blank_rows_by_sheet: dict[str, int] = {}
     for sheet_conf in confirm.get("sheets", []):
         if not sheet_conf.get("include", True):
             warnings.append(f"Sheet「{sheet_conf.get('name')}」已按你的选择跳过")
@@ -814,6 +910,9 @@ def normalize_import_rows(source_content: bytes, confirm: dict) -> tuple[list[di
             if row.status == "example":
                 warnings.append(f"Sheet「{result.name}」第 {row.excel_row} 行为模板示例行，已忽略")
                 continue
+            if row.status == "blank":
+                blank_rows_by_sheet[result.name] = blank_rows_by_sheet.get(result.name, 0) + 1
+                continue
             if row.status == "invalid":
                 warnings.append(
                     f"Sheet「{result.name}」第 {row.excel_row} 行已排除：{'；'.join(row.issues)}"
@@ -823,6 +922,10 @@ def normalize_import_rows(source_content: bytes, confirm: dict) -> tuple[list[di
                 warnings.append(f"Sheet「{result.name}」第 {row.excel_row} 行已按你的选择排除")
                 continue
             items.append(row.material)
+    warnings.extend(
+        f"Sheet「{name}」已忽略 {count} 条模板预留空白行"
+        for name, count in blank_rows_by_sheet.items()
+    )
     return items, warnings
 
 

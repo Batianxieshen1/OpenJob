@@ -63,6 +63,9 @@ def rank_materials(items: list[dict], jd: JdProfile, *, limit: int = 8) -> list[
             str(item.get("title") or ""),
             str(item.get("description") or ""),
             str(item.get("achievements") or ""),
+            str(item.get("resume_bullets") or ""),
+            str(item.get("city") or ""),
+            str(item.get("award_level") or ""),
             " ".join(_tokens(item.get("skills"))),
             " ".join(_tokens(item.get("keywords"))),
         ])
@@ -149,6 +152,9 @@ def material_prompt(candidates: list[Candidate]) -> str:
             + (f" 时间：{dates}" if dates else "")
             + f"\n  描述：{m.get('description')}"
             + (f"\n  成果：{m.get('achievements')}" if m.get("achievements") else "")
+            + (f"\n  简历速写：{m.get('resume_bullets')}" if m.get("resume_bullets") else "")
+            + (f"\n  城市：{m.get('city')}" if m.get("city") else "")
+            + (f"\n  奖项级别：{m.get('award_level')}" if m.get("award_level") else "")
             + (f"\n  技能：{'、'.join(_tokens(m.get('skills')))}" if m.get("skills") else "")
             + (f"\n  方向：{'、'.join(_tokens(m.get('target_directions')))}" if m.get("target_directions") else "")
         )

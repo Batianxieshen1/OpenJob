@@ -129,6 +129,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_3(conn)
     _migrate_v2_4(conn)
     _migrate_v2_5(conn)
+    _migrate_v2_6(conn)
 
 
 def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
@@ -483,11 +484,54 @@ def update_job_score(conn: sqlite3.Connection, job_id: str, score: int, reason: 
     conn.commit()
 
 
-def update_job_greeting(conn: sqlite3.Connection, job_id: str, greeting: str) -> None:
-    """Update job greeting message."""
+def update_job_greeting(
+    conn: sqlite3.Connection,
+    job_id: str,
+    greeting: str,
+    *,
+    fact_status: str = "unverified",
+    source_json: str | None = None,
+    fact_error: str | None = None,
+) -> None:
+    """Update greeting plus its authoritative-source verification metadata.
+
+    Manual edits/default platform text are unverified by default and therefore
+    cannot be sent until a verified OpenJob draft replaces them.
+    """
+    status = str(fact_status or "unverified").strip().lower()
+    if status not in {"verified", "unverified", "failed", "stale"}:
+        raise ValueError("招呼语事实状态非法")
     conn.execute(
-        "UPDATE jobs SET greeting = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL",
-        (greeting, job_id)
+        "UPDATE jobs SET greeting = ?, greeting_fact_status = ?, greeting_source_json = ?, "
+        "greeting_fact_error = ?, updated_at = CURRENT_TIMESTAMP "
+        "WHERE id = ? AND deleted_at IS NULL",
+        (greeting, status, source_json, fact_error, job_id),
+    )
+    conn.commit()
+
+
+def update_job_greeting_facts(
+    conn: sqlite3.Connection,
+    job_id: str,
+    *,
+    fact_status: str = "unverified",
+    source_json: str | None = None,
+    fact_error: str | None = None,
+) -> None:
+    """Update greeting verification metadata without replacing the greeting text.
+
+    Kept separate from :func:`update_job_greeting` so callers that only need to
+    persist a generated string remain backward compatible with the historical
+    three-argument API.
+    """
+    status = str(fact_status or "unverified").strip().lower()
+    if status not in {"verified", "unverified", "failed", "stale"}:
+        raise ValueError("招呼语事实状态非法")
+    conn.execute(
+        "UPDATE jobs SET greeting_fact_status = ?, greeting_source_json = ?, "
+        "greeting_fact_error = ?, updated_at = CURRENT_TIMESTAMP "
+        "WHERE id = ? AND deleted_at IS NULL",
+        (status, source_json, fact_error, job_id),
     )
     conn.commit()
 
@@ -538,10 +582,31 @@ def get_jobs_ready_to_send(conn: sqlite3.Connection) -> list[dict]:
           AND deleted_at IS NULL
           AND greeting IS NOT NULL
           AND TRIM(greeting) != ''
+          AND greeting_fact_status = 'verified'
         ORDER BY score DESC
     """).fetchall()
     return [dict(row) for row in rows]
 
+
+
+def get_jobs_with_delivery_backlog(conn: sqlite3.Connection) -> list[dict]:
+    """Return previously selected greeting rows that need delivery reconciliation.
+
+    This is intentionally broader than ``get_jobs_ready_to_send``: legacy rows
+    created before fact provenance existed are surfaced to the full-workflow
+    reconciliation step, where the sender's final safety boundary still blocks
+    anything not verified.  They must not be treated as directly sendable by
+    API/UI code.
+    """
+    rows = conn.execute("""
+        SELECT * FROM jobs
+        WHERE status IN ('ready', 'approved')
+          AND deleted_at IS NULL
+          AND greeting IS NOT NULL
+          AND TRIM(greeting) != ''
+        ORDER BY score DESC
+    """).fetchall()
+    return [dict(row) for row in rows]
 
 def get_jobs_with_send_errors(conn: sqlite3.Connection) -> list[dict]:
     """Get jobs where greeting sending failed and can be retried."""
@@ -693,6 +758,28 @@ def _migrate_v2_5(conn: sqlite3.Connection) -> None:
     for column in ("material_library_sha256", "material_selection_json", "material_candidates_json"):
         if column not in cols:
             conn.execute(f"ALTER TABLE resumes ADD COLUMN {column} TEXT")
+    conn.commit()
+
+
+def _migrate_v2_6(conn: sqlite3.Connection) -> None:
+    """Add greeting provenance and fact-verification state.
+
+    Existing greetings are intentionally unverified so historical/generated text
+    cannot silently enter a future batch send after the authoritative-source fix.
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    for column, definition in (
+        ("greeting_fact_status", "TEXT NOT NULL DEFAULT 'unverified'"),
+        ("greeting_source_json", "TEXT"),
+        ("greeting_fact_error", "TEXT"),
+    ):
+        if column not in cols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+    conn.execute(
+        "UPDATE jobs SET greeting_fact_status = 'unverified' "
+        "WHERE greeting IS NOT NULL AND trim(greeting) != '' "
+        "AND (greeting_fact_status IS NULL OR trim(greeting_fact_status) = '')"
+    )
     conn.commit()
 
 
