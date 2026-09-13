@@ -5,6 +5,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.columns import Columns
 
+from openjob.contracts import JOB_STATUS_LABELS as STATUS_LABELS
 from openjob.db import (
     get_db, get_stats, get_funnel_stats,
     get_daily_activity, get_top_companies, get_recent_history
@@ -12,22 +13,7 @@ from openjob.db import (
 
 console = Console()
 
-STATUS_LABELS = {
-    "pending": "待评分",
-    "scored": "已评分",
-    "filtered": "已过滤",
-    "ready": "待确认",
-    "approved": "已确认",
-    "skipped": "已跳过",
-    "sent": "已发送",
-    "replied": "已回复",
-    "resume_sent": "简历已发",
-    "needs_resume": "待手动发简历",
-    "follow_up_sent": "已跟进",
-    "rejected": "已拒绝",
-    "error": "发送失败",
-}
-
+# 状态标签单一来源是 openjob.contracts（WP-S0）；此处保留 rich 样式映射用于 CLI 展示。
 STATUS_STYLES = {
     "pending": "dim",
     "scored": "yellow",

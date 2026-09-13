@@ -14,6 +14,7 @@ function statusText(status?: string) {
   if (status === 'skipped') return '已跳过'
   if (status === 'failed') return '执行失败'
   if (status === 'stopped') return '已停止'
+  if (status === 'interrupted') return '已中断（工作台重启）'
   return '暂无记录'
 }
 

@@ -9,6 +9,16 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from openjob.ai.credentials import AIRequestError, call_anthropic_text
+from openjob.ai.fact_policy import (
+    TEMPLATE_RESUME_MARKERS,
+    build_base_resume_fragment,
+    build_material_fragments,
+    detect_prompt_injection,
+    fragments_to_trusted_text,
+    redact_sensitive,
+    sanitize_untrusted_text,
+    validate_generated_text,
+)
 from openjob.cancellation import OperationCancelled, run_cancellable
 from openjob.collection.text import clean_job_description
 from openjob.db import (
@@ -17,18 +27,13 @@ from openjob.db import (
     get_jobs_by_status,
     update_job_greeting,
     update_job_greeting_facts,
-    update_job_status,
+    transition_job_status,
 )
 
 # Web server injects these so greeting generation uses the same runtime database/data
 # directory as the workbench. CLI keeps the project-local defaults.
 RUNTIME_DB_PATH: Path | None = None
 RUNTIME_DATA_DIR: Path | None = None
-
-TEMPLATE_RESUME_MARKERS = (
-    "张三", "李四", "某某大学", "某某公司", "138-0000-0000",
-    "zhangsan@example.com", "示例简历", "示例公司",
-)
 
 
 def _runtime_db():
@@ -224,46 +229,37 @@ def _build_greeting_context(db, job: dict, config: dict) -> GreetingContext:
 
     candidates, material_context, library = _load_greeting_materials(config, job)
     candidate_items = [c.material for c in (candidates or [])]
-    trusted_parts = [base_text]
-    for item in candidate_items:
-        trusted_parts.append(" ".join(str(item.get(k) or "") for k in (
-            "title", "organization", "city", "role", "start_date", "end_date", "description", "achievements", "resume_bullets", "award_level", "skills", "keywords", "target_directions"
-        )))
+    base_fragment = build_base_resume_fragment(base)
+    material_fragments = build_material_fragments(candidate_items)
+    fragments = [fragment for fragment in (base_fragment, *material_fragments) if fragment]
+    trusted_text = fragments_to_trusted_text(fragments) or redact_sensitive(base_text)
+    material_context = redact_sensitive(material_context or "")
+    jd_flags = detect_prompt_injection(str(job.get("jd") or ""))
     source = {
         "base_resume_id": base.get("id"),
         "base_resume_name": base.get("name"),
         "base_selection_reason": selection.reason,
         "material_library_sha256": getattr(library, "sha256", None),
         "candidate_material_ids": [str(item.get("id")) for item in candidate_items if item.get("id")],
+        "fact_ids": [fragment.fact_id for fragment in fragments],
+        "source_types": {
+            "base": "verified_base_resume",
+            "materials": "verified_resume_material",
+        },
+        "jd_injection_risks": jd_flags,
         "fact_policy": "only_base_resume_and_resume_allowed_materials",
     }
     return GreetingContext(
-        resume_summary=base_text,
+        resume_summary=redact_sensitive(base_text),
         material_context=material_context or "（当前素材库没有与该 JD 明确匹配的候选，不得自行补充事实）",
-        trusted_text=" ".join(trusted_parts),
+        trusted_text=trusted_text,
         source=source,
     )
 
 
 def _greeting_fact_issues(greeting: str, trusted_text: str) -> list[str]:
-    """Conservative deterministic guard against hallucinated identity/metrics."""
-    text = str(greeting or "")
-    trusted = str(trusted_text or "")
-    issues: list[str] = []
-    for marker in TEMPLATE_RESUME_MARKERS:
-        if marker in text:
-            issues.append(f"包含示例/占位信息：{marker}")
-    for pattern, label in (
-        (r"[\u4e00-\u9fffA-Za-z]{2,30}(?:大学|学院)", "学校"),
-        (r"[\u4e00-\u9fffA-Za-z]{2,30}(?:专业)", "专业"),
-    ):
-        for value in re.findall(pattern, text):
-            if value not in trusted:
-                issues.append(f"{label}事实未在真实底稿/素材库中找到：{value}")
-    for value in re.findall(r"\b(?:1[3-9]\d{9}|\d{6,18}@[A-Za-z0-9.-]+|\d{2,}(?:\.\d+)?%?)\b", text):
-        if value not in trusted:
-            issues.append(f"联系方式或量化数字未在真实来源中找到：{value}")
-    return list(dict.fromkeys(issues))
+    """Compatibility delegate for the shared deterministic fact validation (WP-S1)."""
+    return validate_generated_text(greeting, trusted_text)
 
 
 def _call_claude(
@@ -521,7 +517,10 @@ def _generate_greeting_once(
     """Generate a single greeting attempt."""
     jd_limit = 250 if compact else 500
     resume_limit = 800 if compact else 1500
-    jd_summary = _truncate_prompt_text(clean_job_description(job.get("jd", "")), jd_limit) or "无详细描述"
+    sanitized_jd, _ = sanitize_untrusted_text(
+        clean_job_description(job.get("jd", "")), label="岗位描述"
+    )
+    jd_summary = _truncate_prompt_text(sanitized_jd, jd_limit) or "无详细描述"
     critique_section = f"\n## 补充改进要求\n- {critique}\n" if critique else ""
 
     # Build extra highlights from config (portfolio URL, personal strengths, etc.)
@@ -843,7 +842,7 @@ def generate_greetings(config: dict) -> int:
                 source_json=json.dumps(greeting_context.source, ensure_ascii=False),
                 fact_error=None,
             )
-            update_job_status(db, job["id"], "ready")
+            transition_job_status(db, job["id"], "ready")
             opening = _opening_signature(best_greeting)
             if opening:
                 recent_openings.append(opening)

@@ -19,7 +19,7 @@ from openjob.browser import (
     wait_for_load,
 )
 from openjob.db import (
-    get_db, get_jobs_ready_to_send, update_job_status, add_history, add_risk_event,
+    get_db, get_jobs_ready_to_send, transition_job_status, add_history, add_risk_event,
     set_platform_safety_lock,
 )
 from openjob.collection.capabilities import platform_supports
@@ -27,6 +27,45 @@ from openjob.throttle import RequestThrottle, SendWindowChecker, ProgressiveBack
 from openjob.platform_safety import PlatformAccessGuard, PlatformSafetyStop
 
 console = Console()
+
+
+def _greeting_fact_recheck_issues(db, job, config) -> list[str]:
+    """发送边界事实复检（WP-S1）：待发文本必须仍能追溯到其记录的事实来源。
+
+    - 溯源清单引用的底稿/素材已不存在 → 拒发（fact_id 缺失不伪装通过）；
+    - 文本含示例标记/未授权身份/未授权数字 → 拒发；
+    - 历史遗留（溯源机制上线前）的 verified 行没有可复核清单，只做文本级黑名单检查。
+    """
+    from openjob.ai.fact_policy import (
+        TEMPLATE_RESUME_MARKERS,
+        rebuild_trusted_baseline,
+        validate_generated_text,
+    )
+
+    greeting = str(job.get("greeting") or "")
+    raw_source = str(job.get("greeting_source_json") or "").strip()
+    try:
+        source = json.loads(raw_source) if raw_source else {}
+    except json.JSONDecodeError:
+        source = {}
+    if not isinstance(source, dict):
+        source = {}
+    has_provenance = bool(
+        source.get("base_resume_id")
+        or source.get("base_resume_name")
+        or source.get("candidate_material_ids")
+    )
+    if not has_provenance:
+        return [
+            f"包含示例/占位信息：{marker}"
+            for marker in TEMPLATE_RESUME_MARKERS
+            if marker in greeting
+        ]
+
+    trusted, missing = rebuild_trusted_baseline(db, source, config)
+    if missing:
+        return [f"事实来源已不存在，拒绝发送：{item}" for item in missing[:3]]
+    return validate_generated_text(greeting, trusted)
 
 CHAT_BUTTON_SELECTOR = (
     'a[redirect-url*="/web/geek/chat"], '
@@ -1248,6 +1287,17 @@ def send_greetings(config: dict, force: bool = False) -> int:
                 progress.update(task, advance=1)
                 continue
 
+            recheck_issues = _greeting_fact_recheck_issues(db, job, config)
+            if recheck_issues:
+                job_id = str(job.get("id") or "")
+                detail = "；".join(recheck_issues[:5])
+                console.print(f"[yellow]    ! 事实复检未通过，已拦截：{job.get('company', '')} - {job.get('title', '')}[/yellow]")
+                add_history(db, job_id, "send_blocked_fact_recheck", detail)
+                send_report["attempted_count"] += 1
+                send_report["failed_count"] += 1
+                progress.update(task, advance=1)
+                continue
+
             if _stop_requested(stop_event):
                 console.print("[yellow]已请求停止，结束发送[/yellow]")
                 send_report["stop_reason"] = "stopped"
@@ -1255,7 +1305,7 @@ def send_greetings(config: dict, force: bool = False) -> int:
 
             greeting = job.get("greeting", "")
             if not greeting:
-                update_job_status(db, job["id"], "error")
+                transition_job_status(db, job["id"], "error")
                 send_report["attempted_count"] += 1
                 send_report["failed_count"] += 1
                 progress.update(task, advance=1)
@@ -1293,7 +1343,7 @@ def send_greetings(config: dict, force: bool = False) -> int:
 
             if result_data.get("success"):
                 throttle.mark()
-                update_job_status(db, job["id"], "sent")
+                transition_job_status(db, job["id"], "sent")
                 add_history(db, job["id"], "sent", result_data.get("history_detail") or greeting[:50])
                 sent_count += 1
                 send_report["sent_count"] = sent_count
@@ -1305,7 +1355,7 @@ def send_greetings(config: dict, force: bool = False) -> int:
                     console.print("[yellow]为了账户安全，已达到平台页面访问上限或仍处于风险冷却，停止投递[/yellow]")
                     break
                 send_report["failed_count"] += 1
-                update_job_status(db, job["id"], "error")
+                transition_job_status(db, job["id"], "error")
                 add_history(db, job["id"], "error", result_data.get("history_detail", f"发送失败: {error}"))
                 if result_data.get("skip_backoff"):
                     progress.update(task, advance=1)

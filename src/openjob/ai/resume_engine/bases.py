@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import sqlite3
 
+from openjob.ai.fact_policy import TEMPLATE_RESUME_MARKERS
+
 _PUNCT = re.compile(r"[\s\d\W]+", re.UNICODE)
 
 
@@ -57,8 +59,7 @@ def _fallback_base(config: dict) -> tuple[str, str]:
     if not path.exists():
         raise RuntimeError(f"真实简历底稿不存在：{path}")
     text = path.read_text(encoding="utf-8")
-    markers = ("张三", "李四", "某某大学", "某某公司", "138-0000-0000", "zhangsan@example.com")
-    if any(marker in text for marker in markers):
+    if any(marker in text for marker in TEMPLATE_RESUME_MARKERS):
         raise RuntimeError("简历包含示例/占位信息，已拒绝作为事实底稿")
     return text, f"用户上传的真实简历文件 {path.name}"
 

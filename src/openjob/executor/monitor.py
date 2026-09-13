@@ -15,7 +15,7 @@ from openjob.cancellation import (
 )
 from openjob.db import (
     get_db, get_jobs_by_status,
-    update_job_status, add_history, add_risk_event, set_platform_safety_lock,
+    transition_job_status, add_history, add_risk_event, set_platform_safety_lock,
 )
 from openjob.throttle import RequestThrottle, SendWindowChecker
 from openjob.platform_safety import (
@@ -1166,7 +1166,7 @@ def _check_boss_replies(config: dict, tracked_jobs: list[dict] | None = None) ->
 
             # Update status to replied if it was 'sent'
             if matched_job.get("status") == "sent":
-                update_job_status(db, matched_job["id"], "replied")
+                transition_job_status(db, matched_job["id"], "replied")
                 add_history(db, matched_job["id"], "replied", f"HR回复: {conv.get('last_message', '')[:50]}")
 
             results.append({
@@ -1311,7 +1311,7 @@ def _handle_conversation(job: dict, config: dict, conversation: dict | None = No
             return "stopped"
         console.print("[dim]    HR已拒绝，标记并停止跟踪[/dim]")
         db = get_db()
-        update_job_status(db, job["id"], "rejected")
+        transition_job_status(db, job["id"], "rejected")
         add_history(db, job["id"], "rejected", "HR回复拒绝")
         db.close()
         close_tab(target_id)
@@ -1405,7 +1405,7 @@ def _handle_conversation(job: dict, config: dict, conversation: dict | None = No
             close_tab(target_id)
             return "stopped"
         db = get_db()
-        update_job_status(db, job["id"], "needs_resume")
+        transition_job_status(db, job["id"], "needs_resume")
         add_history(db, job["id"], "needs_resume", history_detail)
         db.close()
         try:
@@ -1706,7 +1706,7 @@ def _check_follow_ups(config: dict, throttle, replied_job_ids: set | None = None
             break
         if _send_message_in_chat(target_id, follow_up_msg):
             console.print(f"[green]  ✓ 跟进: {job['company']} - {job['title']}[/green]")
-            update_job_status(db, job["id"], "follow_up_sent")
+            transition_job_status(db, job["id"], "follow_up_sent")
             add_history(db, job["id"], "follow_up_sent", follow_up_msg[:100])
             count += 1
         else:

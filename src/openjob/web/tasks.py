@@ -40,6 +40,8 @@ class WorkbenchTask:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     deadline_at: str | None = None
+    finished_at: str | None = None
+    error_count: int = 0
     stop_reason: str | None = None
     stop_requested: Event = field(default_factory=Event, repr=False)
     metrics: dict[str, int] = field(default_factory=dict)
@@ -57,6 +59,8 @@ class WorkbenchTask:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "deadline_at": self.deadline_at,
+            "finished_at": self.finished_at,
+            "error_count": self.error_count,
             "stop_reason": self.stop_reason,
             "stop_requested": self.stop_requested.is_set(),
             "metrics": dict(self.metrics),
@@ -116,8 +120,9 @@ class WorkbenchTaskRunner:
                 task.stop_requested.set()
                 task.status = "stopped"
                 task.stop_reason = "今日发送时间窗口已截止，后台未启动"
+                task.finished_at = datetime.now().isoformat(timespec="seconds")
                 task.logs.append(task.stop_reason)
-                task.updated_at = datetime.now().isoformat(timespec="seconds")
+                task.updated_at = task.finished_at
                 return task.snapshot()
 
             thread = Thread(target=self._run, args=(task, config), daemon=True)
@@ -183,7 +188,8 @@ class WorkbenchTaskRunner:
                     task.status = "stopped"
                 else:
                     task.status = "completed"
-                task.updated_at = datetime.now().isoformat(timespec="seconds")
+                task.finished_at = datetime.now().isoformat(timespec="seconds")
+                task.updated_at = task.finished_at
         except Exception as exc:
             with self._lock:
                 if task.stop_requested.is_set():
@@ -192,7 +198,9 @@ class WorkbenchTaskRunner:
                 else:
                     task.status = "failed"
                     task.error = str(exc)
-                task.updated_at = datetime.now().isoformat(timespec="seconds")
+                    task.error_count += 1
+                task.finished_at = datetime.now().isoformat(timespec="seconds")
+                task.updated_at = task.finished_at
         finally:
             with self._lock:
                 timer = self._deadline_timers.pop(task.id, None)
