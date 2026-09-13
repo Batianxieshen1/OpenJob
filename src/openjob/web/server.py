@@ -41,6 +41,7 @@ from openjob.db import (
 	get_jobs_needing_resume,
 	get_jobs_pending_confirmation,
 	get_jobs_ready_to_send,
+	get_jobs_with_delivery_backlog,
 	get_jobs_with_send_errors,
 	get_recent_history,
 	get_unresolved_resume_failures,
@@ -284,17 +285,51 @@ def _sanitize_config_for_write(data):
 	return cleaned
 
 
+_RESUME_TEMPLATE_MARKERS = (
+	"张三", "李四", "某某大学", "某某公司", "138-0000-0000",
+	"zhangsan@example.com", "示例简历", "示例公司",
+)
+
+
+def _is_trusted_resume_file(raw_path: object) -> bool:
+	"""Return whether a configured file is an explicit, non-template resume source."""
+	try:
+		path = Path(str(raw_path or "").strip())
+	except (TypeError, ValueError, OSError):
+		return False
+	if not str(path):
+		return False
+	try:
+		if path.resolve() in {BASE_DIR.resolve() / "resume.md", BASE_DIR.resolve() / "resume.example.md"}:
+			return False
+	except (OSError, RuntimeError, ValueError):
+		return False
+	if not path.is_file():
+		return False
+	try:
+		content = path.read_text(encoding="utf-8")
+	except (OSError, UnicodeError):
+		return False
+	return bool(content.strip()) and not any(marker in content for marker in _RESUME_TEMPLATE_MARKERS)
+
+
 def _has_any_resume_source() -> bool:
-	"""默认简历文件或多底稿任一存在即可驱动评分与简历引擎。"""
-	resume_path = str(CONFIG_PATH and load_config(CONFIG_PATH).get("profile", {}).get("resume_path") or "")
-	if resume_path and Path(resume_path).exists():
+	"""只有真实上传底稿才能驱动评分与简历引擎，项目示例永不算来源。"""
+	config = load_config(CONFIG_PATH)
+	profile = config.get("profile") or {}
+	if _is_trusted_resume_file(profile.get("resume_path")):
 		return True
 	db = _get_web_db()
 	try:
-		row = db.execute("SELECT 1 FROM base_resumes LIMIT 1").fetchone()
+		rows = db.execute("SELECT content_md FROM base_resumes").fetchall()
 	finally:
 		db.close()
-	return row is not None
+	return any(
+		bool(str(row["content_md"] or "").strip())
+		and not any(marker in str(row["content_md"] or "") for marker in _RESUME_TEMPLATE_MARKERS)
+		for row in rows
+	)
+
 
 
 def _preflight_messages(mode: str, config: dict, options: dict | None = None) -> list[str]:
@@ -633,7 +668,7 @@ def _execute_monitor(task: WorkbenchTask, config: dict, *, initial_cooldown: boo
 def _execute_full(task: WorkbenchTask, config: dict) -> None:
 	db = _get_web_db()
 	try:
-		deferred_job_ids = [str(job["id"]) for job in get_jobs_ready_to_send(db)]
+		deferred_job_ids = [str(job["id"]) for job in get_jobs_with_delivery_backlog(db)]
 	finally:
 		db.close()
 	if deferred_job_ids:
@@ -1584,7 +1619,9 @@ def api_workbench_deliver():
 				).fetchall()
 			}
 			platform_rows = validation_db.execute(
-				f"SELECT id, status, greeting, COALESCE(source_platform, 'boss') AS source_platform FROM jobs WHERE deleted_at IS NULL AND id IN ({placeholders})",
+				f"SELECT id, status, greeting, greeting_fact_status, greeting_source_json, "
+				   f"COALESCE(source_platform, 'boss') AS source_platform "
+				   f"FROM jobs WHERE deleted_at IS NULL AND id IN ({placeholders})",
 				job_ids,
 			).fetchall()
 		finally:
@@ -1615,6 +1652,23 @@ def api_workbench_deliver():
 				"error": "所选岗位状态不允许投递，不能重复发送已投递岗位",
 				"invalid_ids": invalid_status_ids,
 			}, 409)
+
+		# Defense in depth: direct send is allowed only for a greeting generated from
+		# verified resume sources. This blocks historical/platform-default text and
+		# prevents callers from bypassing the DB ready-to-send query.
+		if direct_send:
+			fact_unverified_ids = [
+				str(row["id"])
+				for row in platform_rows
+				if str(row["greeting_fact_status"] or "").strip().lower() != "verified"
+				or not str(row["greeting_source_json"] or "").strip()
+			]
+			if fact_unverified_ids:
+				return _json_response({
+					"error": "招呼语尚未通过事实一致性校验，不能批量发送，请重新生成或人工核验。",
+					"invalid_ids": fact_unverified_ids,
+					"reason_code": "greeting_fact_unverified",
+				}, 409)
 
 		status = task_runner.status()
 		active_task = status.get("active") or {}
@@ -2099,6 +2153,7 @@ def api_materials_preview():
             "total_rows": total_rows,
             "valid_rows": len(result.valid_rows),
             "invalid_rows": len(result.invalid_rows),
+            "blank_rows": len(result.blank_rows),
             "excluded_rows": sum(1 for r in result.rows if r.excluded),
         },
         "rows": paged,
@@ -2147,6 +2202,7 @@ def api_materials_confirm():
     warnings: list = []
     invalid_summary: list[dict] = []
     excluded_total = 0
+    ignored_total = 0
     all_items: list[dict] = []
     seen_item_ids: dict[str, tuple[str, int]] = {}
     try:
@@ -2164,6 +2220,11 @@ def api_materials_confirm():
                 if row.status == "example":
                     excluded_total += 1
                     warnings.append(f"Sheet「{result.name}」第 {row.excel_row} 行为模板示例行，已忽略")
+                    continue
+                if row.status == "blank":
+                    # Numbered-but-empty template rows are an expected shape,
+                    # not user exclusions or import errors.
+                    ignored_total += 1
                     continue
                 if row.excluded:
                     excluded_total += 1
@@ -2221,6 +2282,7 @@ def api_materials_confirm():
         "sha256": library.sha256[:12],
         "warnings": warnings,
         "excluded_rows": excluded_total,
+        "ignored_rows": ignored_total,
     })
 
 
@@ -2345,6 +2407,9 @@ def api_resume_bases_upload():
 		content = content.decode("utf-8", errors="replace")
 	if not content.strip():
 		return _json_response({"error": "解析出的简历内容为空"}, 400)
+	content_text = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else str(content)
+	if any(marker in content_text for marker in _RESUME_TEMPLATE_MARKERS):
+		return _json_response({"error": "检测到示例/占位身份信息，请上传真实简历底稿"}, 400)
 
 	display_name = name or Path(upload.filename).stem
 	# 保存原始文件作为排版模板（仅 Word；其他格式无模板）

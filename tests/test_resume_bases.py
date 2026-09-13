@@ -35,7 +35,7 @@ class BaseSelectionTests(unittest.TestCase):
         finally:
             conn.close()
         self.assertIsNone(sel.base.get("id"))
-        self.assertIn("默认简历", sel.reason)
+        self.assertIn("用户上传", sel.reason)
 
     def test_single_base_used_directly(self):
         from openjob.ai.resume_engine.bases import select_base_for_job

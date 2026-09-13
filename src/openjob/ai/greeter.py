@@ -3,6 +3,7 @@
 import json
 import re
 from pathlib import Path
+from dataclasses import dataclass
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -10,7 +11,64 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from openjob.ai.credentials import AIRequestError, call_anthropic_text
 from openjob.cancellation import OperationCancelled, run_cancellable
 from openjob.collection.text import clean_job_description
-from openjob.db import add_history, get_db, get_jobs_by_status, update_job_greeting, update_job_status
+from openjob.db import (
+    add_history,
+    get_db,
+    get_jobs_by_status,
+    update_job_greeting,
+    update_job_greeting_facts,
+    update_job_status,
+)
+
+# Web server injects these so greeting generation uses the same runtime database/data
+# directory as the workbench. CLI keeps the project-local defaults.
+RUNTIME_DB_PATH: Path | None = None
+RUNTIME_DATA_DIR: Path | None = None
+
+TEMPLATE_RESUME_MARKERS = (
+    "张三", "李四", "某某大学", "某某公司", "138-0000-0000",
+    "zhangsan@example.com", "示例简历", "示例公司",
+)
+
+
+def _runtime_db():
+    return get_db(RUNTIME_DB_PATH) if RUNTIME_DB_PATH else get_db()
+
+
+@dataclass
+class GreetingContext:
+    resume_summary: str
+    material_context: str
+    trusted_text: str
+    source: dict
+
+
+class GreetingFactError(ValueError):
+    """Generated greeting contains facts outside the verified source set."""
+
+
+def _persist_greeting(
+    db,
+    job_id: str,
+    greeting: str,
+    *,
+    fact_status: str = "unverified",
+    source_json: str | None = None,
+    fact_error: str | None = None,
+) -> None:
+    """Persist text and provenance while retaining the legacy text-write call shape."""
+    # Keep the original three positional arguments for integrations/tests that
+    # monkey-patch update_job_greeting. Provenance is persisted immediately
+    # afterwards through the dedicated metadata updater.
+    update_job_greeting(db, job_id, greeting)
+    update_job_greeting_facts(
+        db,
+        job_id,
+        fact_status=fact_status,
+        source_json=source_json,
+        fact_error=fact_error,
+    )
+
 
 console = Console()
 
@@ -26,9 +84,12 @@ GREETING_PROMPT = """你是一位求职者，需要在{platform}上给HR发送�
 - 学历要求：{education}
 - 招聘类型：{recruitment_type}
 - 岗位要求摘要：{jd_summary}
-- 匹配分析：{match_reason}
+- AI 岗位评分理由（仅用于推荐匹配点，绝不是我的事实依据）：{match_reason}
 
-## 可用亮点（只选最相关的一项，不要罗列）
+## 已校验的真实素材候选（只能使用其中明确写出的事实）
+{material_context}
+
+## 可用亮点（只选最相关的一项，不要罗列；没有来源就不要使用）
 {extra_highlights}
 
 ## 最近已经使用过的开头（必须避开相同句式）
@@ -45,8 +106,8 @@ GREETING_PROMPT = """你是一位求职者，需要在{platform}上给HR发送�
 5. 避免“挺有共鸣、挺兴奋、一直在做、从0到1、完整闭环、快速上手”等求职套话
 6. 结尾自然留一个沟通入口，不要固定写“方便的话可以看看/希望有机会聊聊”
 7. 作品集不是固定落款；只有岗位明确关注案例、作品、设计或原型时才可出现一次
-8. 【严禁】不得捏造我没有的经历、头衔或身份，只能使用"我的背景"中明确提到的信息
-9. 【严禁】不得把岗位JD中的描述（如公司头衔、项目名）当作我的经历来写
+8. 【严禁】不得捏造我没有的经历、头衔、学校、专业、城市或身份，只能使用“我的背景”和“已校验的真实素材候选”中明确写出的事实
+9. 【严禁】不得把岗位 JD、AI 评分理由、平台默认招呼语或用户偏好中的描述当作我的个人事实
 10. 项目经历只作轻量证据，可不提；如需提及，整条消息最多出现一次“项目”，不得写具体项目名称
 11. 可以压缩和概括“我的背景”，但不得新增事实、夸大结果或改写成更高职级经历
 {critique_section}
@@ -73,12 +134,136 @@ REVIEW_PROMPT = """请评估以下{platform}招呼语的质量。
 
 
 def _get_resume_summary(config: dict) -> str:
-    """Get a brief resume summary for greeting generation."""
-    resume_path = Path(config.get("profile", {}).get("resume_path", "./resume.md"))
-    if not resume_path.exists():
+    """Read only an explicitly uploaded, non-template resume file.
+
+    ``resume.md`` and ``resume.example.md`` are repository examples, never facts.
+    Multi-direction base_resumes remain the preferred and audited source.
+    """
+    profile = config.get("profile") or {}
+    raw = str(profile.get("resume_path") or "").strip()
+    if not raw:
         return ""
-    content = resume_path.read_text(encoding="utf-8")
-    return content[:1500]
+    path = Path(raw)
+    try:
+        project_root = Path(__file__).resolve().parents[3]
+        if path.resolve() in {project_root / "resume.md", project_root / "resume.example.md"}:
+            return ""
+    except (OSError, RuntimeError, ValueError):
+        return ""
+    if not path.exists() or not path.is_file():
+        return ""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+    if any(marker in content for marker in TEMPLATE_RESUME_MARKERS):
+        return ""
+    return content[:1800]
+
+
+def _style_only_preference(value: object) -> str:
+    """Strip identity-like lines from a preference field before it reaches the LLM."""
+    text = str(value or "").strip()
+    if not text:
+        return "（无额外语气偏好）"
+    lines = []
+    for line in text.splitlines():
+        if re.search(r"我是|姓名|学校|大学|学院|专业|电话|邮箱|手机号|城市|地址", line):
+            continue
+        lines.append(line.strip())
+    return "\n".join(x for x in lines if x)[:500] or "（无额外语气偏好）"
+
+
+def _build_jd_profile(job: dict):
+    from openjob.ai.resume_engine.models import JdProfile
+
+    jd = clean_job_description(job.get("jd", ""))
+    # Deterministic keyword extraction is only for ranking existing materials;
+    # it is not presented as a user fact and does not replace JD parsing.
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9+#.-]{1,}|[\u4e00-\u9fff]{2,12}", f"{job.get('title', '')} {jd}")
+    keywords = list(dict.fromkeys(tokens))[:80]
+    return JdProfile(title=str(job.get("title") or ""), summary=jd, keywords=keywords)
+
+
+def _load_greeting_materials(config: dict, job: dict):
+    from openjob.ai.resume_engine.materials import material_prompt, rank_materials
+    from openjob.resume_materials import MaterialLibraryError, load_or_refresh_library, resolve_library_paths
+
+    data_dir = RUNTIME_DATA_DIR or Path("data")
+    materials_path, index_path = resolve_library_paths(config, data_dir)
+    try:
+        library = load_or_refresh_library(materials_path, index_path)
+    except MaterialLibraryError as exc:
+        if "未找到" in str(exc):
+            return None, "", None
+        raise
+    candidates = rank_materials(library.items, _build_jd_profile(job), limit=8)
+    return candidates, material_prompt(candidates), library
+
+
+def _build_greeting_context(db, job: dict, config: dict) -> GreetingContext:
+    from openjob.ai.resume_engine.bases import select_base_for_job
+
+    jd_text = str(job.get("jd") or "").strip()
+    if not jd_text:
+        raise GreetingFactError("岗位缺少 JD 原文，无法进行事实一致性生成")
+    selection = select_base_for_job(db, f"{job.get('title') or ''}\n{jd_text}", config)
+    base = selection.base
+    if not base:
+        # Compatibility path for a user's explicitly uploaded real resume file;
+        # select_base_for_job itself still rejects repository examples.
+        resume_summary = _get_resume_summary(config)
+        if not resume_summary:
+            raise GreetingFactError(selection.reason)
+        base = {"id": None, "name": "用户上传简历文件", "content_md": resume_summary}
+    base_text = str(base.get("content_md") or "").strip()
+    if not base_text:
+        raise GreetingFactError("真实简历底稿为空")
+    if any(marker in base_text for marker in TEMPLATE_RESUME_MARKERS):
+        raise GreetingFactError("底稿包含示例/占位信息，已阻止生成")
+
+    candidates, material_context, library = _load_greeting_materials(config, job)
+    candidate_items = [c.material for c in (candidates or [])]
+    trusted_parts = [base_text]
+    for item in candidate_items:
+        trusted_parts.append(" ".join(str(item.get(k) or "") for k in (
+            "title", "organization", "city", "role", "start_date", "end_date", "description", "achievements", "resume_bullets", "award_level", "skills", "keywords", "target_directions"
+        )))
+    source = {
+        "base_resume_id": base.get("id"),
+        "base_resume_name": base.get("name"),
+        "base_selection_reason": selection.reason,
+        "material_library_sha256": getattr(library, "sha256", None),
+        "candidate_material_ids": [str(item.get("id")) for item in candidate_items if item.get("id")],
+        "fact_policy": "only_base_resume_and_resume_allowed_materials",
+    }
+    return GreetingContext(
+        resume_summary=base_text,
+        material_context=material_context or "（当前素材库没有与该 JD 明确匹配的候选，不得自行补充事实）",
+        trusted_text=" ".join(trusted_parts),
+        source=source,
+    )
+
+
+def _greeting_fact_issues(greeting: str, trusted_text: str) -> list[str]:
+    """Conservative deterministic guard against hallucinated identity/metrics."""
+    text = str(greeting or "")
+    trusted = str(trusted_text or "")
+    issues: list[str] = []
+    for marker in TEMPLATE_RESUME_MARKERS:
+        if marker in text:
+            issues.append(f"包含示例/占位信息：{marker}")
+    for pattern, label in (
+        (r"[\u4e00-\u9fffA-Za-z]{2,30}(?:大学|学院)", "学校"),
+        (r"[\u4e00-\u9fffA-Za-z]{2,30}(?:专业)", "专业"),
+    ):
+        for value in re.findall(pattern, text):
+            if value not in trusted:
+                issues.append(f"{label}事实未在真实底稿/素材库中找到：{value}")
+    for value in re.findall(r"\b(?:1[3-9]\d{9}|\d{6,18}@[A-Za-z0-9.-]+|\d{2,}(?:\.\d+)?%?)\b", text):
+        if value not in trusted:
+            issues.append(f"联系方式或量化数字未在真实来源中找到：{value}")
+    return list(dict.fromkeys(issues))
 
 
 def _call_claude(
@@ -331,6 +516,7 @@ def _generate_greeting_once(
     compact: bool = False,
     max_tokens: int | None = None,
     recent_openings: list[str] | None = None,
+    material_context: str = "",
 ) -> str | None:
     """Generate a single greeting attempt."""
     jd_limit = 250 if compact else 500
@@ -349,8 +535,14 @@ def _generate_greeting_once(
         for keyword in ("作品集", "案例", "case", "原型", "交互设计", "视觉设计")
     )
     if portfolio_url and portfolio_requested:
+        # An explicitly configured portfolio URL is a user-provided fact. Keep
+        # it available only when the JD actually asks for portfolio/case work;
+        # arbitrary extra_highlights remain excluded until they are audited.
         highlight_lines.append(f"- 个人作品集网址：{portfolio_url}")
-    extra_highlights = "\n".join(highlight_lines) if highlight_lines else "（无额外亮点配置）"
+    extra_highlights = (
+        "\n".join(line for line in highlight_lines if "个人作品集网址" in line)
+        or "（已禁用未审计的配置亮点；只使用真实底稿/素材库）"
+    )
 
     prompt = GREETING_PROMPT.format(
         platform=_platform_label(job),
@@ -363,15 +555,16 @@ def _generate_greeting_once(
             job.get("recruitment_type", ""), "未识别"
         ),
         jd_summary=jd_summary,
-        match_reason=_truncate_prompt_text(job.get("score_reason", ""), 240),
+        match_reason=_truncate_prompt_text(job.get("score_reason", "") or "（无，仅根据 JD 与真实来源匹配）", 240),
+        material_context=_truncate_prompt_text(material_context or "（无）", 1800),
         critique_section=critique_section,
-        extra_highlights=_truncate_prompt_text(extra_highlights, 500),
+        extra_highlights=extra_highlights,
         recent_openings=(
             "\n".join(f"- {opening}" for opening in (recent_openings or [])[-8:])
             or "（暂无）"
         ),
         greeting_preference=_truncate_prompt_text(
-            profile_cfg.get("greeting_preference", "") or "（无额外偏好）",
+            _style_only_preference(profile_cfg.get("greeting_preference", "")),
             500,
         ),
     )
@@ -388,6 +581,7 @@ def _generate_with_token_retry(
     config: dict,
     critique: str = "",
     recent_openings: list[str] | None = None,
+    material_context: str = "",
 ) -> str | None:
     """Retry only request-size/output-limit failures without changing batch size."""
     try:
@@ -397,6 +591,7 @@ def _generate_with_token_retry(
             config,
             critique,
             recent_openings=recent_openings,
+            material_context=material_context,
         )
         if result:
             return result
@@ -416,6 +611,7 @@ def _generate_with_token_retry(
                 config,
                 critique,
                 recent_openings=recent_openings,
+                material_context=material_context,
             )
             if result:
                 return result
@@ -453,6 +649,7 @@ def _generate_with_token_retry(
             compact=compact,
             max_tokens=retry_max_tokens,
             recent_openings=recent_openings,
+            material_context=material_context,
         )
     except AIRequestError as retry_exc:
         if retry_exc.kind in {"output_truncated", "output_limit", "context_limit"}:
@@ -498,7 +695,7 @@ def _review_with_token_retry(greeting: str, job: dict, config: dict) -> dict | N
 
 def generate_greetings(config: dict) -> int:
     """Generate greetings for approved jobs with optional self-review. Returns count generated."""
-    db = get_db()
+    db = _runtime_db()
     jobs = get_jobs_by_status(db, "approved")
     _workbench_job_ids = {str(job_id) for job_id in config.get("_workbench_job_ids", [])}
     if _workbench_job_ids:
@@ -509,11 +706,8 @@ def generate_greetings(config: dict) -> int:
         db.close()
         return 0
 
-    resume_summary = _get_resume_summary(config)
-    if not resume_summary:
-        console.print("[red]无法读取简历[/red]")
-        db.close()
-        return 0
+    # Context is built per job because each JD may select a different real base
+    # resume and a different set of resume_allowed material candidates.
 
     ai_cfg = config.get("ai", {})
     review_threshold = ai_cfg.get("greeting_review_threshold", 7.0)
@@ -553,6 +747,16 @@ def generate_greetings(config: dict) -> int:
         for index, job in enumerate(jobs, start=1):
             if stop_event is not None and stop_event.is_set():
                 break
+            try:
+                greeting_context = _build_greeting_context(db, job, config)
+            except (GreetingFactError, OSError, ValueError, RuntimeError) as exc:
+                reason = str(exc)
+                failed += 1
+                add_history(db, job["id"], "greeting_fact_failed", reason)
+                _persist_greeting(db, job["id"], str(job.get("greeting") or ""), fact_status="failed", fact_error=reason)
+                _notify(config, f"已阻止 {job['company']}｜{job['title']}：{reason}", error=True)
+                progress.update(task, advance=1, description=f"生成招呼语 ({index}/{len(jobs)})")
+                continue
             best_greeting = None
             pause_after_current = ""
 
@@ -586,10 +790,11 @@ def generate_greetings(config: dict) -> int:
                 try:
                     greeting = _generate_with_token_retry(
                         job,
-                        resume_summary,
+                        greeting_context.resume_summary,
                         config,
                         critique,
                         recent_openings,
+                        material_context=greeting_context.material_context,
                     )
                 except OperationCancelled:
                     cancelled = True
@@ -620,7 +825,24 @@ def generate_greetings(config: dict) -> int:
                     break
                 continue
 
-            update_job_greeting(db, job["id"], best_greeting)
+            fact_issues = _greeting_fact_issues(best_greeting, greeting_context.trusted_text)
+            if fact_issues:
+                reason = "；".join(fact_issues[:5])
+                failed += 1
+                _persist_greeting(db, job["id"], best_greeting, fact_status="failed", source_json=json.dumps(greeting_context.source, ensure_ascii=False), fact_error=reason)
+                add_history(db, job["id"], "greeting_fact_failed", reason)
+                _notify(config, f"已阻止 {job['company']}｜{job['title']}：{reason}", error=True)
+                progress.update(task, advance=1, description=f"生成招呼语 ({index}/{len(jobs)})")
+                continue
+
+            _persist_greeting(
+                db,
+                job["id"],
+                best_greeting,
+                fact_status="verified",
+                source_json=json.dumps(greeting_context.source, ensure_ascii=False),
+                fact_error=None,
+            )
             update_job_status(db, job["id"], "ready")
             opening = _opening_signature(best_greeting)
             if opening:

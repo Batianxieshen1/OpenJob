@@ -122,7 +122,7 @@ def generate_resume(
                 reused=True,
             )
 
-        # 底稿选择：多份底稿时按岗位自动挑最接近的一份（无底稿则回退 config 文件）
+        # 底稿选择：只允许已上传并存储在 base_resumes 的真实底稿；绝不回退到 resume.md
         jd_text = job.get("jd") or ""
         if not jd_text.strip():
             return _fail(job_id, "岗位缺少 JD 原文，无法定向优化")
@@ -131,8 +131,10 @@ def generate_resume(
 
         try:
             selection = select_base_for_job(db, f"{job.get('title') or ''}\n{jd_text}", config)
-        except OSError as exc:
-            return _fail(job_id, f"无法读取基础简历：{exc}")
+        except (OSError, RuntimeError) as exc:
+            return _fail(job_id, str(exc))
+        if not selection.base:
+            return _fail(job_id, selection.reason)
         base_resume = selection.base["content_md"]
         base_resume_id = selection.base.get("id")
         console.print(f"[dim]底稿：{selection.reason}[/dim]")
@@ -198,10 +200,13 @@ def generate_resume(
                         "type": c.material.get("type"),
                         "title": c.material.get("title"),
                         "organization": c.material.get("organization"),
+                        "city": c.material.get("city"),
                         "role": c.material.get("role"),
                         "dates": "-".join(x for x in (c.material.get("start_date"), c.material.get("end_date")) if x),
                         "description": c.material.get("description"),
                         "achievements": c.material.get("achievements"),
+                        "resume_bullets": c.material.get("resume_bullets"),
+                        "award_level": c.material.get("award_level"),
                         "skills": c.material.get("skills"),
                         "keywords": c.material.get("keywords"),
                         "target_directions": c.material.get("target_directions"),
@@ -253,7 +258,8 @@ def generate_resume(
             trusted_material_text = " ".join(
                 " ".join(str(v) for v in (m.get("title"), m.get("organization"), m.get("role"),
                                           m.get("start_date"), m.get("end_date"),
-                                          m.get("description"), m.get("achievements"),
+                                          m.get("description"), m.get("achievements"), m.get("resume_bullets"),
+                                          m.get("city"), m.get("award_level"),
                                           " ".join(m.get("skills") or [])))
                 for m in selected_materials
             )

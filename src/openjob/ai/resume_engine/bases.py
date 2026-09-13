@@ -1,7 +1,7 @@
 """多简历底稿：按岗位自动挑选最接近的底稿。
 
 选稿策略（确定性，不烧 AI）：
-1. 只有 0/1 份底稿 → 直接用（0 份回退 config.resume_path，向后兼容）；
+1. 只有 0/1 份底稿 → 直接用（0 份返回安全阻断，不读取示例文件）；
 2. 多份 → 方向标签/名称命中岗位文本优先；否则比较“简历文本 vs 岗位 JD 文本”
    的字符 bigram 重叠度（Jaccard），取最高；
 3. 平手/都低 → is_default 的那份；再没有就用最新一份。
@@ -17,7 +17,7 @@ _PUNCT = re.compile(r"[\s\d\W]+", re.UNICODE)
 
 @dataclass
 class BaseSelection:
-    base: dict | None  # 选中的底稿行（含 content_md）；None = 回退 config 文件
+    base: dict | None  # 选中的真实底稿行（含 content_md）；None = 未配置真实底稿
     reason: str  # 人类可读的选稿理由，工作台展示用
 
 
@@ -32,13 +32,35 @@ def _jaccard(a: set[str], b: set[str]) -> float:
     return len(a & b) / len(a | b)
 
 
-def _fallback_base(config: dict) -> tuple[str, str]:
-    """回退读取 config.resume_path 指向的文件，返回 (text, 来源说明)。"""
+def _is_repository_example_path(path) -> bool:
+    """Only reject the repository's example files, not a user upload named resume.md."""
     from pathlib import Path
 
-    resume_path = Path(config.get("profile", {}).get("resume_path", "./resume.md"))
-    text = resume_path.read_text(encoding="utf-8")
-    return text, f"默认简历文件 {resume_path.name}"
+    try:
+        resolved = Path(path).resolve()
+        project_root = Path(__file__).resolve().parents[3]
+        return resolved in {project_root / "resume.md", project_root / "resume.example.md"}
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def _fallback_base(config: dict) -> tuple[str, str]:
+    """读取用户明确上传的非模板简历；永不读取项目示例文件。"""
+    from pathlib import Path
+
+    raw = str((config.get("profile") or {}).get("resume_path") or "").strip()
+    if not raw:
+        raise RuntimeError("未配置真实简历底稿：请在配置页上传至少一份真实底稿")
+    path = Path(raw)
+    if _is_repository_example_path(path):
+        raise RuntimeError("已拒绝项目示例简历 resume.md/resume.example.md，必须上传真实简历底稿")
+    if not path.exists():
+        raise RuntimeError(f"真实简历底稿不存在：{path}")
+    text = path.read_text(encoding="utf-8")
+    markers = ("张三", "李四", "某某大学", "某某公司", "138-0000-0000", "zhangsan@example.com")
+    if any(marker in text for marker in markers):
+        raise RuntimeError("简历包含示例/占位信息，已拒绝作为事实底稿")
+    return text, f"用户上传的真实简历文件 {path.name}"
 
 
 def select_base_for_job(
@@ -53,8 +75,11 @@ def select_base_for_job(
     bases = [dict(r) for r in rows]
 
     if not bases:
-        text, source = _fallback_base(config)
-        return BaseSelection(base={"id": None, "name": "默认简历", "content_md": text}, reason=f"未配置多底稿，使用{source}")
+        try:
+            text, source = _fallback_base(config)
+        except RuntimeError as exc:
+            return BaseSelection(base=None, reason=str(exc))
+        return BaseSelection(base={"id": None, "name": "用户上传底稿", "content_md": text}, reason=source)
 
     if len(bases) == 1:
         only = bases[0]

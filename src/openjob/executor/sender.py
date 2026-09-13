@@ -1231,6 +1231,23 @@ def send_greetings(config: dict, force: bool = False) -> int:
         task = progress.add_task("发送中", total=len(jobs_to_send))
 
         for job in jobs_to_send:
+            # Defense in depth: the DB query currently filters this already, but
+            # keep the invariant at the actual send boundary as well. This
+            # prevents future query/queue changes from sending platform-default,
+            # manually edited, stale, or otherwise unaudited text.
+            if (
+                str(job.get("greeting_fact_status") or "").strip().lower() != "verified"
+                or not str(job.get("greeting_source_json") or "").strip()
+            ):
+                job_id = str(job.get("id") or "")
+                detail = "招呼语事实来源未验证，已在发送边界拦截"
+                console.print(f"[yellow]    ! 跳过未验证招呼语：{job.get('company', '')} - {job.get('title', '')}[/yellow]")
+                add_history(db, job_id, "send_blocked_fact_unverified", detail)
+                send_report["attempted_count"] += 1
+                send_report["failed_count"] += 1
+                progress.update(task, advance=1)
+                continue
+
             if _stop_requested(stop_event):
                 console.print("[yellow]已请求停止，结束发送[/yellow]")
                 send_report["stop_reason"] = "stopped"

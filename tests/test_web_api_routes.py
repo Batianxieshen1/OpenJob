@@ -1153,7 +1153,7 @@ class WebApiRouteTests(unittest.TestCase):
                 for job_id in ("already-scheduled", "new-ready"):
                     insert_job(db, _job(job_id))
                     update_job_status(db, job_id, "ready")
-                    update_job_greeting(db, job_id, f"{job_id} 的待发送招呼语")
+                    update_job_greeting(db, job_id, f"{job_id} 的待发送招呼语", fact_status="verified", source_json="{}")
             finally:
                 db.close()
             server.set_base_dir(base_dir)
