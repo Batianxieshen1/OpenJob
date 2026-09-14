@@ -203,6 +203,25 @@ const markManuallySent = async (job: Job) => {
     }
   }
 
+  const bulkApproveSelected = async () => {
+    if (!selectedIds.length) return
+    const count = selectedIds.length
+    if (!window.confirm(
+      `把已选的 ${count} 个岗位批量放行到确认队列吗？\n\n只对「已过滤」状态的岗位生效——你的判断会覆盖 AI 评分；其他状态的岗位会被跳过并提示原因。`
+    )) return
+    try {
+      const result = await postJobAction('/api/jobs/bulk-approve', { job_ids: selectedIds })
+      setSelectedIds([])
+      refreshJobs()
+      const skippedCount = Array.isArray(result?.skipped) ? result.skipped.length : 0
+      setNotice(
+        `已放行 ${result?.approved_count ?? 0} 个岗位到确认队列${skippedCount ? `，跳过 ${skippedCount} 个（仅"已过滤"状态可放行）` : ''}。`
+      )
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : '批量放行失败')
+    }
+  }
+
   const restoreJobs = async (jobIds: string[]) => {
     if (!jobIds.length || !window.confirm(`确认恢复 ${jobIds.length} 个岗位吗？恢复后不会自动评分或投递。`)) return
     try {
@@ -369,6 +388,7 @@ const markManuallySent = async (job: Job) => {
         </Button>
         <span className="rounded-full bg-accent-soft px-3 py-2 font-bold text-primary">已选择 {selectedIds.length} 条</span>
         {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>清空选择</Button>}
+        <Button variant="ghost" size="sm" disabled={!selectedIds.length} onClick={() => void bulkApproveSelected()}>放行到确认队列</Button>
         <Button variant="destructive" size="sm" disabled={!selectedIds.length} onClick={() => void softDelete(selectedIds)}>移入回收站</Button>
         <Button size="sm" disabled={!selectedIds.length} onClick={() => void deliverSelectedJobs()}>
           <Send className="mr-1 h-4 w-4" />BOSS 一键投递已选
