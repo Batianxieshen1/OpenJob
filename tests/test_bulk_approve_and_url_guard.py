@@ -116,6 +116,25 @@ class BulkApproveTests(unittest.TestCase):
             status, body = _wsgi("/api/jobs/bulk-approve", method="POST", json_body={"job_ids": []})
             self.assertTrue(str(status).startswith("400"), body)
 
+    def test_manually_approved_low_score_job_visible_in_confirm_queue(self):
+        """人工放行的低分岗位必须出现在确认页（不受评分阈值过滤）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp)  # f1/f2 是 filtered 且 55 分
+            # 放行 f1（人工），f2 保持 filtered
+            _wsgi("/api/jobs/bulk-approve", method="POST", json_body={"job_ids": ["f1"]})
+            # 把阈值调高到 100：f1 只有 55 分
+            import yaml as _yaml
+
+            config_path = Path(tmp) / "config.yaml"
+            config_path.write_text(
+                _yaml.dump({"profile": {}, "scoring": {"threshold": 100}}, allow_unicode=True),
+                encoding="utf-8",
+            )
+            status, body = _wsgi("/api/workbench")
+            ids = {job["id"] for job in body.get("pending_confirmation", [])}
+            self.assertIn("f1", ids, "人工放行的低分岗位应在确认页可见")
+            self.assertNotIn("ready-1", ids, "未放行的低分岗位仍受阈值过滤")
+
 
 class SenderUrlGuardTests(unittest.TestCase):
     def test_real_platform_urls_pass(self):

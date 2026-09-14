@@ -170,6 +170,15 @@ def set_base_dir(base_dir: Path | str) -> None:
 	mark_orphaned_scheduled_runs_interrupted(DATA_DIR / "openjob.db")
 
 
+def _has_manual_approval(db, job_id: str) -> bool:
+	"""该岗位是否被人工放行过（人工判断优先于 AI 评分，不受确认页阈值限制）。"""
+	row = db.execute(
+		"SELECT 1 FROM history WHERE job_id = ? AND action = 'approved' AND detail LIKE '%人工放行%' LIMIT 1",
+		(job_id,),
+	).fetchone()
+	return row is not None
+
+
 def _get_web_db():
 	"""Open the dashboard database from the resolved runtime data directory."""
 	return get_db(DATA_DIR / "openjob.db")
@@ -1354,7 +1363,7 @@ def api_workbench():
 			"funnel_today": get_funnel_stats(db, today=True),
 			"pending_confirmation": [
 				job for job in get_jobs_pending_confirmation(db)
-				if int(job.get("score") or 0) >= threshold
+				if (int(job.get("score") or 0) >= threshold or _has_manual_approval(db, str(job["id"])))
 				and platform_supports(str(job.get("source_platform") or "boss"), "deliver")
 			],
 			"pending_greetings": [
