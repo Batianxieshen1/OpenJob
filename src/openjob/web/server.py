@@ -2249,6 +2249,53 @@ def api_job_transition(job_id):
 		db.close()
 
 
+@app.route("/api/jobs/bulk-approve", method="POST")
+def api_jobs_bulk_approve():
+	"""岗位池批量放行：被 AI 过滤的岗位批量回到确认队列（人工判断优先于评分）。"""
+	try:
+		data = request.json
+	except Exception:
+		return _api_error("INVALID_JSON", "请求体必须是 JSON", status_code=400)
+	if not isinstance(data, dict) or not isinstance(data.get("job_ids"), list):
+		return _api_error("INVALID_REQUEST", "缺少 job_ids 数组", status_code=400)
+	job_ids = [str(jid) for jid in data["job_ids"] if str(jid)]
+	if not job_ids or len(job_ids) > 1000:
+		return _api_error("INVALID_REQUEST", "job_ids 必须是 1-1000 个岗位", status_code=400)
+
+	db = _get_web_db()
+	try:
+		with job_mutation_lock:
+			conflict = _active_task_mutation_error()
+			if conflict is not None:
+				return conflict
+			approved_count = 0
+			skipped: list[dict] = []
+			for job_id in job_ids:
+				row = db.execute(
+					"SELECT id, status FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+				).fetchone()
+				if not row:
+					skipped.append({"job_id": job_id, "reason": "岗位不存在或已进入回收站"})
+					continue
+				if str(row["status"]) != "filtered":
+					skipped.append({
+						"job_id": job_id,
+						"reason": "已在确认队列或状态不支持放行"
+						if str(row["status"]) == "ready"
+						else f"当前状态（{str(row['status'])}）不支持放行，仅「已过滤」岗位可放行",
+					})
+					continue
+				try:
+					transition_job_status(db, job_id, "ready")
+					add_history(db, job_id, "approved", "人工放行（批量）：用户判断优先于 AI 评分，岗位重新进入确认队列")
+					approved_count += 1
+				except IllegalJobStatusTransition as exc:
+					skipped.append({"job_id": job_id, "reason": str(exc)})
+		return _api_envelope({"approved_count": approved_count, "skipped": skipped})
+	finally:
+		db.close()
+
+
 @app.route("/api/jobs/stale-exit", method="POST")
 def api_jobs_stale_exit():
 	"""B9 积压治理：审批后长期未发送的岗位批量退出队列（→stale，可重激活）。"""

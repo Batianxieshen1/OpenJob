@@ -29,6 +29,35 @@ from openjob.platform_safety import PlatformAccessGuard, PlatformSafetyStop
 console = Console()
 
 
+_PLATFORM_URL_DOMAINS = {
+    "boss": "zhipin.com",
+    "zhilian": "zhaopin.com",
+    "51job": "51job.com",
+}
+
+
+def _is_sendable_platform_url(job) -> bool:
+    """发送边界 URL 守卫：岗位链接必须指向其来源平台的真实域名。
+
+    防 mock/测试/损坏数据混进确认队列烧页面额度（真实事故：example.com 假岗位
+    被确认投递后"无法找到沟通按钮"进 error）。
+    """
+    from urllib.parse import urlparse
+
+    platform = str(job.get("source_platform") or "boss").strip().lower()
+    expected_domain = _PLATFORM_URL_DOMAINS.get(platform)
+    if not expected_domain:
+        return False
+    raw_url = str(job.get("url") or "").strip()
+    if not raw_url:
+        return False
+    try:
+        host = urlparse(raw_url).hostname or ""
+    except ValueError:
+        return False
+    return host == expected_domain or host.endswith(f".{expected_domain}")
+
+
 def _greeting_fact_recheck_issues(db, job, config) -> list[str]:
     """发送边界事实复检（WP-S1）：待发文本必须仍能追溯到其记录的事实来源。
 
@@ -1293,6 +1322,19 @@ def send_greetings(config: dict, force: bool = False) -> int:
                 detail = "；".join(recheck_issues[:5])
                 console.print(f"[yellow]    ! 事实复检未通过，已拦截：{job.get('company', '')} - {job.get('title', '')}[/yellow]")
                 add_history(db, job_id, "send_blocked_fact_recheck", detail)
+                send_report["attempted_count"] += 1
+                send_report["failed_count"] += 1
+                progress.update(task, advance=1)
+                continue
+
+            if not _is_sendable_platform_url(job):
+                job_id = str(job.get("id") or "")
+                detail = (
+                    f"岗位链接不是 {job.get('source_platform') or 'boss'} 平台真实地址"
+                    f"（{str(job.get('url') or '')[:60]}），疑似测试/损坏数据，已拦截"
+                )
+                console.print(f"[yellow]    ! 非平台链接，已拦截：{job.get('company', '')} - {job.get('title', '')}[/yellow]")
+                add_history(db, job_id, "send_blocked_invalid_url", detail)
                 send_report["attempted_count"] += 1
                 send_report["failed_count"] += 1
                 progress.update(task, advance=1)

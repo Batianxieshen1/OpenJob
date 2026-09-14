@@ -43,7 +43,7 @@ def _job(job_id: str, title: str = "Engineer") -> dict:
         "hr_active": "",
         "company_size": "",
         "company_industry": "",
-        "url": "https://example.com/job",
+        "url": "https://www.zhipin.com/job_detail/mock.html",
     }
 
 
