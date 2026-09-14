@@ -11,6 +11,17 @@ from openjob.contracts import GREETING_FACT_STATUSES, validate_job_status_transi
 
 DB_PATH = Path("./data/openjob.db")
 MAX_JOB_IDS = 1000
+# C4：schema 版本号写入 PRAGMA user_version；版本变化时迁移前先自动备份。
+# 有意新增迁移时上调此数字并同步 _MIGRATIONS。
+SCHEMA_VERSION = 8
+_MIGRATIONS = (
+    "_migrate_v1_1", "_migrate_v1_2", "_migrate_v1_3", "_migrate_v1_4",
+    "_migrate_platform_access_events", "_init_scoring_runs",
+    "_init_collection_runs", "_init_scheduled_collection_runs",
+    "_migrate_v2_0", "_migrate_v2_1", "_migrate_v2_2", "_migrate_v2_3",
+    "_migrate_v2_4", "_migrate_v2_5", "_migrate_v2_6", "_migrate_v2_7",
+    "_migrate_v2_8",
+)
 DELETION_PROTECTED_STATUSES = {"sent", "replied", "resume_sent", "needs_resume", "follow_up_sent"}
 DELETION_PROTECTED_HISTORY_ACTIONS = {
     "sent", "manual_sent", "replied", "resume_sent", "needs_resume", "follow_up_sent", "reply_pending", "auto_replied",
@@ -41,14 +52,41 @@ class JobManualSentConflictError(ValueError):
 
 
 def get_db(db_path: Path | None = None) -> sqlite3.Connection:
-    """Get a database connection, creating tables if needed."""
+    """Get a database connection, creating tables if needed.
+
+    C4：若已有库的 schema 版本落后于当前代码（即将发生迁移），迁移前先自动备份一份。
+    """
     path = db_path or DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
+    _backup_if_schema_stale(path)
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     _init_tables(conn)
     return conn
+
+
+def _backup_if_schema_stale(path: Path) -> None:
+    """版本落后的旧库在升级前自动备份一次（失败静默，绝不阻塞启动）。"""
+    if not path.exists():
+        return
+    try:
+        probe = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            stored = int(probe.execute("PRAGMA user_version").fetchone()[0] or 0)
+            has_jobs = bool(
+                probe.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs' LIMIT 1"
+                ).fetchone()
+            )
+        finally:
+            probe.close()
+    except sqlite3.Error:
+        return
+    # 老库（有表但从未记录版本号，或版本落后）：备份后再交给 _init_tables 迁移。
+    # stored==0 且尚无 jobs 表 = 全新库，无需备份；已追平版本也不重复备份。
+    if has_jobs and stored < SCHEMA_VERSION:
+        backup_database(backup_dir=path.parent / "backups", source=path)
 
 
 def _init_tables(conn: sqlite3.Connection) -> None:
@@ -134,6 +172,15 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_6(conn)
     _migrate_v2_7(conn)
     _migrate_v2_8(conn)
+    _stamp_schema_version(conn)
+
+
+def _stamp_schema_version(conn: sqlite3.Connection) -> None:
+    """C4：把当前 schema 版本号写入 PRAGMA user_version（幂等）。"""
+    current = int(conn.execute("PRAGMA user_version").fetchone()[0] or 0)
+    if current < SCHEMA_VERSION:
+        conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+        conn.commit()
 
 
 def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
@@ -1362,15 +1409,16 @@ def count_unresolved_monitor_items(conn: sqlite3.Connection) -> int:
     return count_unresolved_reply_pending(conn) + len(get_unresolved_resume_failures(conn))
 
 
-def backup_database(keep: int = 7, backup_dir: Path | None = None) -> Path | None:
+def backup_database(keep: int = 7, backup_dir: Path | None = None, source: Path | None = None) -> Path | None:
     """用 SQLite 在线备份 API 落一份快照到 data/backups/，保留最近 keep 份。
 
     在线备份允许在面板运行中执行；失败返回 None，绝不阻塞采集主流程。
+    source 指定要备份的库（默认 DB_PATH）；runtime 路径重定向时调用方必须传。
     """
     import shutil
     from datetime import datetime as _dt
 
-    src = DB_PATH
+    src = source or DB_PATH
     if not src.exists():
         return None
     target_dir = backup_dir or (src.parent / "backups")
@@ -1392,6 +1440,94 @@ def backup_database(keep: int = 7, backup_dir: Path | None = None) -> Path | Non
     for old in backups[:-keep] if len(backups) > keep else []:
         old.unlink(missing_ok=True)
     return target
+
+
+def integrity_check(db_path: Path | None = None) -> tuple[bool, str]:
+    """PRAGMA quick_check：返回 (ok, 描述)。只读连接，不建表不迁移。"""
+    path = db_path or DB_PATH
+    if not path.exists():
+        return False, "数据库文件不存在"
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            row = conn.execute("PRAGMA quick_check").fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        return False, str(exc)
+    result = str(row[0] if row else "")
+    return result == "ok", result
+
+
+def restore_from_backup(backup_path: Path | str, db_path: Path | None = None) -> bool:
+    """用备份覆盖当前库：先校验备份完整性，再自动备份当前库，最后原子替换。
+
+    恢复失败不破坏现场：校验不通过直接返回 False，不触碰当前数据库。
+    """
+    import os
+    import shutil
+    import sqlite3 as _sqlite3
+
+    backup = Path(backup_path)
+    target = db_path or DB_PATH
+    if not backup.exists():
+        return False
+    # 1) 备份文件完整性校验（坏备份绝不覆盖好库）
+    try:
+        probe = _sqlite3.connect(f"file:{backup}?mode=ro", uri=True)
+        try:
+            check = probe.execute("PRAGMA quick_check").fetchone()
+            tables = {row[0] for row in probe.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        finally:
+            probe.close()
+    except _sqlite3.Error:
+        return False
+    if str(check[0] if check else "") != "ok" or "jobs" not in tables:
+        return False
+    # 2) 恢复前自动备份当前库
+    pre_restore = None
+    if target.exists():
+        pre_restore = target.with_name(
+            f"openjob-pre-restore-{os.getpid()}.db"
+        )
+        try:
+            shutil.copy2(target, pre_restore)
+        except OSError:
+            pre_restore.unlink(missing_ok=True) if pre_restore.exists() else None
+            return False
+    # 3) 替换（临时文件同目录原子 rename，失败回滚）
+    try:
+        temp = target.with_suffix(".db.restore")
+        shutil.copy2(backup, temp)
+        if target.exists():
+            target.unlink()
+        temp.replace(target)
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(target) + suffix)
+            sidecar.unlink(missing_ok=True)
+        if pre_restore and pre_restore.exists():
+            # 当前库快照转正式备份命名，保留可回退点
+            keep_name = pre_restore.with_name(
+                f"openjob-{_dt_now_stamp()}-pre{os.getpid() & 0xFFFF:04x}.db"
+            )
+            pre_restore.rename(keep_name)
+        return True
+    except OSError:
+        if pre_restore and pre_restore.exists():
+            try:
+                if target.exists():
+                    target.unlink()
+                shutil.copy2(pre_restore, target)
+                pre_restore.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return False
+
+
+def _dt_now_stamp() -> str:
+    from datetime import datetime
+
+    return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
 RESUME_VERSION_STATUSES = {"parsing", "drafting", "review", "exported", "sent", "failed"}

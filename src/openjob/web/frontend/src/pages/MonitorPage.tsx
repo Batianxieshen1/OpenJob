@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { BrandLogo } from '@/components/brand/Brand'
 import { MessageCircle, Radar } from 'lucide-react'
+import { RunsPanel } from '@/components/monitor/RunsPanel'
 import { parseHistoryDetail } from '@/lib/historyDetail'
 import { getActionLabel } from '@/lib/status'
 
@@ -128,6 +129,8 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
   }
 
   return (
+    <div className="space-y-4">
+    <RunsPanel />
     <div className="rounded-3xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
@@ -275,6 +278,6 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
         )}
       </div>
     </div>
+    </div>
   )
 }
-

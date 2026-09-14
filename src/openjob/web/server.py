@@ -429,6 +429,26 @@ def _task_config(extra: dict | None = None) -> dict:
 
 def _log(task: WorkbenchTask, message: str) -> None:
 	task.logs.append(message)
+	_append_task_log_file(str(task.id), message)
+
+
+TASK_LOG_MAX_BYTES = 5 * 1024 * 1024  # C2：单文件 5MB，超过轮转为 .1
+
+
+def _append_task_log_file(task_id: str, message: str) -> None:
+	"""任务日志持久化到 data/logs/{task_id}.log（失败不阻塞任务）。"""
+	try:
+		log_path = DATA_DIR / "logs" / f"{task_id}.log"
+		log_path.parent.mkdir(parents=True, exist_ok=True)
+		if log_path.exists() and log_path.stat().st_size + len(message.encode("utf-8")) > TASK_LOG_MAX_BYTES:
+			rotated = log_path.with_suffix(".log.1")
+			if rotated.exists():
+				rotated.unlink()
+			log_path.replace(rotated)
+		with log_path.open("a", encoding="utf-8") as handle:
+			handle.write(f"{message}\n")
+	except OSError:
+		pass
 
 
 def _record_collect_progress(task: WorkbenchTask, state: dict) -> None:
@@ -1378,6 +1398,108 @@ def api_workbench():
 		db.close()
 
 
+@app.route("/api/logs/<task_id>/tail")
+def api_task_log_tail(task_id):
+	"""C2：任务日志尾部（默认 200 行）；文件不存在回退内存快照。"""
+	task_id = str(task_id).strip()
+	if not task_id or "/" in task_id or "\\" in task_id or ".." in task_id:
+		return _api_error("INVALID_REQUEST", "非法任务 ID", status_code=400)
+	try:
+		limit = max(1, min(int(request.query.get("lines", "200")), 1000))
+	except (TypeError, ValueError):
+		limit = 200
+	log_path = DATA_DIR / "logs" / f"{task_id}.log"
+	lines: list[str] = []
+	source = "file"
+	if log_path.exists():
+		try:
+			content = log_path.read_text(encoding="utf-8", errors="replace")
+			lines = content.splitlines()
+		except OSError:
+			lines = []
+	if not lines:
+		snapshot = task_runner.get(task_id)
+		if snapshot:
+			lines = list(snapshot.get("logs") or [])
+			source = "memory"
+	return _api_envelope({
+		"task_id": task_id,
+		"source": source,
+		"total_lines": len(lines),
+		"lines": lines[-limit:],
+	})
+
+
+ERROR_CATEGORY_RULES: tuple[tuple[str, str], ...] = (
+	("无法找到沟通按钮", "selector_miss:页面结构变化，选择器未命中"),
+	("未进入具体聊天会话", "navigation:会话跳转未确认"),
+	("AI 评分失败", "ai_timeout:AI 评分超时/频率限制"),
+	("AI评分失败", "ai_timeout:AI 评分超时/频率限制"),
+	("评分失败", "ai_timeout:AI 评分超时/频率限制"),
+	("AI 未返回完整", "ai_parse:AI 返回无法解析"),
+	("事实来源已不存在", "fact_source:事实来源缺失被拦截"),
+	("包含示例/占位信息", "fact_guard:示例污染被拦截"),
+	("未在真实底稿", "fact_guard:事实校验未通过"),
+)
+
+
+@app.route("/api/errors/summary")
+def api_errors_summary():
+	"""C2 错误归因：把 history 中的失败记录归类聚合，100% 可解释。"""
+	days = request.params.get("days", "30")
+	try:
+		days = max(1, min(int(days), 365))
+	except (TypeError, ValueError):
+		days = 30
+	db = _get_web_db()
+	try:
+		rows = db.execute(
+			"""
+			SELECT action, detail, COUNT(*) AS cnt
+			FROM history
+			WHERE action IN ('error', 'score_failed', 'resume_failed',
+			                 'greeting_fact_failed', 'send_blocked_fact_unverified',
+			                 'send_blocked_fact_recheck')
+			  AND created_at >= datetime('now', ?)
+			GROUP BY action, substr(detail, 1, 60)
+			ORDER BY cnt DESC
+			""",
+			(f"-{days} day",),
+		).fetchall()
+		categories: dict[str, dict] = {}
+		unclassified = 0
+		total = 0
+		for row in rows:
+			count = int(row["cnt"])
+			total += count
+			detail = str(row["detail"] or "")
+			# 保留真实岗位上下文线索，但不泄露 JD/招呼语原文（截断 + 只取首行）
+			label = detail.splitlines()[0][:60] if detail else row["action"]
+			category = None
+			for marker, name in ERROR_CATEGORY_RULES:
+				if marker in detail:
+					category = name
+					break
+			if category is None:
+				category = f"other:{row['action']}"
+				unclassified += count
+			bucket = categories.setdefault(category, {"count": 0, "samples": []})
+			bucket["count"] += count
+			if len(bucket["samples"]) < 3:
+				bucket["samples"].append({"action": row["action"], "label": label})
+		return _api_envelope({
+			"days": days,
+			"total": total,
+			"unclassified": unclassified,
+			"categories": [
+				{"category": name, "count": item["count"], "samples": item["samples"]}
+				for name, item in sorted(categories.items(), key=lambda kv: -kv[1]["count"])
+			],
+		})
+	finally:
+		db.close()
+
+
 @app.route("/api/workbench/preflight", method=["GET", "POST"])
 def api_workbench_preflight():
 	body = request.json if request.method == "POST" else {}
@@ -2069,6 +2191,12 @@ def api_jobs_stale_exit():
 		stale_count = 0
 		skipped: list[dict] = []
 		for job_id in job_ids:
+			existing = db.execute(
+				"SELECT id, status FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+			).fetchone()
+			if not existing:
+				skipped.append({"job_id": job_id, "reason": "岗位不存在或已进入回收站"})
+				continue
 			try:
 				transition_job_status(db, job_id, "stale")
 				add_history(db, job_id, "stale", "Web Dashboard 批量过期退出（审批后未发送）")
