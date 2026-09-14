@@ -1585,6 +1585,44 @@ def api_greeting_effectiveness():
 		db.close()
 
 
+@app.route("/api/delivery-log")
+def api_delivery_log():
+	"""投递记录：发送/失败台账 × 招呼语全文对照（打招呼语进度与内容一屏可见）。"""
+	days = request.params.get("days", "7")
+	try:
+		days = max(1, min(int(days), 90))
+	except (TypeError, ValueError):
+		days = 7
+	db = _get_web_db()
+	try:
+		rows = db.execute(
+			"""
+			SELECT h.id, h.job_id, h.action, h.detail, h.created_at,
+			       j.company, j.title, j.score, j.status AS job_status,
+			       j.greeting, j.greeting_fact_status, j.url
+			FROM history h
+			JOIN jobs j ON j.id = h.job_id
+			WHERE h.action IN ('sent', 'error', 'send_blocked_fact_unverified',
+			                   'send_blocked_fact_recheck', 'send_blocked_invalid_url',
+			                   'manual_sent')
+			  AND h.created_at >= datetime('now', ?)
+			  AND j.deleted_at IS NULL
+			ORDER BY h.id DESC
+			LIMIT 100
+			""",
+			(f"-{days} day",),
+		).fetchall()
+		items = [dict(row) for row in rows]
+		summary = {
+			"sent": sum(1 for item in items if item["action"] in ("sent", "manual_sent")),
+			"failed": sum(1 for item in items if item["action"] == "error"),
+			"blocked": sum(1 for item in items if item["action"].startswith("send_blocked")),
+		}
+		return _api_envelope({"days": days, "summary": summary, "items": items})
+	finally:
+		db.close()
+
+
 @app.route("/api/workbench/preflight", method=["GET", "POST"])
 def api_workbench_preflight():
 	body = request.json if request.method == "POST" else {}
