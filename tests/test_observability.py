@@ -138,3 +138,40 @@ class ErrorSummaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeliveryLogTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.original_base_dir = server.BASE_DIR
+        server.set_base_dir(Path(self._tmp.name))
+
+    def tearDown(self):
+        server.set_base_dir(self.original_base_dir)
+        self._tmp.cleanup()
+
+    def test_delivery_log_joins_greeting_and_summary(self):
+        from openjob.db import add_history, get_db, insert_job, transition_job_status, update_job_greeting, update_job_score
+
+        db = get_db(Path(self._tmp.name) / "data" / "openjob.db")
+        for job_id, final, history_action in (("d1", "sent", "sent"), ("d2", "error", "error")):
+            insert_job(db, {"id": job_id, "title": "数据专员", "company": "对照公司", "jd": "x", "url": "https://www.zhipin.com/j"})
+            update_job_score(db, job_id, 80, "种子")
+            transition_job_status(db, job_id, "ready")
+            transition_job_status(db, job_id, "approved")
+            if history_action == "sent":
+                transition_job_status(db, job_id, "sent")
+            else:
+                transition_job_status(db, job_id, "error")
+            update_job_greeting(db, job_id, f"{job_id} 的招呼语全文", fact_status="verified", source_json="{}")
+            add_history(db, job_id, history_action, f"{job_id} 台账")
+        db.close()
+        status, body = _wsgi("/api/delivery-log?days=7")
+        self.assertTrue(str(status).startswith("200"), body)
+        data = body["data"]
+        self.assertEqual(data["summary"]["sent"], 1)
+        self.assertEqual(data["summary"]["failed"], 1)
+        by_job = {item["job_id"]: item for item in data["items"]}
+        self.assertEqual(by_job["d1"]["greeting"], "d1 的招呼语全文")
+        self.assertEqual(by_job["d1"]["greeting_fact_status"], "verified")
+        self.assertEqual(by_job["d2"]["action"], "error")
