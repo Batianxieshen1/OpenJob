@@ -52,6 +52,17 @@ class GreetingFactError(ValueError):
     """Generated greeting contains facts outside the verified source set."""
 
 
+def _greeting_style_features(greeting: str) -> dict:
+    """B5 效果标记：招呼语的客观风格特征（写入 source_json 供后续粗对比）。"""
+    text = str(greeting or "").strip()
+    return {
+        "length": len(text),
+        "opening": _opening_signature(text),
+        "ends_with_question": text.endswith(("？", "?")),
+        "sentence_count": max(text.count("。") + text.count("！") + text.count("？"), 1),
+    }
+
+
 def _persist_greeting(
     db,
     job_id: str,
@@ -897,7 +908,7 @@ def generate_greetings(config: dict) -> int:
                 job["id"],
                 best_greeting,
                 fact_status="verified",
-                source_json=json.dumps(greeting_context.source, ensure_ascii=False),
+                source_json=json.dumps({**greeting_context.source, "style": _greeting_style_features(best_greeting)}, ensure_ascii=False),
                 fact_error=None,
             )
             transition_job_status(db, job["id"], "ready")
