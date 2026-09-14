@@ -79,9 +79,15 @@ export default function ConfirmQueuePage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [page, setPage] = useState(0)
-  const [batchTarget, setBatchTarget] = useState<string[] | null>(null)
+  const [batchTarget, setBatchTarget] = useState<{ ids: string[]; directSend: boolean } | null>(null)
   const [batchSubmitting, setBatchSubmitting] = useState(false)
+  const [tab, setTab] = useState<'confirm' | 'ready_to_send'>('confirm')
+  const [sendSelected, setSendSelected] = useState<string[]>([])
+  const [editingGreeting, setEditingGreeting] = useState<{ jobId: string; text: string } | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
   const debouncedQuery = useDebouncedValue(filters.query, 250)
+
+  const readyToSendJobs = workbench.pending_greetings || []
 
   const pendingJobs = workbench.pending_confirmation || []
   const jobs = useMemo(
@@ -113,28 +119,34 @@ export default function ConfirmQueuePage() {
     setPage(0)
   }, [quickFilter, filters])
 
-  const confirmDeliver = async (ids: string[]) => {
+  const confirmDeliver = async (ids: string[], directSend = false) => {
     if (!ids.length) return
-    setBatchTarget(ids)
+    setBatchTarget({ ids, directSend })
   }
 
   const runBatchDeliver = async () => {
-    const ids = batchTarget || []
+    const ids = batchTarget?.ids || []
+    const directSend = batchTarget?.directSend || false
     if (!ids.length || batchSubmitting) return
     setBatchSubmitting(true)
     try {
       const res = await fetch('/api/workbench/deliver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_ids: ids }),
+        body: JSON.stringify(directSend ? { job_ids: ids, direct_send: true } : { job_ids: ids }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || '投递失败')
       }
       setSelected(prev => prev.filter(id => !ids.includes(id)))
+      setSendSelected([])
       await refresh()
-      setNotice(`已确认投递 ${ids.length} 个岗位，后端按队列推进（受时间窗与每日额度限制）。`)
+      setNotice(
+        directSend
+          ? `已把 ${ids.length} 个岗位加入发送队列（招呼语不重新生成，按安全队列直接发送）。`
+          : `已确认投递 ${ids.length} 个岗位，后端按队列推进（受时间窗与每日额度限制）。`
+      )
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '投递失败')
     } finally {
@@ -196,21 +208,147 @@ export default function ConfirmQueuePage() {
     }
   }
 
+  const saveGreetingEdit = async () => {
+    if (!editingGreeting || editSaving) return
+    const text = editingGreeting.text.trim()
+    if (!text) {
+      setNotice('招呼语不能为空。')
+      return
+    }
+    setEditSaving(true)
+    try {
+      const res = await fetch(`/api/jobs/${editingGreeting.jobId}/greeting`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ greeting: text }),
+      })
+      const payload = await res.json()
+      if (!res.ok) {
+        const issues = payload?.error?.details?.issues as string[] | undefined
+        throw new Error(issues?.length ? `${payload.error.message}：${issues[0]}` : payload?.error?.message || '保存失败')
+      }
+      setEditingGreeting(null)
+      await refresh()
+      setNotice('招呼语已保存并通过事实校验。')
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm text-muted">加载中...</div>
   }
 
   return (
     <div className="mx-auto max-w-[1440px] space-y-4">
-      <header>
-        <h1 className="text-lg font-semibold">投递确认</h1>
-        <p className="text-xs text-muted">
-          这里是投递前的人工闸门：AI 只建议，你拍板。勾选岗位 → 一键投递 → 招呼语生成后按安全队列发送。
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">投递确认</h1>
+          <p className="text-xs text-muted">
+            这里是投递前的人工闸门：AI 只建议，你拍板。勾选岗位 → 一键投递 → 招呼语生成后按安全队列发送。
+          </p>
+        </div>
+        <div className="flex items-center gap-1 rounded-full border border-card-border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => setTab('confirm')}
+            className={cn(
+              'rounded-full px-3 py-1.5 text-xs font-semibold transition-soft',
+              tab === 'confirm' ? 'bg-ink text-shell' : 'text-muted hover:text-foreground'
+            )}
+          >
+            待确认生成（{jobs.length}）
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('ready_to_send')}
+            className={cn(
+              'rounded-full px-3 py-1.5 text-xs font-semibold transition-soft',
+              tab === 'ready_to_send' ? 'bg-ink text-shell' : 'text-muted hover:text-foreground'
+            )}
+          >
+            待发送招呼语（{readyToSendJobs.length}）
+          </button>
+        </div>
       </header>
 
       {notice && <div className="rise-in rounded-card border border-card-border bg-card px-4 py-3 text-sm text-foreground">{notice}</div>}
 
+      {tab === 'ready_to_send' ? (
+        <section className="rounded-module border border-card-border bg-card p-5">
+          <div className="sticky top-0 z-20 -mx-5 mb-3 rounded-t-module border-b border-card-border bg-shell/95 px-5 py-3 backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-muted">
+                招呼语已生成并通过事实校验的岗位 <span className="font-semibold text-foreground tabular-nums">{readyToSendJobs.length}</span> 个，等待进入发送队列
+                {sendSelected.length > 0 && <span className="ml-1 text-primary">· 已选 {sendSelected.length}</span>}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={!sendSelected.length} onClick={() => setSendSelected([])}>清空选择</Button>
+                <Button size="sm" disabled={!sendSelected.length} onClick={() => confirmDeliver(sendSelected, true)}>一键投递已选 {sendSelected.length}（不重新生成）</Button>
+              </div>
+            </div>
+          </div>
+          {readyToSendJobs.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-card-border bg-surface-hover p-6 text-center text-sm text-muted">
+              暂无待发送岗位。在「待确认生成」里确认的岗位生成招呼语后会出现在这里。
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {readyToSendJobs.map(job => (
+                <li key={job.id} className={cn(
+                  'rounded-card border p-4 transition-soft',
+                  sendSelected.includes(job.id) ? 'border-primary bg-accent-soft/40' : 'border-card-border bg-surface-hover'
+                )}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={sendSelected.includes(job.id)}
+                          onChange={() => setSendSelected(prev => (prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]))}
+                          aria-label={`选择岗位：${job.company} ${job.title}`}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="font-semibold text-foreground">{job.company}｜{job.title}</span>
+                        <span className="text-xs text-muted tabular-nums">{job.score} 分</span>
+                        {waitingDays(job) >= 2 && (
+                          <span className={cn('text-xs', waitingDays(job) > 7 ? 'font-semibold text-warning' : 'text-muted')}>
+                            已等待 {waitingDays(job)} 天
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{job.greeting}</p>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => setEditingGreeting({ jobId: job.id, text: job.greeting || '' })}>
+                      编辑招呼语
+                    </Button>
+                  </div>
+                  {editingGreeting?.jobId === job.id && (
+                    <div className="mt-3 rounded-xl border border-card-border bg-card p-3">
+                      <textarea
+                        value={editingGreeting.text}
+                        onChange={event => setEditingGreeting({ jobId: job.id, text: event.target.value })}
+                        rows={4}
+                        className="w-full rounded-lg border border-card-border bg-card px-3 py-2 text-sm leading-6 outline-none focus:border-primary"
+                        aria-label={`编辑招呼语：${job.company}`}
+                      />
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <Button variant="secondary" size="sm" disabled={editSaving} onClick={() => setEditingGreeting(null)}>取消</Button>
+                        <Button size="sm" disabled={editSaving} onClick={() => void saveGreetingEdit()}>
+                          {editSaving ? '校验中…' : '保存（重新过事实校验）'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : (
+      <>
       {/* 批量操作栏：吸顶，滚动时始终可操作 */}
       <div className="sticky top-0 z-30 rounded-card border border-card-border bg-shell/95 px-4 py-3 shadow-card backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -292,11 +430,13 @@ export default function ConfirmQueuePage() {
           </div>
         )}
       </section>
+      </>
+      )}
 
       {selectedJob && <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
-      {batchTarget && batchTarget.length > 0 && (
+      {batchTarget && batchTarget.ids.length > 0 && (
         <BatchConfirmDialog
-          jobs={jobs.filter(job => batchTarget.includes(job.id))}
+          jobs={(batchTarget.directSend ? readyToSendJobs : jobs).filter(job => batchTarget.ids.includes(job.id))}
           quotaRemaining={workbench.send_quota?.remaining ?? 0}
           submitting={batchSubmitting}
           onConfirm={runBatchDeliver}
