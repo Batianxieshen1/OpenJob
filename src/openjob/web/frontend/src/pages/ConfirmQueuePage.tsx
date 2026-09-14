@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useDashboard, type Job } from '@/hooks/useDashboard'
 import { useDebouncedValue, EMPTY_JOB_FILTERS, hasActiveJobFilters, hasInvalidSalaryRange, filterJobs, type JobFilters } from '@/lib/jobFilters'
 import { Button } from '@/components/ui/button'
 import { JobFilterBar } from '@/components/jobs/JobFilterBar'
-import { JobActionCard, JobDetailModal } from '@/components/jobs/JobCards'
+import { JobActionCard, JobDetailModal, waitingDays } from '@/components/jobs/JobCards'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 16
@@ -20,6 +21,56 @@ function isActiveToday(job: Job) {
   return Boolean(job.hr_active && (job.hr_active.includes('分钟') || job.hr_active.includes('在线') || job.hr_active.includes('今日')))
 }
 
+/** B9 六要素批量确认对话框：发送数/平台分布/事实校验/需检查/额度 + 不可撤回警示 */
+function BatchConfirmDialog({
+  jobs, quotaRemaining, submitting, onConfirm, onClose,
+}: {
+  jobs: Job[]
+  quotaRemaining: number
+  submitting: boolean
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const job of jobs) {
+      const platform = job.source_platform || 'boss'
+      counts[platform] = (counts[platform] || 0) + 1
+    }
+    return counts
+  }, [jobs])
+  const platformLabel: Record<string, string> = { boss: 'BOSS直聘', zhilian: '智联招聘', '51job': '前程无忧' }
+  const verified = jobs.filter(job => (job.greeting || '').trim() && job.greeting_fact_status === 'verified').length
+  const noGreeting = jobs.filter(job => !(job.greeting || '').trim()).length
+  const needCheck = jobs.filter(job => (job.greeting || '').trim() && job.greeting_fact_status !== 'verified').length
+  const total = jobs.length
+
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
+      <div role="dialog" aria-modal="true" aria-label="批量确认发送" className="w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
+        <h3 className="text-lg font-semibold">批量确认发送</h3>
+        <ul className="mt-4 space-y-2 text-sm">
+          <li>本次将发送 <span className="font-semibold text-primary tabular-nums">{total}</span> 条招呼语</li>
+          <li>平台分布：{Object.entries(platformCounts).map(([p, n]) => `${platformLabel[p] || p} ${n}`).join('，') || '-'}</li>
+          <li>已过事实校验（可发送）：<span className="font-semibold text-success tabular-nums">{verified}</span> 条；无招呼语将现场生成：<span className="tabular-nums">{noGreeting}</span> 条</li>
+          <li>需人工检查（未过事实校验，会被跳过）：<span className={cn('tabular-nums', needCheck > 0 && 'font-semibold text-warning')}>{needCheck}</span> 条</li>
+          <li>今日剩余额度：<span className="tabular-nums">{quotaRemaining}</span> 条{total > quotaRemaining && <span className="ml-1 text-warning">（超出部分明日时间窗自动续发）</span>}</li>
+        </ul>
+        <p className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+          ⚠ 发送后不可自动撤回：招呼语会按安全队列（时间窗/间隔/每日上限）逐条发出，请确认所选岗位均为你真实想投的。
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>再看看</Button>
+          <Button size="sm" disabled={submitting} onClick={onConfirm}>
+            {submitting ? '提交中…' : `确认发送 ${total} 条招呼语`}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 export default function ConfirmQueuePage() {
   const { workbench, loading, refresh } = useDashboard('workbench')
   const [selected, setSelected] = useState<string[]>([])
@@ -28,6 +79,8 @@ export default function ConfirmQueuePage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [page, setPage] = useState(0)
+  const [batchTarget, setBatchTarget] = useState<string[] | null>(null)
+  const [batchSubmitting, setBatchSubmitting] = useState(false)
   const debouncedQuery = useDebouncedValue(filters.query, 250)
 
   const pendingJobs = workbench.pending_confirmation || []
@@ -62,8 +115,13 @@ export default function ConfirmQueuePage() {
 
   const confirmDeliver = async (ids: string[]) => {
     if (!ids.length) return
-    const count = ids.length
-    if (!window.confirm(`是否投递以下 ${count} 个岗位？确认后将生成定制招呼语并按安全队列发送。`)) return
+    setBatchTarget(ids)
+  }
+
+  const runBatchDeliver = async () => {
+    const ids = batchTarget || []
+    if (!ids.length || batchSubmitting) return
+    setBatchSubmitting(true)
     try {
       const res = await fetch('/api/workbench/deliver', {
         method: 'POST',
@@ -76,9 +134,36 @@ export default function ConfirmQueuePage() {
       }
       setSelected(prev => prev.filter(id => !ids.includes(id)))
       await refresh()
-      setNotice(`已确认投递 ${count} 个岗位，后端按队列推进（受时间窗与每日额度限制）。`)
+      setNotice(`已确认投递 ${ids.length} 个岗位，后端按队列推进（受时间窗与每日额度限制）。`)
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '投递失败')
+    } finally {
+      setBatchSubmitting(false)
+      setBatchTarget(null)
+    }
+  }
+
+  const staleExitOverdue = async () => {
+    const overdueIds = jobs.filter(job => selected.includes(job.id) && waitingDays(job) > 7)
+    if (!overdueIds.length) {
+      setNotice('已选岗位中没有等待超过 7 天的岗位。')
+      return
+    }
+    if (!window.confirm(`过期退出会把手选的 ${overdueIds.length} 个超 7 天岗位移出确认队列（状态变为「超期退出」，可随时重新激活）。继续吗？`)) return
+    try {
+      const res = await fetch('/api/jobs/stale-exit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_ids: overdueIds.map(job => job.id) }),
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(payload.error || '过期退出失败')
+      setSelected([])
+      await refresh()
+      const skipped = Array.isArray(payload?.data?.skipped) ? payload.data.skipped.length : 0
+      setNotice(`已过期退出 ${payload?.data?.stale_count ?? overdueIds.length} 个岗位${skipped ? `，${skipped} 个因状态不允许被跳过` : ''}。`)
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '过期退出失败')
     }
   }
 
@@ -156,6 +241,7 @@ export default function ConfirmQueuePage() {
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => setSelected(filtered.map(job => job.id))}>全选本页结果</Button>
             <Button variant="secondary" size="sm" onClick={() => setSelected([])}>清空</Button>
+            <Button variant="secondary" size="sm" onClick={staleExitOverdue}>超 7 天过期退出</Button>
             <Button variant="secondary" size="sm" onClick={() => rejectSelected(actionable)}>放弃已选 {actionable.length}</Button>
             <Button size="sm" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
           </div>
@@ -208,6 +294,15 @@ export default function ConfirmQueuePage() {
       </section>
 
       {selectedJob && <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
+      {batchTarget && batchTarget.length > 0 && (
+        <BatchConfirmDialog
+          jobs={jobs.filter(job => batchTarget.includes(job.id))}
+          quotaRemaining={workbench.send_quota?.remaining ?? 0}
+          submitting={batchSubmitting}
+          onConfirm={runBatchDeliver}
+          onClose={() => { if (!batchSubmitting) setBatchTarget(null) }}
+        />
+      )}
     </div>
   )
 }

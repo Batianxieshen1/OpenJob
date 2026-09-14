@@ -45,9 +45,17 @@ approved   → ready | sent | error | rejected | skipped | stale  # approved→r
 sent       → replied | resume_sent | needs_resume | follow_up_sent | rejected | stale
 error      → sent | error                    # 发送重试
 needs_resume / resume_sent / follow_up_sent → 回复/简历/拒绝等投后互转（见 contracts）
-replied / rejected / skipped               → 终态（A2 引入 interview/offer/closed 时扩展）
+replied    → interview | hr_rejected | closed                # A2 投后终态
+interview  → offer | hr_rejected | closed
+offer      → closed
+hr_rejected → closed
+replied / rejected / skipped / closed      → closed 为唯一再出口的终态族
 stale      → ready | approved                # B9 重激活
 ```
+
+可视化版本（mermaid）见 `docs/state-machine.md`（A2）；投后流转的操作入口为
+`POST /api/jobs/<id>/transition`（非法 409），回复回流字段见 A1（`replied_at`/
+`reply_count`/`last_reply_snippet` + conversations 表）。
 
 - 非法迁移抛 `IllegalJobStatusTransition`，**原状态保留**，API 返回 409 +
   `ILLEGAL_STATUS_TRANSITION`。禁止 `sent→pending`。

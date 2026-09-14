@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { BrandMark } from '@/components/brand/Brand'
-import { BarChart3, BriefcaseBusiness, ClipboardCheck, FileText, LayoutDashboard, Radar, Settings } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, ClipboardCheck, FileText, Inbox, LayoutDashboard, Radar, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { to: '/resume', icon: FileText, label: '简历工作台' },
   { to: '/stats', icon: BarChart3, label: '市场分析' },
   { to: '/monitor', icon: Radar, label: '监测执行' },
+  { to: '/inbox', icon: Inbox, label: '回复工作台' },
   { to: '/config', icon: Settings, label: '配置' },
 ]
 
@@ -29,9 +30,15 @@ export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
 
     const fetchPendingReplies = async () => {
       try {
-        const res = await fetch('/api/history/unresolved-replies/count')
-        const data = await res.json()
-        setPendingReplies(Number(data.count) || 0)
+        const [repliesRes, inboxRes] = await Promise.all([
+          fetch('/api/history/unresolved-replies/count'),
+          fetch('/api/inbox'),
+        ])
+        const repliesData = await repliesRes.json().catch(() => ({}))
+        const inboxData = await inboxRes.json().catch(() => ({}))
+        setPendingReplies(
+          (Number(repliesData.count) || 0) + (Number(inboxData?.data?.pending_count) || 0),
+        )
       } catch {
         setPendingReplies(0)
       }
@@ -75,7 +82,7 @@ export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
             >
               {item.label}
             </span>
-            {item.to === '/monitor' && pendingReplies > 0 && (
+            {(item.to === '/monitor' || item.to === '/inbox') && pendingReplies > 0 && (
               <span
                 className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-shell"
                 aria-label="有待处理事项"

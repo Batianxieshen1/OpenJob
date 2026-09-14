@@ -132,6 +132,8 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_4(conn)
     _migrate_v2_5(conn)
     _migrate_v2_6(conn)
+    _migrate_v2_7(conn)
+    _migrate_v2_8(conn)
 
 
 def job_exists(conn: sqlite3.Connection, job_id: str) -> bool:
@@ -553,11 +555,14 @@ def transition_job_status(
     status: str,
     *,
     via: str = "standard",
+    closed_reason: str | None = None,
 ) -> None:
-    """Whitelisted status transition (WP-S0).
+    """Whitelisted status transition (WP-S0/A2).
 
     Illegal transitions raise :class:`IllegalJobStatusTransition` and leave the
     original status untouched; same-status rewrites stay idempotent.
+    Entering ``interview`` stamps ``interview_at`` (first time only); entering
+    ``closed`` stamps ``closed_at``/``closed_reason``.
     """
     row = conn.execute(
         "SELECT status FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
@@ -565,6 +570,156 @@ def transition_job_status(
     if row is not None:
         validate_job_status_transition(str(row["status"] or ""), str(status), via=via)
     update_job_status(conn, job_id, status)
+    if status == "interview":
+        conn.execute(
+            "UPDATE jobs SET interview_at = COALESCE(interview_at, CURRENT_TIMESTAMP) WHERE id = ?",
+            (job_id,),
+        )
+        conn.commit()
+    elif status == "closed":
+        conn.execute(
+            "UPDATE jobs SET closed_at = CURRENT_TIMESTAMP, "
+            "closed_reason = COALESCE(NULLIF(?, ''), closed_reason) WHERE id = ?",
+            (str(closed_reason or ""), job_id),
+        )
+        conn.commit()
+
+
+def record_job_reply(
+    conn: sqlite3.Connection,
+    job_id: str,
+    snippet: str = "",
+    *,
+    replied_at: str | None = None,
+) -> None:
+    """A1 投后回流：登记一次 HR 回复事件（首响时间、计数、≤60字摘要）。
+
+    重复扫描由调用方（指纹去重）保证不重复进入本函数。
+    """
+    snippet = str(snippet or "").strip()[:60]
+    if replied_at:
+        conn.execute(
+            "UPDATE jobs SET reply_count = COALESCE(reply_count, 0) + 1, "
+            "last_reply_snippet = ?, replied_at = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ? AND deleted_at IS NULL",
+            (snippet, replied_at, job_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE jobs SET reply_count = COALESCE(reply_count, 0) + 1, "
+            "last_reply_snippet = ?, replied_at = COALESCE(replied_at, CURRENT_TIMESTAMP), "
+            "updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL",
+            (snippet, job_id),
+        )
+    conn.commit()
+
+
+def upsert_conversation(
+    conn: sqlite3.Connection,
+    *,
+    platform: str,
+    fingerprint: str,
+    hr_name: str = "",
+    company: str = "",
+    snippet: str = "",
+    job_id: str | None,
+    match_status: str,
+) -> int | None:
+    """登记/更新一次监测到的会话（指纹唯一，重复扫描幂等）。
+
+    已处置（resolved/dismissed）的会话不再回退为 pending。
+    返回会话行 id；新建且命中 UNIQUE 冲突时仍返回现有 id。
+    """
+    row = conn.execute(
+        "SELECT id, handle_status FROM conversations WHERE platform = ? AND fingerprint = ?",
+        (str(platform or "boss"), str(fingerprint)),
+    ).fetchone()
+    snippet = str(snippet or "").strip()[:60]
+    if row is None:
+        cursor = conn.execute(
+            """
+            INSERT INTO conversations
+                (platform, fingerprint, hr_name, company, last_message_snippet, job_id, match_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (str(platform or "boss"), str(fingerprint), str(hr_name or ""),
+             str(company or ""), snippet, job_id, str(match_status)),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+    conversation_id = int(row["id"])
+    if str(row["handle_status"] or "pending") == "pending":
+        conn.execute(
+            """
+            UPDATE conversations
+            SET hr_name = ?, company = ?, last_message_snippet = ?,
+                job_id = COALESCE(?, job_id), match_status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (str(hr_name or ""), str(company or ""), snippet, job_id,
+             str(match_status), conversation_id),
+        )
+        conn.commit()
+    return conversation_id
+
+
+def set_conversation_handle_status(
+    conn: sqlite3.Connection,
+    conversation_id: int,
+    handle_status: str,
+) -> bool:
+    """更新会话处置状态（pending → resolved | dismissed）。"""
+    if handle_status not in {"pending", "resolved", "dismissed"}:
+        raise ValueError("会话处置状态非法")
+    cursor = conn.execute(
+        "UPDATE conversations SET handle_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (handle_status, int(conversation_id)),
+    )
+    conn.commit()
+    return cursor.rowcount == 1
+
+
+def link_conversation(
+    conn: sqlite3.Connection,
+    conversation_id: int,
+    job_id: str,
+) -> bool:
+    """A3 人工关联：把未匹配/歧义会话绑定到指定岗位（仅 pending 会话可关联）。"""
+    cursor = conn.execute(
+        """
+        UPDATE conversations
+        SET job_id = ?, match_status = 'matched', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND handle_status = 'pending'
+        """,
+        (str(job_id), int(conversation_id)),
+    )
+    conn.commit()
+    return cursor.rowcount == 1
+
+
+def list_conversations(
+    conn: sqlite3.Connection,
+    *,
+    handle_status: str | None = "pending",
+    limit: int = 100,
+) -> list[dict]:
+    """列出会话（可按处置状态过滤，联岗位摘要；按更新时间倒序）。"""
+    sql = (
+        "SELECT c.*, j.company AS job_company, j.title AS job_title, j.status AS job_status "
+        "FROM conversations c LEFT JOIN jobs j ON j.id = c.job_id"
+    )
+    params: list[Any] = []
+    if handle_status:
+        sql += " WHERE c.handle_status = ?"
+        params.append(handle_status)
+    sql += " ORDER BY c.updated_at DESC LIMIT ?"
+    params.append(int(limit))
+    return [dict(row) for row in conn.execute(sql, params).fetchall()]
+
+
+def get_conversation(conn: sqlite3.Connection, conversation_id: int) -> dict | None:
+    row = conn.execute("SELECT * FROM conversations WHERE id = ?", (int(conversation_id),)).fetchone()
+    return dict(row) if row else None
 
 
 def add_history(conn: sqlite3.Connection, job_id: str, action: str, detail: str = "") -> None:
@@ -802,6 +957,55 @@ def _migrate_v2_6(conn: sqlite3.Connection) -> None:
         "WHERE greeting IS NOT NULL AND trim(greeting) != '' "
         "AND (greeting_fact_status IS NULL OR trim(greeting_fact_status) = '')"
     )
+    conn.commit()
+
+
+def _migrate_v2_7(conn: sqlite3.Connection) -> None:
+    """A1 投后回流：jobs 回复事实字段 + conversations 会话登记表（幂等）。
+
+    聊天正文不留存：conversations 只保存 ≤60 字摘要与结构化字段（隐私存量最小化）。
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "replied_at" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN replied_at TIMESTAMP")
+    if "reply_count" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN reply_count INTEGER DEFAULT 0")
+    if "last_reply_snippet" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN last_reply_snippet TEXT")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            platform TEXT NOT NULL DEFAULT 'boss',
+            fingerprint TEXT NOT NULL,
+            hr_name TEXT DEFAULT '',
+            company TEXT DEFAULT '',
+            last_message_snippet TEXT DEFAULT '',
+            job_id TEXT,
+            match_status TEXT NOT NULL DEFAULT 'unmatched',
+            handle_status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(platform, fingerprint),
+            FOREIGN KEY (job_id) REFERENCES jobs(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_conversations_handle ON conversations(handle_status, updated_at)"
+    )
+    conn.commit()
+
+
+def _migrate_v2_8(conn: sqlite3.Connection) -> None:
+    """A2 面试与终态管理：interview_at / closed_at / closed_reason（幂等）。"""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "interview_at" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN interview_at TIMESTAMP")
+    if "closed_at" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN closed_at TIMESTAMP")
+    if "closed_reason" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN closed_reason TEXT")
     conn.commit()
 
 

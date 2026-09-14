@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, ExternalLink, XCircle, CheckCircle2 } from 'lucide-react'
+import { Eye, ExternalLink, XCircle, CheckCircle2, History, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getStatusLabel } from '@/lib/status'
+import { getActionLabel, getStatusLabel } from '@/lib/status'
 import type { Job } from '@/hooks/useDashboard'
 
 export function jobSubtitle(job: Job) {
@@ -20,6 +20,126 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-card-border bg-surface-hover p-4">
       <div className="text-xs text-muted">{label}</div>
       <div className="mt-1 font-semibold text-foreground">{value}</div>
+    </div>
+  )
+}
+
+interface TimelineItem {
+  id: number
+  action: string
+  detail: string
+  created_at: string
+}
+
+/** A1 回流摘要块：回复次数 + 最新摘要 + 手动兜底标记 */
+function ReplySummaryBlock({ job }: { job: Job }) {
+  const count = Number(job.reply_count || 0)
+  return (
+    <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold">
+          <MessageCircle className="mr-1.5 inline h-4 w-4 text-success" />
+          HR 回复{count > 0 ? <span className="ml-1 text-success tabular-nums">×{count}</span> : <span className="ml-2 text-xs font-normal text-muted">暂无回复记录</span>}
+        </div>
+        {job.replied_at && <span className="text-xs text-muted">首响 {new Date(job.replied_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>}
+      </div>
+      {job.last_reply_snippet && (
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">“{job.last_reply_snippet}”</p>
+      )}
+    </div>
+  )
+}
+
+/** A2 事件时间线：岗位从采集到终态的全部动作，每步带时间戳与操作者 */
+function HistoryTimeline({ jobId }: { jobId: string }) {
+  const [items, setItems] = useState<TimelineItem[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/jobs/${jobId}`, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('加载失败'))))
+      .then((data: { history?: TimelineItem[] }) => { if (!cancelled) setItems(data.history || []) })
+      .catch(() => { if (!cancelled) setItems([]) })
+    return () => { cancelled = true }
+  }, [jobId])
+  if (!items) return <p className="mt-2 text-xs text-muted">时间线加载中…</p>
+  if (!items.length) return <p className="mt-2 text-xs text-muted">暂无事件记录。</p>
+  return (
+    <ol className="mt-3 space-y-2.5">
+      {items.map(item => (
+        <li key={item.id} className="flex gap-3">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground">
+              {getActionLabel(item.action)}
+              <span className="ml-2 text-xs font-normal text-muted tabular-nums">
+                {new Date(item.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+              </span>
+            </div>
+            {item.detail && <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted">{item.detail}</p>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** A2 手动流转：按当前状态给出合法的下一步按钮，非法迁移由后端 409 拒绝 */
+const TRANSITION_OPTIONS: Record<string, Array<{ status: string; label: string; reason?: boolean }>> = {
+  replied: [
+    { status: 'interview', label: '约面试' },
+    { status: 'hr_rejected', label: 'HR 拒绝' },
+    { status: 'closed', label: '关闭', reason: true },
+  ],
+  interview: [
+    { status: 'offer', label: '拿 Offer' },
+    { status: 'hr_rejected', label: 'HR 拒绝' },
+    { status: 'closed', label: '关闭', reason: true },
+  ],
+  offer: [{ status: 'closed', label: '关闭', reason: true }],
+  hr_rejected: [{ status: 'closed', label: '关闭', reason: true }],
+  stale: [{ status: 'ready', label: '重新激活' }],
+}
+
+function TransitionButtons({ job, onDone }: { job: Job; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const options = TRANSITION_OPTIONS[job.status] || []
+  if (!options.length) return null
+
+  const transition = async (target: { status: string; label: string; reason?: boolean }) => {
+    let reason = ''
+    if (target.reason) {
+      reason = window.prompt('关闭原因（可选，方便以后复盘）：', '') || ''
+      if (reason === null) return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/jobs/${job.id}/transition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: target.status, reason }),
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(payload.error?.message || payload.error || '流转失败')
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '流转失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap gap-2">
+        {options.map(option => (
+          <Button key={option.status} variant="secondary" size="sm" disabled={busy} onClick={() => transition(option)}>
+            {option.label}
+          </Button>
+        ))}
+      </div>
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   )
 }
@@ -143,6 +263,15 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
           <div className="text-sm font-semibold">招呼语</div>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">{job.greeting || '未生成'}</p>
         </div>
+        <ReplySummaryBlock job={job} />
+        <TransitionButtons job={job} onDone={onClose} />
+        <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
+          <div className="flex items-center text-sm font-semibold">
+            <History className="mr-1.5 h-4 w-4 text-primary" />
+            事件时间线
+          </div>
+          <HistoryTimeline jobId={job.id} />
+        </div>
         <WelfareVerifyBlock jobId={job.id} jd={job.jd || ''} />
       </div>
     </div>,
@@ -158,12 +287,27 @@ interface JobActionCardProps {
   onReject: () => void
 }
 
-/** 待确认岗位卡：选中态用描边+浅蓝勾角标表达，不做整卡高饱和 */
+/** B9 队列时效：审批后在确认队列等待的天数 */
+export function waitingDays(job: Job): number {
+  const base = job.updated_at || job.created_at
+  if (!base) return 0
+  const ms = Date.now() - new Date(base).getTime()
+  if (!Number.isFinite(ms) || ms <= 0) return 0
+  return Math.floor(ms / 86_400_000)
+}
+
+/** 待确认岗位卡：选中态用描边+浅蓝勾角标表达，不做整卡高饱和；超 7 天灰显建议重检 */
 export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: JobActionCardProps) {
+  const days = waitingDays(job)
+  const overdue = days > 7
   return (
     <div
       className={`relative rounded-card border p-4 transition-soft ${
-        selected ? 'border-primary bg-accent-soft/40' : 'border-card-border bg-card hover:border-primary/30'
+        overdue && !selected
+          ? 'border-card-border bg-surface-hover opacity-75'
+          : selected
+            ? 'border-primary bg-accent-soft/40'
+            : 'border-card-border bg-card hover:border-primary/30'
       }`}
     >
       {selected && (
@@ -188,6 +332,11 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: J
           className="mt-1 h-4 w-4 shrink-0 accent-primary"
         />
       </div>
+      {days >= 2 && (
+        <p className={`mt-2 text-xs ${overdue ? 'font-semibold text-warning' : 'text-muted'}`}>
+          已等待 {days} 天{overdue ? '，超过 7 天：投递价值可能下降，建议重检评分或过期退出' : ''}
+        </p>
+      )}
       <p className="mt-3 line-clamp-2 min-h-12 text-[13px] leading-6 text-muted">{job.score_reason || job.greeting || '等待继续推进。'}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" onClick={onDetail}><Eye className="mr-2 h-4 w-4" />查看详情</Button>

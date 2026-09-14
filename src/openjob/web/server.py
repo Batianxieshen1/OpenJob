@@ -50,10 +50,15 @@ from openjob.db import (
 	mark_external_jobs_sent,
 	permanent_delete_jobs,
 	query_jobs,
+	record_job_reply,
 	restore_jobs,
 	delete_base_resume,
 	insert_base_resume,
 	list_base_resumes,
+	list_conversations,
+	get_conversation,
+	link_conversation,
+	set_conversation_handle_status,
 	set_job_resume_pointer,
 	soft_delete_jobs,
 	update_base_resume,
@@ -151,8 +156,11 @@ def set_base_dir(base_dir: Path | str) -> None:
 	DATA_DIR = BASE_DIR / "data"
 	RESUME_DIR = DATA_DIR / "resumes"
 	CONFIG_PATH = BASE_DIR / "config.yaml"
+	from openjob.ai import greeter as greeter_module
 	from openjob.ai.resume_engine import engine as resume_engine
 
+	greeter_module.RUNTIME_DB_PATH = DATA_DIR / "openjob.db"
+	greeter_module.RUNTIME_DATA_DIR = DATA_DIR
 	resume_engine.RUNTIME_DB_PATH = DATA_DIR / "openjob.db"
 	resume_engine.RUNTIME_DATA_DIR = DATA_DIR
 	mark_orphaned_scoring_runs_paused(DATA_DIR / "openjob.db")
@@ -1341,6 +1349,21 @@ def api_workbench():
 				job for job in get_jobs_needing_resume(db)
 				if platform_supports(str(job.get("source_platform") or "boss"), "deliver")
 			],
+			"delivery_aging": {
+				"approved_total": int(db.execute(
+					"SELECT COUNT(*) AS cnt FROM jobs WHERE status = 'approved' AND deleted_at IS NULL"
+				).fetchone()["cnt"]),
+				"approved_overdue_7d": int(db.execute(
+					"SELECT COUNT(*) AS cnt FROM jobs WHERE status = 'approved' AND deleted_at IS NULL "
+					"AND updated_at < datetime('now', '-7 day')"
+				).fetchone()["cnt"]),
+				"stale_total": int(db.execute(
+					"SELECT COUNT(*) AS cnt FROM jobs WHERE status = 'stale' AND deleted_at IS NULL"
+				).fetchone()["cnt"]),
+				"pending_replies": int(count_unresolved_monitor_items(db) or 0) + int(db.execute(
+					"SELECT COUNT(*) AS cnt FROM conversations WHERE handle_status = 'pending'"
+				).fetchone()["cnt"]),
+			},
 			"send_quota": {
 				"daily_limit": daily_limit,
 				"sent": today_sent,
@@ -1965,6 +1988,207 @@ def api_job_greeting_edit(job_id):
 		db.close()
 
 
+@app.route("/api/jobs/<job_id>/mark-replied", method="POST")
+def api_job_mark_replied(job_id):
+	"""A1 手动兜底：监测未自动回流时，人工把岗位标记为已回复。"""
+	db = _get_web_db()
+	try:
+		try:
+			body = request.json or {}
+		except Exception:
+			body = {}
+		if not isinstance(body, dict):
+			return _api_error("INVALID_JSON", "请求体必须是对象", status_code=400)
+		row = db.execute(
+			"SELECT id FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+		).fetchone()
+		if not row:
+			return _api_error("JOB_NOT_FOUND", "岗位不存在或已进入回收站", status_code=404)
+		snippet = str(body.get("snippet") or "").strip()[:60]
+		transition_job_status(db, job_id, "replied")
+		record_job_reply(db, job_id, snippet)
+		add_history(db, job_id, "replied", "Web Dashboard 手动标记已回复")
+		return _api_envelope({"job_id": job_id, "status": "replied"})
+	except IllegalJobStatusTransition as exc:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(exc), status_code=409)
+	finally:
+		db.close()
+
+
+@app.route("/api/jobs/<job_id>/transition", method="POST")
+def api_job_transition(job_id):
+	"""A2 手动流转：按状态白名单推进投后状态（约面/Offer/关闭/HR拒绝/stale 重激活）。
+
+	非法迁移返回 409 并保留原状态；进入 closed 时可携带 closed_reason。
+	"""
+	try:
+		data = request.json
+	except Exception:
+		return _api_error("INVALID_JSON", "请求体必须是 JSON", status_code=400)
+	if not isinstance(data, dict):
+		return _api_error("INVALID_JSON", "请求体必须是对象", status_code=400)
+	new_status = str(data.get("status") or "").strip()
+	if new_status not in JOB_STATUS_TRANSITIONS:
+		return _api_error("UNKNOWN_STATUS", f"未知岗位状态：{new_status}", status_code=400)
+	reason = str(data.get("reason") or "").strip()
+
+	db = _get_web_db()
+	try:
+		row = db.execute(
+			"SELECT id, status FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+		).fetchone()
+		if not row:
+			return _api_error("JOB_NOT_FOUND", "岗位不存在或已进入回收站", status_code=404)
+		transition_job_status(db, job_id, new_status, closed_reason=reason or None)
+		detail = f"Web Dashboard 手动流转：{JOB_STATUS_LABELS.get(new_status, new_status)}"
+		if reason:
+			detail += f"（{reason[:40]}）"
+		add_history(db, job_id, new_status, detail)
+		return _api_envelope({"job_id": job_id, "status": new_status})
+	except IllegalJobStatusTransition as exc:
+		return _api_error("ILLEGAL_STATUS_TRANSITION", str(exc), status_code=409)
+	finally:
+		db.close()
+
+
+@app.route("/api/jobs/stale-exit", method="POST")
+def api_jobs_stale_exit():
+	"""B9 积压治理：审批后长期未发送的岗位批量退出队列（→stale，可重激活）。"""
+	try:
+		data = request.json
+	except Exception:
+		return _api_error("INVALID_JSON", "请求体必须是 JSON", status_code=400)
+	if not isinstance(data, dict) or not isinstance(data.get("job_ids"), list):
+		return _api_error("INVALID_REQUEST", "缺少 job_ids 数组", status_code=400)
+	job_ids = [str(jid) for jid in data["job_ids"] if str(jid)]
+	if not job_ids or len(job_ids) > 1000:
+		return _api_error("INVALID_REQUEST", "job_ids 必须是 1-1000 个岗位", status_code=400)
+
+	db = _get_web_db()
+	try:
+		stale_count = 0
+		skipped: list[dict] = []
+		for job_id in job_ids:
+			try:
+				transition_job_status(db, job_id, "stale")
+				add_history(db, job_id, "stale", "Web Dashboard 批量过期退出（审批后未发送）")
+				stale_count += 1
+			except IllegalJobStatusTransition as exc:
+				skipped.append({"job_id": job_id, "reason": str(exc)})
+		return _api_envelope({"stale_count": stale_count, "skipped": skipped})
+	finally:
+		db.close()
+
+
+@app.route("/api/inbox")
+def api_inbox():
+	"""A3 回复工作台：待处理会话（含未匹配待人工关联）+ 待确认回复计数。"""
+	db = _get_web_db()
+	try:
+		conversations = list_conversations(db, handle_status="pending", limit=100)
+		unresolved_replies = count_unresolved_monitor_items(db)
+		pending_count = db.execute(
+			"SELECT COUNT(*) AS cnt FROM conversations WHERE handle_status = 'pending'"
+		).fetchone()["cnt"]
+		return _api_envelope({
+			"conversations": conversations,
+			"unresolved_replies": int(unresolved_replies or 0),
+			"pending_count": int(pending_count or 0),
+		})
+	finally:
+		db.close()
+
+
+@app.route("/api/conversations/<conversation_id>/link", method="POST")
+def api_conversation_link(conversation_id):
+	"""A3 人工关联：把未匹配/歧义会话绑定到指定岗位。"""
+	try:
+		data = request.json
+	except Exception:
+		return _api_error("INVALID_JSON", "请求体必须是 JSON", status_code=400)
+	if not isinstance(data, dict) or not str(data.get("job_id") or "").strip():
+		return _api_error("INVALID_REQUEST", "缺少 job_id", status_code=400)
+	job_id = str(data["job_id"]).strip()
+
+	db = _get_web_db()
+	try:
+		job = db.execute(
+			"SELECT id FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+		).fetchone()
+		if not job:
+			return _api_error("JOB_NOT_FOUND", "岗位不存在或已进入回收站", status_code=404)
+		if not link_conversation(db, conversation_id, job_id):
+			return _api_error(
+				"CONVERSATION_NOT_LINKABLE",
+				"会话不存在或已处置（仅待处理会话可关联）",
+				status_code=409,
+			)
+		add_history(db, job_id, "replied", "回复工作台人工关联会话")
+		return _api_envelope({"conversation_id": conversation_id, "job_id": job_id})
+	finally:
+		db.close()
+
+
+@app.route("/api/conversations/<conversation_id>/dismiss", method="POST")
+def api_conversation_dismiss(conversation_id):
+	db = _get_web_db()
+	try:
+		if not set_conversation_handle_status(db, conversation_id, "dismissed"):
+			return _api_error("CONVERSATION_NOT_FOUND", "会话不存在", status_code=404)
+		return _api_envelope({"conversation_id": conversation_id, "handle_status": "dismissed"})
+	finally:
+		db.close()
+
+
+@app.route("/api/conversations/<conversation_id>/resolve", method="POST")
+def api_conversation_resolve(conversation_id):
+	db = _get_web_db()
+	try:
+		if not set_conversation_handle_status(db, conversation_id, "resolved"):
+			return _api_error("CONVERSATION_NOT_FOUND", "会话不存在", status_code=404)
+		return _api_envelope({"conversation_id": conversation_id, "handle_status": "resolved"})
+	finally:
+		db.close()
+
+
+@app.route("/api/conversations/<conversation_id>/draft", method="POST")
+def api_conversation_draft(conversation_id):
+	"""A3 回复草稿：只生成文本供复制，绝不发送（零平台副作用），生成后过事实校验。"""
+	db = _get_web_db()
+	try:
+		conv = get_conversation(db, conversation_id)
+		if not conv:
+			return _api_error("CONVERSATION_NOT_FOUND", "会话不存在", status_code=404)
+		job_id = str(conv.get("job_id") or "").strip()
+		if not job_id:
+			return _api_error(
+				"CONVERSATION_UNLINKED",
+				"该会话尚未关联岗位，请先人工关联再生成草稿",
+				status_code=409,
+			)
+		job_row = db.execute(
+			"SELECT * FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)
+		).fetchone()
+		if not job_row:
+			return _api_error("JOB_NOT_FOUND", "关联岗位不存在或已进入回收站", status_code=404)
+		from openjob.ai.greeter import generate_reply_draft
+
+		result = generate_reply_draft(
+			db, dict(job_row), str(conv.get("last_message_snippet") or ""), load_config(CONFIG_PATH)
+		)
+		issues = list(result.get("issues") or [])
+		return _api_envelope({
+			"conversation_id": conversation_id,
+			"job_id": job_id,
+			"draft": result.get("draft"),
+			"fact_status": "verified" if (result.get("draft") and not issues) else "unverified",
+			"issues": issues,
+			"injection_risks": list((result.get("source") or {}).get("hr_injection_risks") or []),
+		})
+	finally:
+		db.close()
+
+
 @app.route("/api/resume/version/<resume_id>/download")
 def api_resume_version_download(resume_id):
 	"""下载定制简历版本文件（?format=docx|pdf|md，默认 pdf）。"""
@@ -2035,7 +2259,13 @@ def api_job_detail(job_id):
 		row = db.execute("SELECT * FROM jobs WHERE id = ? AND deleted_at IS NULL", (job_id,)).fetchone()
 		if not row:
 			return _json_response({"error": "岗位不存在"}, 404)
-		return _json_response(dict(row))
+		job = dict(row)
+		history_rows = db.execute(
+			"SELECT id, action, detail, created_at FROM history WHERE job_id = ? ORDER BY id DESC LIMIT 100",
+			(job_id,),
+		).fetchall()
+		job["history"] = [dict(item) for item in history_rows]
+		return _json_response(job)
 	finally:
 		db.close()
 
@@ -2876,7 +3106,7 @@ def api_history_reply(history_id):
 		if row["action"] != "reply_pending":
 			return _json_response({"error": "只能确认待回复记录"}, 400)
 
-		from openjob.executor.monitor import _build_reply_resolution_detail
+		from openjob.executor.monitor import _build_reply_resolution_detail, _parse_reply_detail
 
 		add_history(
 			db,
@@ -2891,6 +3121,9 @@ def api_history_reply(history_id):
 			),
 		)
 		transition_job_status(db, row["job_id"], "replied")
+		pending_payload = _parse_reply_detail(row["detail"])
+		hr_question = str(pending_payload.get("hr_question") or "").strip()
+		record_job_reply(db, row["job_id"], hr_question[:60])
 		return _json_response({"success": True, "message": "回复已记录，请在招聘平台手动发送。"})
 	except IllegalJobStatusTransition as e:
 		return _api_error("ILLEGAL_STATUS_TRANSITION", str(e), status_code=409)

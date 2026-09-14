@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { BarChart3, BriefcaseBusiness, ClipboardCheck, FileText, LayoutDashboard, Radar, Settings } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, ClipboardCheck, FileText, Inbox, LayoutDashboard, Radar, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const items = [
@@ -8,6 +8,7 @@ const items = [
   { to: '/confirm', icon: ClipboardCheck, label: '确认' },
   { to: '/resume', icon: FileText, label: '简历' },
   { to: '/monitor', icon: Radar, label: '监测' },
+  { to: '/inbox', icon: Inbox, label: '回复' },
   { to: '/config', icon: Settings, label: '配置' },
 ]
 
