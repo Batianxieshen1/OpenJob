@@ -53,8 +53,32 @@ function statusVariant(status: string) {
     'follow_up_sent',
     'rejected',
     'error',
+    'stale',
+    'interview',
+    'offer',
+    'hr_rejected',
+    'closed',
   ])
   return variants.has(status) ? status : 'default'
+}
+
+const POST_SEND_STATUSES = [
+  'sent', 'replied', 'resume_sent', 'needs_resume', 'follow_up_sent',
+  'interview', 'offer', 'hr_rejected', 'closed',
+]
+
+/** A1 回流徽章：HR 回复次数与最新摘要 */
+function ReplyBadge({ job }: { job: Job }) {
+  const count = Number(job.reply_count || 0)
+  if (!count) return null
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success"
+      title={job.last_reply_snippet ? `最新回复：${job.last_reply_snippet}` : 'HR 已回复'}
+    >
+      💬 {count}
+    </span>
+  )
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -135,7 +159,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
           {jobs.map(job => {
             const isExternalPlatform = job.source_platform === 'zhilian' || job.source_platform === '51job'
             const externalUrl = safeExternalJobUrl(job)
-            const alreadySent = ['sent', 'replied', 'resume_sent', 'needs_resume', 'follow_up_sent'].includes(job.status)
+            const alreadySent = POST_SEND_STATUSES.includes(job.status)
             const isSelected = selectedIds.includes(job.id)
             return (
               <div
@@ -167,6 +191,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                   <span>{job.salary || '-'}</span>
                   <span className="text-muted-3">·</span>
                   <Badge variant={statusVariant(job.status) as any}>{getStatusLabel(job.status)}</Badge>
+<ReplyBadge job={job} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-3">
                   <span className="rounded-full bg-accent-soft px-1.5 py-0.5 font-semibold text-primary">
@@ -250,7 +275,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                 const isExpanded = expanded === job.id
                 const isExternalPlatform = job.source_platform === 'zhilian' || job.source_platform === '51job'
                 const externalUrl = safeExternalJobUrl(job)
-                const alreadySent = ['sent', 'replied', 'resume_sent', 'needs_resume', 'follow_up_sent'].includes(job.status)
+                const alreadySent = POST_SEND_STATUSES.includes(job.status)
                 const subtitleParts = [
                   job.education || '学历未识别',
                   job.recruitment_type === 'campus' ? '校招' : job.recruitment_type === 'experienced' ? '社招' : '',
@@ -292,6 +317,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 align-middle">
                         <Badge variant={statusVariant(job.status) as any}>{getStatusLabel(job.status)}</Badge>
+<ReplyBadge job={job} />
                       </td>
                       <td className="hidden whitespace-nowrap px-4 py-3 align-middle text-xs text-muted lg:table-cell">
                         <span className="inline-flex items-center gap-1.5">

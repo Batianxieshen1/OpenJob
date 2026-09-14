@@ -15,7 +15,8 @@ from openjob.cancellation import (
 )
 from openjob.db import (
     get_db, get_jobs_by_status,
-    transition_job_status, add_history, add_risk_event, set_platform_safety_lock,
+    record_job_reply, transition_job_status, upsert_conversation,
+    add_history, add_risk_event, set_platform_safety_lock,
 )
 from openjob.throttle import RequestThrottle, SendWindowChecker
 from openjob.platform_safety import (
@@ -1149,36 +1150,70 @@ def _check_boss_replies(config: dict, tracked_jobs: list[dict] | None = None) ->
         if not conv.get("has_reply"):
             continue
 
-        matched_job = _match_conversation_to_job(conv, all_tracked_jobs)
-        if matched_job:
-            pending = _get_unresolved_pending_reply(db, matched_job["id"])
-            if pending and _pending_matches_chat_list(_row_text(pending, "detail"), conv):
-                console.print(
-                    f"[dim]  跳过已有待确认回复: {matched_job['company']} - {matched_job['title']}[/dim]"
-                )
-                continue
-            handled = _get_latest_handled_reply(db, matched_job["id"])
-            if handled and _handled_reply_matches_chat_list(_row_text(handled, "detail"), conv):
-                console.print(
-                    f"[dim]  跳过已处理的相同HR消息: {matched_job['company']} - {matched_job['title']}[/dim]"
-                )
-                continue
-
-            # Update status to replied if it was 'sent'
-            if matched_job.get("status") == "sent":
-                transition_job_status(db, matched_job["id"], "replied")
-                add_history(db, matched_job["id"], "replied", f"HR回复: {conv.get('last_message', '')[:50]}")
-
-            results.append({
-                "job": matched_job,
-                "conversation": conv,
-            })
-            console.print(
-                f"[green]  ✓ {matched_job['company']} - {matched_job['title']} 有新回复[/green]"
+        matched_job, match_status = _match_conversation_to_job(conv, all_tracked_jobs)
+        if not matched_job:
+            # A1：未匹配/歧义会话不再静默丢弃——登记到回复工作台，宁可不配不错配。
+            reason = "歧义（命中多个岗位）" if match_status == "ambiguous" else "未匹配到已发送岗位"
+            console.print(f"[yellow]  ! {conv.get('company', '')} 有回复但{reason}，已登记待人工关联[/yellow]")
+            upsert_conversation(
+                db,
+                platform="boss",
+                fingerprint=_conversation_fingerprint(conv),
+                hr_name=str(conv.get("hr_name") or ""),
+                company=str(conv.get("company") or ""),
+                snippet=str(conv.get("last_message") or ""),
+                job_id=None,
+                match_status=match_status,
             )
-            if len(results) >= max_conversations:
-                console.print(f"[dim]本轮已达到对话处理上限 {max_conversations}[/dim]")
-                break
+            continue
+        pending = _get_unresolved_pending_reply(db, matched_job["id"])
+        if pending and _pending_matches_chat_list(_row_text(pending, "detail"), conv):
+            console.print(
+                f"[dim]  跳过已有待确认回复: {matched_job['company']} - {matched_job['title']}[/dim]"
+            )
+            continue
+        handled = _get_latest_handled_reply(db, matched_job["id"])
+        if handled and _handled_reply_matches_chat_list(_row_text(handled, "detail"), conv):
+            console.print(
+                f"[dim]  跳过已处理的相同HR消息: {matched_job['company']} - {matched_job['title']}[/dim]"
+            )
+            continue
+
+        # A1 回流：新回复事件登记回复事实（首响时间/计数/摘要）与会话行
+        record_job_reply(db, matched_job["id"], str(conv.get("last_message") or ""))
+        upsert_conversation(
+            db,
+            platform="boss",
+            fingerprint=_conversation_fingerprint(conv),
+            hr_name=str(conv.get("hr_name") or ""),
+            company=str(conv.get("company") or ""),
+            snippet=str(conv.get("last_message") or ""),
+            job_id=str(matched_job.get("id") or ""),
+            match_status="matched",
+        )
+
+        # Update status to replied if it was 'sent'
+        if matched_job.get("status") == "sent":
+            # 结构化指纹 detail：重复扫描同一条 HR 消息时由去重守卫拦截，不重复计数
+            history_detail = json.dumps({
+                "schema": "replied.scan.v1",
+                "note": "监测扫描自动标记已回复",
+                "reply_fingerprint": str(conv.get("last_message") or "").strip(),
+                "chat_list_last_message": str(conv.get("last_message") or ""),
+            }, ensure_ascii=False)
+            transition_job_status(db, matched_job["id"], "replied")
+            add_history(db, matched_job["id"], "replied", history_detail)
+
+        results.append({
+            "job": matched_job,
+            "conversation": conv,
+        })
+        console.print(
+            f"[green]  ✓ {matched_job['company']} - {matched_job['title']} 有新回复[/green]"
+        )
+        if len(results) >= max_conversations:
+            console.print(f"[dim]本轮已达到对话处理上限 {max_conversations}[/dim]")
+            break
 
     if not results:
         console.print("[dim]暂无新回复[/dim]")
@@ -1200,42 +1235,79 @@ def check_replies(config: dict) -> list[dict]:
     return boss_results
 
 
-def _match_conversation_to_job(conv: dict, jobs: list[dict]) -> dict | None:
-    """Match a chat conversation to a job record."""
+def _match_conversation_to_job(conv: dict, jobs: list[dict]) -> tuple[dict | None, str]:
+    """Match a chat conversation to a job record (A1 三分支）。
+
+    返回 (job, match_status)，match_status ∈ {"matched", "ambiguous", "unmatched"}：
+    同一会话命中多个岗位时判为 ambiguous，宁可不配不错配，交给回复工作台人工关联。
+    """
     conv_hr = conv.get("hr_name", "").strip()
     conv_company = conv.get("company", "").strip()
 
     if not conv_hr:
-        return None
+        return None, "unmatched"
 
-    # Exact match first (hr_name + company)
-    for job in jobs:
-        job_hr = (job.get("hr_name") or "").strip()
-        job_company = (job.get("company") or "").strip()
-        if conv_hr == job_hr and conv_company == job_company:
-            return job
+    def _distinct(candidates) -> list[dict]:
+        hits: list[dict] = []
+        seen: set[str] = set()
+        for job in candidates:
+            job_id = str(job.get("id"))
+            if job_id not in seen:
+                seen.add(job_id)
+                hits.append(job)
+        return hits
+
+    # Exact match (hr_name + company)
+    exact = _distinct(
+        job for job in jobs
+        if conv_hr == (job.get("hr_name") or "").strip()
+        and conv_company == (job.get("company") or "").strip()
+    )
+    if len(exact) == 1:
+        return exact[0], "matched"
+    if len(exact) > 1:
+        return None, "ambiguous"
 
     # Fuzzy match by hr_name + partial company
-    for job in jobs:
-        job_hr = (job.get("hr_name") or "").strip()
-        job_company = (job.get("company") or "").strip()
-        if conv_hr == job_hr and job_company and (
-            conv_company in job_company or job_company in conv_company
-        ):
-            return job
+    fuzzy = _distinct(
+        job for job in jobs
+        if conv_hr == (job.get("hr_name") or "").strip()
+        and (job.get("company") or "").strip()
+        and (conv_company in job["company"] or job["company"] in conv_company)
+    )
+    if len(fuzzy) == 1:
+        return fuzzy[0], "matched"
+    if len(fuzzy) > 1:
+        return None, "ambiguous"
 
     # Fallback: job has no hr_name, match by company name only
-    for job in jobs:
-        job_hr = (job.get("hr_name") or "").strip()
-        job_company = (job.get("company") or "").strip()
-        if not job_hr and job_company and (
-            conv_company == job_company
-            or conv_company in job_company
-            or job_company in conv_company
-        ):
-            return job
+    company_only = _distinct(
+        job for job in jobs
+        if not (job.get("hr_name") or "").strip()
+        and (job.get("company") or "").strip()
+        and (
+            conv_company == job["company"]
+            or conv_company in job["company"]
+            or job["company"] in conv_company
+        )
+    )
+    if len(company_only) == 1:
+        return company_only[0], "matched"
+    if len(company_only) > 1:
+        return None, "ambiguous"
 
-    return None
+    return None, "unmatched"
+
+
+def _conversation_fingerprint(conv: dict) -> str:
+    """聊天列表指纹：同一条 HR 消息重复扫描只登记一次。"""
+    import hashlib
+
+    raw = "|".join(
+        str(conv.get(key) or "").strip()
+        for key in ("hr_name", "company", "last_message")
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
 def _handle_conversation(job: dict, config: dict, conversation: dict | None = None) -> str:
@@ -1794,12 +1866,23 @@ def monitor_and_send_resumes(config: dict) -> dict:
         try:
             from openjob.notify import notify_desktop
 
-            _companies = "、".join(
-                str(item.get("job", {}).get("company") or "") for item in replied_conversations[:3]
-            )
+            def _job_label(item: dict) -> str:
+                job_info = item.get("job") or {}
+                company = str(job_info.get("company") or "").strip()
+                title = str(job_info.get("title") or "").strip()
+                return f"{company}·{title}" if title else company
+
+            _labels = "、".join(_job_label(item) for item in replied_conversations[:3])
+            _first_snippet = ""
+            for item in replied_conversations:
+                snippet = str((item.get("conversation") or {}).get("last_message") or "").strip()
+                if snippet:
+                    _first_snippet = snippet[:40]
+                    break
+            _suffix = f"｜最新消息：{_first_snippet}" if _first_snippet else ""
             notify_desktop(
                 f"BOSS 直聘：{len(replied_conversations)} 个新回复",
-                f"来自：{_companies}，打开面板「监测执行」查看与回复",
+                f"来自：{_labels}，打开面板「回复工作台」查看与回复{_suffix}",
                 config,
             )
         except Exception:

@@ -29,10 +29,16 @@ JOB_STATUS_LABELS: dict[str, str] = {
     "follow_up_sent": "已跟进",
     "rejected": "已拒绝",
     "error": "发送失败",
+    "stale": "超期退出",
+    "interview": "面试中",
+    "offer": "Offer",
+    "hr_rejected": "HR拒绝",
+    "closed": "已关闭",
 }
 
 # 终态之外保留的准入状态：manual_sent 是 history 动作（人工平台外发送台账），
-# 不是岗位状态；stale（审批超期退出，可重激活）由 WP-B9 引入写入路径。
+# 不是岗位状态。stale（B9 审批超期退出，可重激活）与 interview/offer/closed/
+# hr_rejected（A2 投后终态）自本版本起启用写入路径。
 JOB_STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
     "pending": frozenset({"scored", "filtered", "ready", "error", "rejected"}),
     "scored": frozenset({"ready", "filtered", "error", "rejected"}),
@@ -44,10 +50,14 @@ JOB_STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
     "needs_resume": frozenset({"resume_sent", "replied", "rejected", "follow_up_sent", "stale"}),
     "resume_sent": frozenset({"replied", "rejected", "needs_resume", "follow_up_sent", "stale"}),
     "follow_up_sent": frozenset({"replied", "resume_sent", "needs_resume", "rejected", "stale"}),
-    "replied": frozenset(),
+    "replied": frozenset({"interview", "hr_rejected", "closed"}),
+    "interview": frozenset({"offer", "closed", "hr_rejected"}),
+    "offer": frozenset({"closed"}),
+    "hr_rejected": frozenset({"closed"}),
     "rejected": frozenset(),
     "skipped": frozenset(),
     "stale": frozenset({"ready", "approved"}),
+    "closed": frozenset(),
 }
 
 # 智联/前程无忧的人工“标记已发送”是用户显式确认的平台外动作，

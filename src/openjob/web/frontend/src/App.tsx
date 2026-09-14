@@ -12,6 +12,7 @@ const ConfigPage = lazy(() => import('./pages/ConfigPage'))
 const ResumePage = lazy(() => import('./pages/ResumePage'))
 const StatsPage = lazy(() => import('./pages/StatsPage'))
 const ConfirmQueuePage = lazy(() => import('./pages/ConfirmQueuePage'))
+const InboxPage = lazy(() => import('./pages/InboxPage'))
 
 function PageFallback() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
                   <Route path="/stats" element={<StatsPage />} />
                   <Route path="/confirm" element={<ConfirmQueuePage />} />
                   <Route path="/monitor" element={<MonitorPage />} />
+                  <Route path="/inbox" element={<InboxPage />} />
                   <Route path="/config" element={<ConfigPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

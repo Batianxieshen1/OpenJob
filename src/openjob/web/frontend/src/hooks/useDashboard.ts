@@ -40,6 +40,13 @@ interface Job {
   deleted_reason?: string | null
   resume_path?: string
   last_error?: string
+  greeting_fact_status?: string
+  reply_count?: number
+  replied_at?: string | null
+  last_reply_snippet?: string | null
+  interview_at?: string | null
+  closed_at?: string | null
+  closed_reason?: string | null
 }
 
 interface TopCompany {
@@ -121,6 +128,12 @@ export interface WorkbenchData {
   send_errors: Job[]
   needs_resume: Job[]
   send_quota: { daily_limit: number; sent: number; remaining: number; exhausted: boolean }
+  delivery_aging?: {
+    approved_total: number
+    approved_overdue_7d: number
+    stale_total: number
+    pending_replies: number
+  }
   task: WorkbenchTask | null
   last_task: WorkbenchTask | null
   scheduled_collection: ScheduledCollectionSummary

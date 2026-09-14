@@ -572,6 +572,29 @@ export default function DashboardPage() {
             sendErrorsCount={workbench.send_errors.length}
             pendingRepliesCount={pendingReplies.length}
           />
+          {workbench.delivery_aging && (
+            <button
+              type="button"
+              onClick={() => { window.location.hash = ''; window.location.assign('/confirm') }}
+              className="mt-4 w-full rounded-module border border-card-border bg-card p-4 text-left transition-soft hover:border-primary/30"
+            >
+              <div className="text-xs font-semibold text-muted">队列健康（B9）</div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className={`text-2xl font-semibold tabular-nums ${workbench.delivery_aging.approved_overdue_7d > 0 ? 'text-warning' : 'text-foreground'}`}>
+                  {workbench.delivery_aging.approved_total}
+                </span>
+                <span className="text-xs text-muted">个已确认待发送</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                超 7 天 <span className={`tabular-nums ${workbench.delivery_aging.approved_overdue_7d > 0 ? 'font-semibold text-warning' : ''}`}>{workbench.delivery_aging.approved_overdue_7d}</span>
+                · 超期退出 {workbench.delivery_aging.stale_total}
+                · 待回复 {workbench.delivery_aging.pending_replies}
+              </p>
+              {workbench.delivery_aging.approved_overdue_7d > 0 && (
+                <p className="mt-1 text-xs text-warning">投递确认页可一键过期退出积压岗位。</p>
+              )}
+            </button>
+          )}
         </div>
         <div className="xl:col-span-4">
           <BestMatchCard jobs={workbench.pending_confirmation} />
