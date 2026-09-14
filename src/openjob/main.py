@@ -248,6 +248,47 @@ def restore(ctx: click.Context, backup: str, yes: bool) -> None:
         raise SystemExit(1)
 
 
+@cli.command(name="export-data")
+@click.option("--out", "-o", default=None, type=click.Path(), help="导出 zip 路径（默认 data/exports/openjob-export-<日期>.zip）")
+@click.option("--no-resumes", is_flag=True, help="不打包简历产物目录")
+@click.pass_context
+def export_data(ctx: click.Context, out: str | None, no_resumes: bool) -> None:
+    """全量数据导出：库快照+简历产物+素材库+用量（不含 config.yaml/API Key）"""
+    from datetime import datetime as _dt
+
+    from openjob.data_export import build_export_archive
+
+    base_dir = ctx.obj["base_dir"]
+    target = Path(out) if out else base_dir / "data" / "exports" / f"openjob-export-{_dt.now():%Y%m%d}.zip"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = build_export_archive(base_dir, include_resumes=not no_resumes)
+    target.write_bytes(payload)
+    console.print(f"[green]✓[/green] 已导出：{target}（{len(payload) / 1024:.0f} KB，不含 config.yaml 与 API Key）")
+
+
+@cli.command()
+@click.option("--write", "do_write", is_flag=True, help="确认后写入归档目录（默认仅预览，不写任何文件）")
+@click.option("--yes", is_flag=True, help="跳过写入前的交互确认")
+@click.pass_context
+def weekly(ctx: click.Context, do_write: bool, yes: bool) -> None:
+    """求职周报：上周数字+环比+待办（dry-run 预览，确认后才写盘）"""
+    from openjob.weekly_report import collect_weekly_stats, render_weekly_markdown, write_weekly_report
+
+    base_dir = ctx.obj["base_dir"]
+    config = ctx.obj["config"]
+    report = collect_weekly_stats(base_dir / "data" / "openjob.db")
+    markdown = render_weekly_markdown(report, config)
+    console.print(markdown)
+    if not do_write:
+        console.print("\n[dim]以上为预览（未写入任何文件）。加 --write 归档到周报目录。[/dim]")
+        return
+    if not yes:
+        console.print("[yellow]写入需显式确认：加 --yes 跳过交互。[/yellow]")
+        raise SystemExit(1)
+    path = write_weekly_report(markdown, config, base_dir)
+    console.print(f"[green]✓[/green] 周报已归档：{path}")
+
+
 @cli.command()
 @click.pass_context
 def run(ctx: click.Context) -> None:

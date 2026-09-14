@@ -1500,6 +1500,82 @@ def api_errors_summary():
 		db.close()
 
 
+@app.route("/api/weekly-report/preview")
+def api_weekly_report_preview():
+	"""B3 周报预览（dry-run，零写入）。"""
+	from openjob.weekly_report import collect_weekly_stats, render_weekly_markdown
+
+	try:
+		report = collect_weekly_stats(DATA_DIR / "openjob.db")
+		return _api_envelope({
+			"report": report,
+			"markdown": render_weekly_markdown(report, load_config(CONFIG_PATH)),
+			"target_dir": str((load_config(CONFIG_PATH).get("profile") or {}).get("weekly_report_dir") or DATA_DIR / "weekly_reports"),
+		})
+	except Exception as e:
+		return _api_error("WEEKLY_REPORT_FAILED", str(e), status_code=500)
+
+
+@app.route("/api/weekly-report/write", method="POST")
+def api_weekly_report_write():
+	"""B3 周报写入：必须显式 confirm=true（未确认零写入）。"""
+	try:
+		data = request.json or {}
+	except Exception:
+		data = {}
+	if not isinstance(data, dict) or data.get("confirm") is not True:
+		return _api_error("CONFIRMATION_REQUIRED", "写入周报需要 confirm=true", status_code=400)
+	from openjob.weekly_report import collect_weekly_stats, render_weekly_markdown, write_weekly_report
+
+	try:
+		config = load_config(CONFIG_PATH)
+		report = collect_weekly_stats(DATA_DIR / "openjob.db")
+		path = write_weekly_report(render_weekly_markdown(report, config), config, BASE_DIR)
+		return _api_envelope({"path": str(path)})
+	except Exception as e:
+		return _api_error("WEEKLY_REPORT_FAILED", str(e), status_code=500)
+
+
+@app.route("/api/greeting-effectiveness")
+def api_greeting_effectiveness():
+	"""B5 招呼语效果粗对比：按风格特征分组统计回复情况。
+
+	明示边界：相关≠因果——回复受岗位质量、时机等多因素影响，本数据只作参考。
+	"""
+	db = _get_web_db()
+	try:
+		rows = db.execute(
+			"SELECT greeting_source_json, status FROM jobs "
+			"WHERE greeting_source_json IS NOT NULL AND TRIM(greeting_source_json) != '' "
+			"AND deleted_at IS NULL"
+		).fetchall()
+		buckets: dict[str, dict[str, int]] = {}
+		total_with_style = 0
+		for row in rows:
+			try:
+				source = json.loads(row["greeting_source_json"])
+			except (json.JSONDecodeError, TypeError):
+				continue
+			style = source.get("style") if isinstance(source, dict) else None
+			if not isinstance(style, dict):
+				continue
+			total_with_style += 1
+			length_bucket = "≤60字" if int(style.get("length") or 0) <= 60 else ">60字"
+			question = "问句结尾" if style.get("ends_with_question") else "陈述结尾"
+			for bucket in (length_bucket, question):
+				entry = buckets.setdefault(bucket, {"total": 0, "replied": 0})
+				entry["total"] += 1
+				if str(row["status"]) in ("replied", "interview", "offer"):
+					entry["replied"] += 1
+		return _api_envelope({
+			"total_with_style": total_with_style,
+			"buckets": buckets,
+			"note": "相关≠因果：回复率受岗位质量、时机等多因素影响，本数据只作参考，不做因果结论。",
+		})
+	finally:
+		db.close()
+
+
 @app.route("/api/workbench/preflight", method=["GET", "POST"])
 def api_workbench_preflight():
 	body = request.json if request.method == "POST" else {}
