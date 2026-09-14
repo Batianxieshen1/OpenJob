@@ -206,6 +206,49 @@ def status(ctx: click.Context, full: bool) -> None:
 
 
 @cli.command()
+@click.option("--package", "package_path", default=None, type=click.Path(), help="导出脱敏诊断包 zip 到该路径")
+@click.option("--include-logs", is_flag=True, help="诊断包包含脱敏后的运行日志尾部（默认不含）")
+@click.pass_context
+def doctor(ctx: click.Context, package_path: str | None, include_logs: bool) -> None:
+    """运行环境自诊断：Chrome/AI/配置/数据库/磁盘/备份/风控/定时任务"""
+    from openjob.diagnostics import build_diagnostic_package, render_doctor, run_doctor
+
+    base_dir = ctx.obj["base_dir"]
+    config = ctx.obj["config"]
+    results = run_doctor(base_dir, config)
+    failures = render_doctor(results, lambda line: console.print(line))
+    if package_path:
+        payload = build_diagnostic_package(base_dir, config, include_logs=include_logs)
+        target = Path(package_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        note = "（含脱敏日志尾部）" if include_logs else "（不含日志，可用 --include-logs 附加脱敏日志）"
+        console.print(f"\n[green]✓[/green] 脱敏诊断包已导出：{target} {note}")
+    if failures:
+        raise SystemExit(1)
+
+
+@cli.command()
+@click.argument("backup", type=click.Path(exists=True, dir_okay=False))
+@click.option("--yes", is_flag=True, help="跳过二次确认")
+@click.pass_context
+def restore(ctx: click.Context, backup: str, yes: bool) -> None:
+    """从 data/backups/ 的备份恢复数据库（恢复前自动备份当前库）"""
+    from openjob.db import restore_from_backup
+
+    if not yes:
+        console.print(f"[yellow]将用备份覆盖当前数据库：{backup}[/yellow]")
+        console.print("[dim]当前数据会先自动备份一份再被替换。加 --yes 跳过确认。[/dim]")
+        raise SystemExit(1)
+    restored = restore_from_backup(backup)
+    if restored:
+        console.print(f"[green]✓[/green] 已恢复：{Path(backup).name} → openjob.db（原库已另存备份）")
+    else:
+        console.print("[red]✗[/red] 恢复失败：备份文件无效或被其他进程占用，请确认工作台已停止")
+        raise SystemExit(1)
+
+
+@cli.command()
 @click.pass_context
 def run(ctx: click.Context) -> None:
     """一键运行完整流程: 采集→评分→确认→招呼语→发送"""

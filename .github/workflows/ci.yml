@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install package
-        run: pip install -e . ruff pytest
+        run: pip install -e . ruff pytest pytest-cov
 
       - name: Verify CLI entry point
         run: openjob --help
@@ -38,8 +38,13 @@ jobs:
         # syntax and undefined-name errors while that debt is retired separately.
         run: ruff check src/ --select=E9,F63,F7,F82
 
-      - name: Run Python test suite
-        run: python -m pytest -q
+      - name: Run Python test suite with coverage gate
+        # WP-C1：核心模块（简历引擎/投递执行/数据库）覆盖率门禁，2026-09-14 基线 73%。
+        # 只增不降：每次有意提升后手动上调此数字。
+        run: >
+          python -m pytest -q
+          --cov=openjob.ai.resume_engine --cov=openjob.executor --cov=openjob.db
+          --cov-report=term --cov-fail-under=72
 
   frontend-quality:
     runs-on: ubuntu-latest

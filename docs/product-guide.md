@@ -244,6 +244,16 @@ OpenJob 需要连接一个开启远程调试端口的 Chrome，才能读取招�
 
 详细风险建议见 [风险与使用守则](risk-guide.md)。
 
+### 自诊断与备份恢复
+
+- `openjob doctor`：八项体检（Chrome 连接、AI 配置、配置完整性、数据库完整性、磁盘空间、
+  备份新鲜度、风控锁、定时采集），每项给出 ✅/⚠️/❌ 与一行修复建议；
+- `openjob doctor --package 诊断包.zip`：导出脱敏诊断包用于求助或存档——默认不含
+  API Key、简历、联系方式与数据库内容；加 `--include-logs` 才会附带电话/邮箱已自动脱敏的日志尾部；
+- `openjob restore data/backups/openjob-xxxx.db`：从备份恢复数据库。坏备份会被直接拒绝；
+  恢复前当前库会自动另存一份（`openjob-…-pre….db`），随时可以再恢复回去。恢复前请先关闭工作台；
+- 数据库每次 schema 升级前会自动备份一份到 `data/backups/`；日常备份由工作台每日自动执行。
+
 ## 9. 常见问题
 
 ### 工作台打不开
