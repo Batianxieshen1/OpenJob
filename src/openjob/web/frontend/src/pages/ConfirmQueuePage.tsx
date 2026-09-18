@@ -285,6 +285,15 @@ export default function ConfirmQueuePage() {
                 {sendSelected.length > 0 && <span className="ml-1 text-primary">· 已选 {sendSelected.length}</span>}
               </span>
               <div className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={!readyToSendJobs.length} onClick={() => setSendSelected(readyToSendJobs.map(job => job.id))}>全选</Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={!readyToSendJobs.length || !(workbench.send_quota?.remaining ?? 0)}
+                  onClick={() => setSendSelected(readyToSendJobs.slice(0, workbench.send_quota?.remaining ?? 0).map(job => job.id))}
+                >
+                  只选额度内（{Math.min(readyToSendJobs.length, workbench.send_quota?.remaining ?? 0)}）
+                </Button>
                 <Button variant="secondary" size="sm" disabled={!sendSelected.length} onClick={() => setSendSelected([])}>清空选择</Button>
                 <Button size="sm" disabled={!sendSelected.length} onClick={() => confirmDeliver(sendSelected, true)}>一键投递已选 {sendSelected.length}（不重新生成）</Button>
               </div>
