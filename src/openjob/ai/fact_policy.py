@@ -165,6 +165,48 @@ _IDENTITY_PATTERNS: tuple[tuple[re.Pattern, str], ...] = (
     (re.compile(r"[\u4e00-\u9fffA-Za-z]{2,30}(?:专业)"), "专业"),
 )
 
+# 身份捕获常带口语前缀（"我是华南师范大学"）；剥前缀后再回溯真实来源
+_IDENTITY_LEAD = re.compile(r"^(?:我是|我是的|来自|毕业于|就读于|作为|一名|一个)+")
+
+
+def _covered_by_trusted(text: str, trusted: str) -> bool:
+    """text 能否被 trusted 的连续片段（≥2 字）贪心完整覆盖（容忍简称与连写）。"""
+    trusted_tokens = re.findall(r"[\u4e00-\u9fffA-Za-z0-9]{2,}", trusted)
+    index = 0
+    while index < len(text):
+        matched = False
+        for length in range(len(text) - index, 1, -1):
+            piece = text[index : index + length]
+            if piece in trusted or any(piece in token for token in trusted_tokens):
+                index += length
+                matched = True
+                break
+        if not matched:
+            return False
+    return True
+
+
+def _identity_in_trusted(value: str, trusted: str) -> bool:
+    if value in trusted:
+        return True
+    stripped = _IDENTITY_LEAD.sub("", value)
+    if not stripped:
+        return False
+    if stripped in trusted:
+        return True
+    # 简称容忍（如"大数据管理"之于"大数据管理与应用"）：捕获串剥前缀后，
+    # 必须含一个可回溯的 ≥4 字真实片段，且其余部分都能被 trusted 片段覆盖。
+    if not trusted:
+        return False
+    core_hit = any(
+        token in stripped
+        for token in re.findall(r"[\u4e00-\u9fffA-Za-z0-9]{4,}", trusted)
+    )
+    if not core_hit:
+        return False
+    remainder = re.sub(r"(?:大学|学院|专业)$", "", stripped)
+    return _covered_by_trusted(remainder, trusted)
+
 _CONTACT_NUMBER_RE = re.compile(
     r"\b(?:1[3-9]\d{9}|\d{6,18}@[A-Za-z0-9.-]+|\d{2,}(?:\.\d+)?%?)\b"
 )
@@ -190,7 +232,7 @@ def validate_generated_text(
             issues.append(f"包含示例/占位信息：{marker}")
     for pattern, label in _IDENTITY_PATTERNS:
         for match in pattern.findall(value):
-            if match not in trusted:
+            if not _identity_in_trusted(match, trusted):
                 issues.append(f"{label}事实未在真实底稿/素材库中找到：{match}")
     if check_numbers:
         for number in _CONTACT_NUMBER_RE.findall(value):
