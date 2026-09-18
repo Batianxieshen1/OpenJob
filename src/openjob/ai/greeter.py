@@ -52,6 +52,21 @@ class GreetingFactError(ValueError):
     """Generated greeting contains facts outside the verified source set."""
 
 
+def _ensure_university_tag(greeting: str) -> str:
+    """确定性后处理：学校名统一带 211 标记（用户明确要求的自报优势）。
+
+    - 「华南师范大学」→「华南师范大学（211）」（已有 211 标记则不动）；
+    - 简称「华南师大/华师」→「华南师范大学（211）」；
+    - 括号用全角，与底稿教育行写法一致。
+    """
+    text = str(greeting or "")
+    if "华南师范大学（211）" in text or "华南师范大学(211)" in text:
+        return text
+    text = text.replace("华南师范大学", "华南师范大学（211）")
+    text = text.replace("华南师大", "华南师范大学（211）").replace("华师", "华南师范大学（211）")
+    return text
+
+
 def _greeting_style_features(greeting: str) -> dict:
     """B5 效果标记：招呼语的客观风格特征（写入 source_json 供后续粗对比）。"""
     text = str(greeting or "").strip()
@@ -893,7 +908,7 @@ def generate_greetings(config: dict) -> int:
                         failed += 1
                     break
 
-                best_greeting = greeting
+                best_greeting = _ensure_university_tag(greeting)
                 if max_iterations == 0:
                     break
 
