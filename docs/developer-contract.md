@@ -43,7 +43,7 @@ ready      → approved | sent | rejected | skipped | error | filtered
            # 发送队列从 ready 直发（get_jobs_ready_to_send 含 ready/approved）；重评分可降级
 approved   → ready | sent | error | rejected | skipped | stale  # approved→ready：招呼语生成后回到待发送
 sent       → replied | resume_sent | needs_resume | follow_up_sent | rejected | stale
-error      → sent | error                    # 发送重试
+error      → sent | error | follow_up_sent   # 重试；或从聊天列表找回并发跟进
 needs_resume / resume_sent / follow_up_sent → 回复/简历/拒绝等投后互转（见 contracts）
 replied    → interview | hr_rejected | closed                # A2 投后终态
 interview  → offer | hr_rejected | closed

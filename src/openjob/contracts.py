@@ -46,7 +46,7 @@ JOB_STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
     "ready": frozenset({"approved", "sent", "rejected", "skipped", "error", "filtered"}),
     "approved": frozenset({"ready", "sent", "error", "rejected", "skipped", "stale"}),
     "sent": frozenset({"replied", "resume_sent", "needs_resume", "follow_up_sent", "rejected", "stale"}),
-    "error": frozenset({"sent", "error"}),
+    "error": frozenset({"sent", "error", "follow_up_sent"}),
     "needs_resume": frozenset({"resume_sent", "replied", "rejected", "follow_up_sent", "stale"}),
     "resume_sent": frozenset({"replied", "rejected", "needs_resume", "follow_up_sent", "stale"}),
     "follow_up_sent": frozenset({"replied", "resume_sent", "needs_resume", "rejected", "stale"}),
