@@ -186,6 +186,28 @@ def _covered_by_trusted(text: str, trusted: str) -> bool:
     return True
 
 
+def _is_generic_phrase(value: str) -> bool:
+    """剥掉口语前缀与「学院/专业」尾巴后是虚词短语（如"我在学院""难点常在把专业"）——不是身份表述。"""
+    core = _IDENTITY_LEAD.sub("", value)
+    core = re.sub(r"(?:学院|专业)$", "", core)
+    return len(core) <= 2 or bool(re.search(r"[把在的了是个这和与就都帮]", core))
+
+
+# 常见学校简称 → 全称（简称不是全称的子串，如"华南师大"省略了"师范"，
+# 子串覆盖永远接不住，必须显式映射；仅当全称在可信基线中出现时才展开）
+SCHOOL_ALIAS_EXPANSIONS: tuple[tuple[str, str], ...] = (
+    ("华南师大", "华南师范大学"),
+    ("华师", "华南师范大学"),
+)
+
+
+def _expand_school_aliases(text: str, trusted: str) -> str:
+    for alias, full_name in SCHOOL_ALIAS_EXPANSIONS:
+        if alias in text and full_name in trusted:
+            text = text.replace(alias, full_name)
+    return text
+
+
 def _identity_in_trusted(value: str, trusted: str) -> bool:
     if value in trusted:
         return True
@@ -194,13 +216,14 @@ def _identity_in_trusted(value: str, trusted: str) -> bool:
         return False
     if stripped in trusted:
         return True
-    # 简称容忍（如"大数据管理"之于"大数据管理与应用"）：捕获串剥前缀后，
-    # 必须含一个可回溯的 ≥4 字真实片段，且其余部分都能被 trusted 片段覆盖。
+    # 简称容忍（"华南师大"之于"华南师范大学"、"大数据管理"之于"大数据管理与应用"）：
+    # 剥前缀后必须含一个可回溯的 4-6 字滑窗片段，且其余部分都能被 trusted 片段覆盖。
     if not trusted:
         return False
     core_hit = any(
-        token in stripped
-        for token in re.findall(r"[\u4e00-\u9fffA-Za-z0-9]{4,}", trusted)
+        stripped[i : i + length] in trusted
+        for length in (4, 5, 6)
+        for i in range(max(len(stripped) - length + 1, 0))
     )
     if not core_hit:
         return False
@@ -232,7 +255,9 @@ def validate_generated_text(
             issues.append(f"包含示例/占位信息：{marker}")
     for pattern, label in _IDENTITY_PATTERNS:
         for match in pattern.findall(value):
-            if not _identity_in_trusted(match, trusted):
+            if _is_generic_phrase(match):
+                continue
+            if not _identity_in_trusted(_expand_school_aliases(match, trusted), trusted):
                 issues.append(f"{label}事实未在真实底稿/素材库中找到：{match}")
     if check_numbers:
         for number in _CONTACT_NUMBER_RE.findall(value):
