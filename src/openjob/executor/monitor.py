@@ -1717,7 +1717,8 @@ def _check_follow_ups(config: dict, throttle, replied_job_ids: set | None = None
     interval_hours = follow_up_cfg.get("interval_hours", 48)
 
     db = get_db()
-    sent_jobs = get_jobs_by_status(db, "sent")
+    # 跟进目标：已发送超时无回复 + 发送失败（大概率已在平台沟通过，从聊天列表找回）
+    sent_jobs = get_jobs_by_status(db, "sent") + get_jobs_by_status(db, "error")
 
     if not sent_jobs:
         db.close()

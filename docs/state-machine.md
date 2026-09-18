@@ -39,6 +39,7 @@ stateDiagram-v2
     offer --> closed
     hr_rejected --> closed
     error --> sent : 重试
+    error --> follow_up_sent : 聊天列表找回并发跟进
     error --> error : 重试再失败
 ```
 
