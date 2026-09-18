@@ -177,14 +177,25 @@ def _get_resume_summary(config: dict) -> str:
     return content[:1800]
 
 
-def _style_only_preference(value: object) -> str:
-    """Strip identity-like lines from a preference field before it reaches the LLM."""
+def _style_only_preference(value: object, trusted_text: str = "") -> str:
+    """过滤招呼语偏好中的身份性描述。
+
+    安全语义（WP-S1）：偏好里的身份表述只有在**真实底稿/素材可回溯**时才放行
+    （用户明确要求的真实自报，如"华南师范大学（211）的大三学生"——学校/年级均
+    在教育经历行中）；无法回溯的身份表述（潜在编造）仍然剥离。
+    """
     text = str(value or "").strip()
     if not text:
         return "（无额外语气偏好）"
+    trusted = str(trusted_text or "")
     lines = []
     for line in text.splitlines():
         if re.search(r"我是|姓名|学校|大学|学院|专业|电话|邮箱|手机号|城市|地址", line):
+            # 身份行：逐 token 回溯真实来源；至少一个身份 token 可回溯才放行整行
+            tokens = re.findall(r"[\u4e00-\u9fffA-Za-z0-9]{2,}", line)
+            if trusted and any(token in trusted for token in tokens):
+                lines.append(line.strip())
+            # 无可回溯 token → 静默剥离（原行为）
             continue
         lines.append(line.strip())
     return "\n".join(x for x in lines if x)[:500] or "（无额外语气偏好）"
@@ -574,7 +585,10 @@ def _generate_greeting_once(
             or "（暂无）"
         ),
         greeting_preference=_truncate_prompt_text(
-            _style_only_preference(profile_cfg.get("greeting_preference", "")),
+            _style_only_preference(
+                profile_cfg.get("greeting_preference", ""),
+                trusted_text=f"{resume_summary} {material_context}",
+            ),
             500,
         ),
     )

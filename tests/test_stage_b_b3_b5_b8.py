@@ -34,10 +34,15 @@ def _job(job_id: str, **overrides) -> dict:
 
 
 def _seed_week_activity(db, *, days_ago_start: int, job_count: int, sent: int, replied: int):
-    """在指定周窗口内造采集/确认/发送/回复数据（固定锚点保证可对账）。"""
+    """在报告期窗口内造采集/确认/发送/回复数据。
+
+    锚点 = 上周六（now - weekday - 2 天）：无论今天星期几，都落在"上周一~本周一"
+    报告期窗口内，测试对运行日期不敏感。
+    """
     from datetime import datetime, timedelta
 
-    anchor = datetime.now() - timedelta(days=days_ago_start)
+    now = datetime.now()
+    anchor = now - timedelta(days=now.weekday() + 2)
     for index in range(job_count):
         job_id = f"w{days_ago_start}-{index}"
         stamp = (anchor + timedelta(hours=index % 24)).strftime("%Y-%m-%d %H:%M:%S")
@@ -70,7 +75,8 @@ class WeeklyReportTests(unittest.TestCase):
             db = get_db(db_path)
             _seed_week_activity(db, days_ago_start=1, job_count=3, sent=2, replied=1)
             db.close()
-            report = collect_weekly_stats(db_path, now=datetime(2026, 9, 14, 10, 0))
+            # 报告窗口用真实时钟（种子相对 -1 天，必然落在"上周一~本周一"窗口内）
+            report = collect_weekly_stats(db_path)
             markdown = render_weekly_markdown(report, {})
             after_md = sorted(p.name for p in Path(tmp).rglob("*.md"))
             self.assertEqual(after_md, [])  # dry-run 零写入（WAL 副作用不算写入）
