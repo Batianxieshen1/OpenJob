@@ -230,6 +230,14 @@
           "default": 60
         },
         {
+          "key": "daily_recommendation_page_limit",
+          "label": "BOSS 单日推荐页上限",
+          "type": "number",
+          "min": 1,
+          "max": 50,
+          "default": 10
+        },
+        {
           "key": "daily_detail_page_limit",
           "label": "BOSS 单日详情页尝试上限",
           "type": "number",

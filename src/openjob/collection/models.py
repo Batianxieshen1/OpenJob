@@ -11,6 +11,14 @@ from openjob.collection.text import clean_job_description
 
 PlatformId = Literal["boss", "zhilian", "51job"]
 
+# 采集来源通道（WP 推荐页）：search=搜索流；recommendation=BOSS 推荐页。
+# source_keyword 只保存真实搜索关键词；推荐页通道 source_keyword 为空。
+COLLECTION_CHANNEL_LABELS: dict[str, str] = {
+    "search": "搜索流",
+    "recommendation": "推荐页",
+}
+SUPPORTED_BOSS_CHANNELS = frozenset(COLLECTION_CHANNEL_LABELS)
+
 
 def classify_recruitment_type(title: str = "", experience: str = "", jd: str = "", salary: str = "") -> str:
     """Classify jobs the way job seekers read them: 实习 vs 正式岗.
@@ -51,6 +59,12 @@ class PlatformCollectionRequest:
     max_pages: int = 3
     sort: str = "default"
     recruitment_filter: str = ""
+    source_channels: list[str] = field(default_factory=lambda: ["search"])
+    # 真实推荐页为传统分页（?page=N）：max_scrolls 语义为最大分页轮次（见
+    # docs/architecture/boss-recommendation-discovery.md §5）。
+    recommendation_max_scrolls: int = 4
+    recommendation_max_cards: int = 50
+    recommendation_same_result_limit: int = 2
 
 
 @dataclass
@@ -75,6 +89,11 @@ class JobCandidate:
     company_industry: str = ""
     url: str = ""
     source_keyword: str = ""
+    source_channel: str = "search"
+
+    @property
+    def source_label(self) -> str:
+        return COLLECTION_CHANNEL_LABELS.get(self.source_channel, self.source_channel)
 
     @property
     def storage_id(self) -> str:
@@ -103,6 +122,7 @@ class JobCandidate:
             "source_platform": self.platform,
             "source_job_id": self.source_job_id,
             "source_keyword": self.source_keyword,
+            "source_channel": self.source_channel if self.source_channel in COLLECTION_CHANNEL_LABELS else "search",
         }
 
 
@@ -146,3 +166,6 @@ class PlatformCollectionResult:
     new_job_ids: list[str] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)
     error: str = ""
+    # 按来源通道的阶段结果（search / recommendation）：status、reason_code、
+    # message、seen、new、duplicate、filtered、parse_failed、save_failed。
+    source_results: dict[str, dict[str, Any]] = field(default_factory=dict)
