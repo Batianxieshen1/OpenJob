@@ -1,0 +1,72 @@
+{
+  "captured_at": "2026-09-19",
+  "source": "登录态专用 Chrome 只读勘察",
+  "page_states": [
+    {
+      "state": "first_page",
+      "url": "https://www.zhipin.com/web/geek/recommend",
+      "detail_link_count": 20,
+      "has_expected_content": true,
+      "is_end_of_feed": false,
+      "risk": null,
+      "note": "首屏 20 个岗位卡片；传统分页制，无无限滚动"
+    },
+    {
+      "state": "second_page",
+      "url": "https://www.zhipin.com/web/geek/recommend/?page=2",
+      "detail_link_count": 20,
+      "has_expected_content": true,
+      "is_end_of_feed": false,
+      "risk": null,
+      "pagination_observed": {
+        "container": ".options-pages",
+        "current_page_class": "selected",
+        "page_numbers_visible": [1, 2, 3, 4, 5, 6, "...", 20],
+        "total_pages": 20,
+        "first_card_path_page2": "/job_detail/sanitized-recommend-1001.html"
+      },
+      "note": "?page=N 分页有效；第 2 页与第 1 页岗位不同（ID 不同），分页条 selected 标记当前页"
+    },
+    {
+      "state": "scroll_no_growth",
+      "url": "https://www.zhipin.com/web/geek/recommend",
+      "detail_link_count": 20,
+      "has_expected_content": true,
+      "is_end_of_feed": false,
+      "risk": null,
+      "note": "实测 3 轮窗口高度滚动，detail_link_count 恒为 20 不变——滚动不加载新内容，必须用分页而非滚动"
+    },
+    {
+      "state": "last_page_beyond_range",
+      "url": "https://www.zhipin.com/web/geek/recommend/?page=99",
+      "detail_link_count": 0,
+      "has_expected_content": false,
+      "is_end_of_feed": true,
+      "risk": null,
+      "end_markers": ["暂无更多", "没有更多"],
+      "note": "超出总页数时为空列表 + 结束信号；解析器应判定 is_end_of_feed 并安全停止（该行由分页条 total_pages 推断与常规空态行为得出，实弹验收时需复核）"
+    },
+    {
+      "state": "login_required",
+      "url": "https://www.zhipin.com/web/user/?ka=header-login（重定向）",
+      "detail_link_count": 0,
+      "has_expected_content": false,
+      "is_end_of_feed": false,
+      "risk": "login_required",
+      "note": "未登录访问 recommend 会重定向到登录页；解析器须以无 /job_detail/ 链接 + 登录信号判别，沿用 BOSS 现有 login_required 停机"
+    },
+    {
+      "state": "risk_intercept",
+      "url": "https://www.zhipin.com/web/common/safety/tip.html（示例）",
+      "detail_link_count": 0,
+      "has_expected_content": false,
+      "is_end_of_feed": false,
+      "risk": "blocked",
+      "note": "验证码/操作频繁/拦截页沿用现有 JS_DETECT_COLLECTION_RISK 判据与停机；expected-content 探针需同时认可推荐页卡片结构"
+    }
+  ],
+  "scroll_behavior_summary": {
+    "finding": "推荐页为传统分页（page=1..20），窗口滚动不触发任何新内容加载",
+    "implication": "计划书 §6.4 的『有限滚动驱动』在真实页面上退化为『有限分页驱动』：max_scrolls 语义改为 max_pages，same_result_limit 语义为连续空页/重复页上限；接口名保留 max_scrolls 以减少契约改动，注释说明实际控制分页轮次"
+  }
+}
