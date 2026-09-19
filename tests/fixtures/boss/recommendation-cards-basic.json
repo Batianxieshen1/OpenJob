@@ -1,0 +1,94 @@
+{
+  "captured_at": "2026-09-19",
+  "source": "登录态专用 Chrome 只读勘察；真实公司名/岗位ID/HR名/链接参数已脱敏替换",
+  "page_url": "https://www.zhipin.com/web/geek/recommend",
+  "layout": "li.item-boss 卡片由 Vue 渲染（data-v-* 属性），容器为 .sider-recommend-main 内的 ul > li.item-recommend",
+  "cards": [
+    {
+      "title": "数据分析实习生",
+      "salary": "150-200元/天",
+      "experience": "在校/应届",
+      "education": "本科",
+      "company": "示例科技公司",
+      "company_meta": "计算机软件 C轮 500-999人",
+      "hr_name": "示例女士",
+      "hr_title": "HR",
+      "location": "广州·天河区·石牌",
+      "url": "/job_detail/sanitized-recommend-0001.html"
+    },
+    {
+      "title": "舆情分析师（日常实习岗）",
+      "salary": "100-150元/天",
+      "experience": "在校/应届",
+      "education": "本科",
+      "company": "示例信息技术公司",
+      "company_meta": "互联网 不需要融资 100-499人",
+      "hr_name": "示例先生",
+      "hr_title": "hrbp",
+      "location": "广州·越秀区·大东",
+      "url": "/job_detail/sanitized-recommend-0002.html"
+    },
+    {
+      "title": "数据开发实习生（J14077）",
+      "salary": "180-200元/天",
+      "experience": "在校/应届",
+      "education": "本科",
+      "company": "示例投资集团",
+      "company_meta": "投资/融资 已上市 10000人以上",
+      "hr_name": "示例人力实习生",
+      "hr_title": "人力实习生",
+      "location": "佛山",
+      "url": "/job_detail/sanitized-recommend-0003.html"
+    },
+    {
+      "title": "测试实习生（缺薪资标签样本：salary 为空，详情页补齐）",
+      "salary": "",
+      "experience": "",
+      "education": "",
+      "company": "清能互联科技",
+      "company_meta": "计算机软件 C轮 500-999人",
+      "hr_name": "赖女士",
+      "hr_title": "HR",
+      "location": "广州·天河区·石牌",
+      "url": "/job_detail/c86858d9ae20731e03J729i-EVpQ.html"
+    },
+    {
+      "title": "测试实习生（重复链接样本：与上一条同 URL）",
+      "salary": "180-200元/天",
+      "experience": "在校/应届",
+      "education": "本科",
+      "company": "清能互联科技",
+      "company_meta": "计算机软件 C轮 500-999人",
+      "hr_name": "赖女士",
+      "hr_title": "HR",
+      "location": "广州·天河区·石牌",
+      "url": "/job_detail/c86858d9ae20731e03J729i-EVpQ.html"
+    }
+  ],
+  "selectors_confirmed": {
+    "card_container": "li.item-boss",
+    "list_container": ".sider-recommend-main",
+    "list_item_wrapper": "[class*=\"recommend\"] li / li.item-recommend",
+    "detail_link": "a[href*=\"/job_detail/\"]（在 .job-name .flex a.name 内）",
+    "title": ".job-name-text",
+    "location": ".location（内含 em，文本带方括号）",
+    "company": ".company-info .text b a",
+    "company_meta": ".company-info p.gray（行业/融资/规模 三个 span）",
+    "hr_name": ".info-header h3.name（首个 span）",
+    "hr_title": ".info-header h3.name span.gray",
+    "salary_experience_education": ".job-info > p.gray：直接文本节点=薪资，两个 span=经验、学历",
+    "pagination": ".options-pages（当前页 a.selected；页码 a；URL 为 ?page=N）"
+  },
+  "url_normalization": {
+    "rule": "new URL(href, location.origin).pathname",
+    "reason": "详情链接带会话性 securityId 与 ka=personal_added_job_* 参数，不得入库；身份只取 /job_detail/<id>.html 路径",
+    "examples": [
+      "/job_detail/c86858d9ae20731e03J729i-EVpQ.html?securityId=XXX&ka=personal_added_job_XXX → /job_detail/c86858d9ae20731e03J729i-EVpQ.html"
+    ]
+  },
+  "safety_notes": [
+    "卡片头部含 a.btn.btn-startchat「继续沟通」按钮（已沟通状态），解析器只读链接，绝不点击",
+    "ka=personal_added_continue_* 前缀表明推荐页大量展示已沟通岗位——与搜索流去重是核心场景",
+    "不读取 Cookie/localStorage；不点击任何 btn-startchat；薪资等字段只在详情页补全"
+  ]
+}
