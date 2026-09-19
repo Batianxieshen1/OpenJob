@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from openjob.collection.base import CollectionError, CollectorHooks
 from openjob.collection.models import (
+    SUPPORTED_BOSS_CHANNELS,
     CollectionProgress,
     JobCandidate,
     PlatformCollectionRequest,
@@ -93,6 +94,27 @@ def normalize_collection_options(config: dict[str, Any], raw_options: dict[str, 
             "sort": str(base.get("sort") or ("newest" if platform == "boss" else "default")),
             "recruitment_filter": str(base.get("recruitment_filter") or "").strip(),
         }
+        if platform == "boss":
+            # 来源通道契约（推荐页计划 Task 1）：默认 ["search"]；去重保序。
+            # 取值优先级：raw.boss 顶层 → raw.boss.search → config.platforms.boss 顶层 → config.boss.search。
+            # 通道合法性在 validate_collection_options 统一校验。
+            channel_holders = [value, search, configured_platforms.get("boss") or {}, base]
+            channels: list[str] | None = None
+            params: dict[str, Any] = {}
+            for holder in channel_holders:
+                if not isinstance(holder, dict):
+                    continue
+                if channels is None and holder.get("source_channels") not in (None, "", [], {}):
+                    channels = _clean_strings(holder.get("source_channels"))
+                for key in ("recommendation_max_scrolls", "recommendation_max_cards", "recommendation_same_result_limit"):
+                    if key not in params and holder.get(key) is not None:
+                        params[key] = holder.get(key)
+            if channels is None or not channels:
+                channels = ["search"]
+            platforms[platform]["source_channels"] = list(dict.fromkeys(channels))
+            platforms[platform]["recommendation_max_scrolls"] = params.get("recommendation_max_scrolls", 4)
+            platforms[platform]["recommendation_max_cards"] = params.get("recommendation_max_cards", 50)
+            platforms[platform]["recommendation_same_result_limit"] = params.get("recommendation_same_result_limit", 2)
 
     order = supplied.get("platform_order")
     if order is None:
@@ -147,10 +169,22 @@ def validate_collection_options(options: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"{platform} 平台配置无效")
         keywords = _clean_strings(value.get("keywords"))
         cities = _clean_strings(value.get("cities"))
-        if not keywords:
-            raise ValueError(f"{platform} 至少需要一个非空关键词")
-        if not cities:
-            raise ValueError(f"{platform} 至少需要一个城市")
+        # 来源通道契约：非 BOSS 只允许 search；BOSS 通道需在白名单内；
+        # 只选推荐页时允许空关键词/城市（依赖账号推荐流）。
+        channels = list(value.get("source_channels") or ["search"]) if isinstance(value.get("source_channels"), list) else ["search"]
+        channels = [str(channel).strip() for channel in channels if str(channel).strip()]
+        if not channels:
+            channels = ["search"]
+        unknown_channels = [channel for channel in channels if channel not in SUPPORTED_BOSS_CHANNELS]
+        if unknown_channels:
+            raise ValueError(f"采集来源通道无效：{'、'.join(unknown_channels)}（只支持 搜索流/推荐页）")
+        if platform != "boss" and "recommendation" in channels:
+            raise ValueError(f"{platform} 平台当前不支持推荐页来源，推荐页仅对 BOSS 直聘开放")
+        if "search" in channels:
+            if not keywords:
+                raise ValueError(f"{platform} 至少需要一个非空关键词")
+            if not cities:
+                raise ValueError(f"{platform} 至少需要一个城市")
         city_codes = value.get("city_codes") if isinstance(value.get("city_codes"), dict) else {}
         city_codes = {str(key).strip(): str(code).strip() for key, code in city_codes.items() if str(key).strip()}
         if platform == "zhilian":
@@ -185,6 +219,22 @@ def validate_collection_options(options: dict[str, Any]) -> dict[str, Any]:
         recruitment_filter = str(value.get("recruitment_filter") or "").strip()
         if recruitment_filter not in {"", "campus", "experienced"}:
             raise ValueError("招聘类型过滤只支持：空（全部）、campus（只有实习）、experienced（只有正式岗）")
+        recommendation_params: dict[str, int] = {}
+        if platform == "boss":
+            for field_name, low, high, label in (
+                ("recommendation_max_scrolls", 1, 10, "推荐页最大分页轮次"),
+                ("recommendation_max_cards", 1, 200, "推荐页最大卡片数"),
+                ("recommendation_same_result_limit", 1, 5, "推荐页连续无新增轮次上限"),
+            ):
+                default = {"recommendation_max_scrolls": 4, "recommendation_max_cards": 50,
+                           "recommendation_same_result_limit": 2}[field_name]
+                try:
+                    param = int(value.get(field_name, default))
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"{label}必须是整数") from exc
+                if not low <= param <= high:
+                    raise ValueError(f"{label}范围为 {low}-{high}")
+                recommendation_params[field_name] = param
         normalized["platforms"][platform] = {
             "keywords": keywords,
             "cities": cities,
@@ -192,7 +242,10 @@ def validate_collection_options(options: dict[str, Any]) -> dict[str, Any]:
             "max_pages": max_pages,
             "sort": sort,
             "recruitment_filter": recruitment_filter,
+            "source_channels": channels,
         }
+        if platform == "boss":
+            normalized["platforms"][platform].update(recommendation_params)
     return normalized
 
 

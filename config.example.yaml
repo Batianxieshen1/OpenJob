@@ -35,7 +35,8 @@ collection:
   auto_score_default: false
   # 以下页面额度只统计 BOSS 直聘；智联和 51job 不占用。
   daily_search_page_limit: 60     # BOSS 单日搜索页上限
-  daily_detail_page_limit: 150    # BOSS 单日详情页尝试上限
+  daily_recommendation_page_limit: 10  # BOSS 单日推荐页加载上限（启用推荐页时生效）
+  daily_detail_page_limit: 150    # BOSS 单日详情页尝试上限（搜索/推荐共用）
   max_consecutive_page_failures: 3
   risk_pause_min_minutes: 5       # BOSS 风险信号后随机暂停下限
   risk_pause_max_minutes: 10      # BOSS 风险信号后随机暂停上限
@@ -56,6 +57,10 @@ collection_schedule:
 platforms:
   boss:
     enabled: true
+    source_channels: [search]  # 可选 search / recommendation；推荐页默认关闭
+    recommendation_max_scrolls: 4        # 推荐页最大分页轮次（1-10）
+    recommendation_max_cards: 50         # 推荐页最大卡片数（1-200）
+    recommendation_same_result_limit: 2  # 连续无新增轮次上限（1-5）
     search:
       keywords: ["关键词1", "关键词2"]
       cities: ["北京"]

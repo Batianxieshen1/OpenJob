@@ -90,6 +90,7 @@ DEFAULTS: dict[str, Any] = {
         "default_order": ["boss"],
         "auto_score_default": False,
         "daily_search_page_limit": 60,
+        "daily_recommendation_page_limit": 10,
         "daily_detail_page_limit": 150,
         "max_consecutive_page_failures": 3,
         "risk_pause_min_minutes": 5,
@@ -111,6 +112,11 @@ DEFAULTS: dict[str, Any] = {
     "platforms": {
         "boss": {
             "enabled": True,
+            # 推荐页默认关闭：会增加页面访问与详情解析时间，需用户显式启用。
+            "source_channels": ["search"],
+            "recommendation_max_scrolls": 4,
+            "recommendation_max_cards": 50,
+            "recommendation_same_result_limit": 2,
             "search": {
                 "keywords": [],
                 "cities": [],

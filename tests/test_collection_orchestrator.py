@@ -218,3 +218,81 @@ class CollectionOrchestratorTests(TestCase):
             "platforms": {"zhilian": {"enabled": False, "search": {}}},
         })
         self.assertEqual(result["platform_order"], ["boss"])
+
+
+class SourceChannelContractTests(TestCase):
+    """推荐页来源通道契约（推荐计划 Task 1.6 的 8 个场景）。"""
+
+    def _cfg(self, **overrides):
+        cfg = {
+            "search": {"keywords": ["数据分析实习"], "cities": ["广州"]},
+            "platforms": {"boss": {"enabled": True, "search": {}}},
+        }
+        cfg["platforms"]["boss"].update(overrides)
+        return cfg
+
+    def test_legacy_config_normalizes_to_search_only(self):
+        result = normalize_collection_options(self._cfg())
+        boss = result["platforms"]["boss"]
+        self.assertEqual(boss["source_channels"], ["search"])
+        self.assertEqual(boss["recommendation_max_scrolls"], 4)
+        self.assertEqual(boss["recommendation_max_cards"], 50)
+        self.assertEqual(boss["recommendation_same_result_limit"], 2)
+
+    def test_boss_search_and_recommendation_accepted(self):
+        cfg = self._cfg(source_channels=["search", "recommendation"])
+        cfg["platforms"]["boss"]["recommendation_max_scrolls"] = 2
+        result = normalize_collection_options(cfg)
+        self.assertEqual(result["platforms"]["boss"]["source_channels"], ["search", "recommendation"])
+        self.assertEqual(result["platforms"]["boss"]["recommendation_max_scrolls"], 2)
+
+    def test_boss_recommendation_only_allows_empty_keywords(self):
+        cfg = {"search": {}, "platforms": {"boss": {"enabled": True, "source_channels": ["recommendation"], "search": {}}}}
+        result = normalize_collection_options(cfg)
+        self.assertEqual(result["platforms"]["boss"]["source_channels"], ["recommendation"])
+        self.assertEqual(result["platforms"]["boss"]["keywords"], [])
+
+    def test_non_boss_recommendation_rejected(self):
+        with self.assertRaises(ValueError):
+            normalize_collection_options({
+                "platforms": {
+                    "zhilian": {
+                        "source_channels": ["search", "recommendation"],
+                        "keywords": ["AI"], "cities": ["北京"],
+                        "city_codes": {"北京": "101010100"},
+                    }
+                },
+                "platform_order": ["zhilian"],
+            })
+
+    def test_duplicate_channels_deduped_in_order(self):
+        cfg = self._cfg(source_channels=["recommendation", "search", "recommendation"])
+        result = normalize_collection_options(cfg)
+        self.assertEqual(result["platforms"]["boss"]["source_channels"], ["recommendation", "search"])
+
+    def test_search_channel_requires_keywords_and_city(self):
+        cfg = self._cfg()
+        cfg["search"] = {"keywords": [], "cities": []}
+        with self.assertRaises(ValueError):
+            normalize_collection_options(cfg)
+
+    def test_recommendation_params_out_of_range_rejected(self):
+        cfg = self._cfg(source_channels=["search", "recommendation"], recommendation_max_scrolls=99)
+        with self.assertRaises(ValueError):
+            normalize_collection_options(cfg)
+        cfg2 = self._cfg(source_channels=["search", "recommendation"], recommendation_max_cards=0)
+        with self.assertRaises(ValueError):
+            normalize_collection_options(cfg2)
+
+    def test_unknown_channel_rejected(self):
+        cfg = self._cfg(source_channels=["search", "weibo"])
+        with self.assertRaises(ValueError):
+            normalize_collection_options(cfg)
+
+    def test_auto_score_false_still_collects_recommendation(self):
+        result = normalize_collection_options(
+            self._cfg(source_channels=["search", "recommendation"]),
+            {"auto_score": False},
+        )
+        self.assertIn("recommendation", result["platforms"]["boss"]["source_channels"])
+        self.assertFalse(result["auto_score"])
