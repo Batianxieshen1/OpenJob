@@ -16,6 +16,10 @@ interface PlatformDraft {
   maxPages: string
   sort: string
   recruitmentFilter: string
+  sourceChannels: string[]
+  recommendationMaxScrolls: string
+  recommendationMaxCards: string
+  recommendationSameResultLimit: string
 }
 
 interface PlatformCityOption {
@@ -32,9 +36,9 @@ interface CollectJobsDialogProps {
 }
 
 const initialDrafts: Record<PlatformId, PlatformDraft> = {
-  boss: { enabled: true, keywords: '', cities: '', cityCodes: '', maxPages: '3', sort: 'default', recruitmentFilter: '' },
-  zhilian: { enabled: false, keywords: '', cities: '', cityCodes: '', maxPages: '1', sort: 'default', recruitmentFilter: '' },
-  '51job': { enabled: false, keywords: '', cities: '上海', cityCodes: '上海=020000', maxPages: '1', sort: 'default', recruitmentFilter: '' },
+  boss: { enabled: true, keywords: '', cities: '', cityCodes: '', maxPages: '3', sort: 'default', recruitmentFilter: '', sourceChannels: ['search'], recommendationMaxScrolls: '4', recommendationMaxCards: '50', recommendationSameResultLimit: '2' },
+  zhilian: { enabled: false, keywords: '', cities: '', cityCodes: '', maxPages: '1', sort: 'default', recruitmentFilter: '', sourceChannels: ['search'], recommendationMaxScrolls: '4', recommendationMaxCards: '50', recommendationSameResultLimit: '2' },
+  '51job': { enabled: false, keywords: '', cities: '上海', cityCodes: '上海=020000', maxPages: '1', sort: 'default', recruitmentFilter: '', sourceChannels: ['search'], recommendationMaxScrolls: '4', recommendationMaxCards: '50', recommendationSameResultLimit: '2' },
 }
 
 function splitValues(value: string) {
@@ -88,6 +92,12 @@ function draftFromConfig(config: Record<string, any> | null, platform: PlatformI
     maxPages: String(configured.max_pages || (platform === 'boss' ? 3 : 1)),
     sort: configured.sort || (platform === 'boss' ? 'default' : 'default'),
     recruitmentFilter: configured.recruitment_filter || '',
+    sourceChannels: Array.isArray(config?.platforms?.[platform]?.source_channels) && config.platforms[platform].source_channels.length
+      ? config.platforms[platform].source_channels.filter((c: string) => c === 'search' || c === 'recommendation')
+      : ['search'],
+    recommendationMaxScrolls: String(config?.platforms?.[platform]?.recommendation_max_scrolls ?? 4),
+    recommendationMaxCards: String(config?.platforms?.[platform]?.recommendation_max_cards ?? 50),
+    recommendationSameResultLimit: String(config?.platforms?.[platform]?.recommendation_same_result_limit ?? 2),
   }
 }
 
@@ -155,7 +165,7 @@ export function CollectJobsDialog({ open, mode = 'collect', activeTask, onClose,
 
   if (!open) return null
 
-  const updateDraft = (platform: PlatformId, key: keyof PlatformDraft, value: string | boolean) => {
+  const updateDraft = (platform: PlatformId, key: keyof PlatformDraft, value: string | boolean | string[]) => {
     setDrafts(previous => ({ ...previous, [platform]: { ...previous[platform], [key]: value } }))
     setError('')
   }
@@ -188,9 +198,13 @@ export function CollectJobsDialog({ open, mode = 'collect', activeTask, onClose,
       const draft = drafts[platform]
       const keywords = splitValues(draft.keywords)
       const cities = splitValues(draft.cities)
-      if (!keywords.length || !cities.length) {
+      const channels = platform === 'boss'
+        ? (draft.sourceChannels.length ? draft.sourceChannels : ['search'])
+        : ['search']
+      const recommendationOnly = platform === 'boss' && channels.length === 1 && channels[0] === 'recommendation'
+      if (!recommendationOnly && (!keywords.length || !cities.length)) {
         const label = platform === 'boss' ? 'BOSS 直聘' : platform === 'zhilian' ? '智联招聘' : '前程无忧'
-        setError(`${label} 需要至少一个关键词和城市。`)
+        setError(`${label} 需要至少一个关键词和城市（只采集推荐页时可不填）。`)
         return
       }
       const configuredCodes = parseCityCodes(draft.cityCodes)
@@ -210,6 +224,12 @@ export function CollectJobsDialog({ open, mode = 'collect', activeTask, onClose,
         max_pages: Number(draft.maxPages),
         sort: draft.sort,
         recruitment_filter: draft.recruitmentFilter,
+        ...(platform === 'boss' ? {
+          source_channels: channels,
+          recommendation_max_scrolls: Number(draft.recommendationMaxScrolls),
+          recommendation_max_cards: Number(draft.recommendationMaxCards),
+          recommendation_same_result_limit: Number(draft.recommendationSameResultLimit),
+        } : {}),
       }
     }
     onStart({ platform_order: enabledOrder, auto_score: mode === 'full' ? true : autoScore, platforms })
@@ -236,6 +256,16 @@ export function CollectJobsDialog({ open, mode = 'collect', activeTask, onClose,
                   <div className="flex items-center justify-between font-semibold"><span>{platform === 'boss' ? 'BOSS 直聘' : platform === 'zhilian' ? '智联招聘' : '前程无忧'}</span><span>新增 {state.new}</span></div>
                   <div className="mt-1 text-xs text-muted">{state.status} · {state.city || '等待'} · {state.keyword || ''} · 第 {state.page || 0}/{state.max_pages || 0} 页</div>
                   <div className="mt-1 text-xs text-muted">扫描 {state.seen || 0} · 重复 {state.duplicate || 0} · 过滤 {state.filtered || 0} · 解析失败 {state.parse_failed || 0} · 保存失败 {state.save_failed || 0}</div>
+                  {state.sources && typeof state.sources === 'object' && Object.keys(state.sources).length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {Object.entries(state.sources as Record<string, any>).map(([channel, info]) => (
+                        <div key={channel} className="rounded-lg bg-surface-hover px-2 py-1 text-xs text-muted">
+                          {String((info as any).label || channel)}：扫描 {(info as any).seen || 0} · 新增 {(info as any).new || 0} · 重复 {(info as any).duplicate || 0}
+                          {(info as any).reason_code && <span className="ml-1 text-warning">（{(info as any).reason_code}）</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {state.message && <div className="mt-1 text-xs text-primary">{state.message}</div>}
                 </div>
               ))}
@@ -276,6 +306,44 @@ export function CollectJobsDialog({ open, mode = 'collect', activeTask, onClose,
                       <label className="text-xs font-bold text-muted">岗位类型<Select value={draft.recruitmentFilter} onChange={event => updateDraft(platform, 'recruitmentFilter', event.target.value)}><option value="">全部</option><option value="campus">只有实习</option><option value="experienced">只有正式岗</option></Select></label>
                     )}
                   </div>
+                  {platform === 'boss' && (
+                    <div className="rounded-xl border border-card-border bg-card px-3 py-2.5">
+                      <div className="text-xs font-bold text-muted">采集来源</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-4">
+                        <label className="flex items-center gap-1.5 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={draft.sourceChannels.includes('search')}
+                            onChange={event => updateDraft('boss', 'sourceChannels', event.target.checked
+                              ? ['search', ...draft.sourceChannels.filter(c => c !== 'search')]
+                              : draft.sourceChannels.filter(c => c !== 'search'))}
+                            className="h-4 w-4 accent-primary"
+                          />搜索流
+                        </label>
+                        <label className="flex items-center gap-1.5 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={draft.sourceChannels.includes('recommendation')}
+                            onChange={event => updateDraft('boss', 'sourceChannels', event.target.checked
+                              ? [...draft.sourceChannels.filter(c => c !== 'recommendation'), 'recommendation']
+                              : draft.sourceChannels.filter(c => c !== 'recommendation'))}
+                            className="h-4 w-4 accent-primary"
+                          />推荐页
+                        </label>
+                      </div>
+                      {draft.sourceChannels.includes('recommendation') && (
+                        <>
+                          <p className="mt-2 text-xs leading-5 text-warning">推荐页来自 BOSS 个性化推荐，不依赖搜索关键词；会增加页面访问和详情解析时间，仍受 BOSS 每日安全额度限制。推荐页只采集，不会自动发送招呼语、简历或回复。</p>
+                          <div className="mt-2 grid grid-cols-3 gap-2">
+                            <label className="text-xs font-bold text-muted">分页轮次<Input type="number" min={1} max={10} value={draft.recommendationMaxScrolls} onChange={event => updateDraft('boss', 'recommendationMaxScrolls', event.target.value)} /></label>
+                            <label className="text-xs font-bold text-muted">最大卡片数<Input type="number" min={1} max={200} value={draft.recommendationMaxCards} onChange={event => updateDraft('boss', 'recommendationMaxCards', event.target.value)} /></label>
+                            <label className="text-xs font-bold text-muted">连续无新增上限<Input type="number" min={1} max={5} value={draft.recommendationSameResultLimit} onChange={event => updateDraft('boss', 'recommendationSameResultLimit', event.target.value)} /></label>
+                          </div>
+                        </>
+                      )}
+                      {!draft.sourceChannels.length && <p className="mt-2 text-xs text-warning">至少选择一个采集来源。</p>}
+                    </div>
+                  )}
                 </div>}
                 {!draft.enabled && mode === 'full' && platform !== 'boss' && <p className="mt-3 text-xs text-muted">当前只支持“岗位采集”，不进入发送全流程。</p>}
               </section>

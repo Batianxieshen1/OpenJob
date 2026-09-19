@@ -2679,3 +2679,73 @@ class MaterialImportFlowTests(unittest.TestCase):
         _, data = self._request("/api/resume/materials/analyze", method="POST", body=parts, content_type=ctype)
         status, payload = self._request("/api/resume/materials/status")
         self.assertTrue(payload["import_in_progress"])
+
+
+class JobSourceLabelApiTests(unittest.TestCase):
+    def setUp(self):
+        self.original_base_dir = server.BASE_DIR
+
+    def tearDown(self):
+        server.set_base_dir(self.original_base_dir)
+
+    def _request(self, path, method="GET", json_body=None):
+        captured = {}
+
+        def start_response(status, headers, exc_info=None):
+            captured["status"] = status
+
+        body_bytes = json.dumps(json_body).encode("utf-8") if json_body is not None else b""
+        environ = {
+            "REQUEST_METHOD": method, "PATH_INFO": path, "QUERY_STRING": "",
+            "SERVER_NAME": "localhost", "SERVER_PORT": "8686", "SERVER_PROTOCOL": "HTTP/1.1",
+            "CONTENT_LENGTH": str(len(body_bytes)),
+            "CONTENT_TYPE": "application/json" if body_bytes else "",
+            "wsgi.version": (1, 0), "wsgi.url_scheme": "http",
+            "wsgi.input": io.BytesIO(body_bytes), "wsgi.errors": io.StringIO(),
+            "wsgi.multithread": False, "wsgi.multiprocess": False, "wsgi.run_once": False,
+        }
+        chunks = server.app(environ, start_response)
+        return captured["status"], {}, b"".join(chunks).decode("utf-8")
+
+    def _seed(self, tmp):
+        import yaml as _yaml
+
+        base = Path(tmp)
+        (base / "config.yaml").write_text(_yaml.dump({"profile": {}}, allow_unicode=True), encoding="utf-8")
+        db = get_db(base / "data" / "openjob.db")
+        insert_job(db, _job("src-1"))
+        update_job_status(db, "src-1", "ready")
+        update_job_score(db, "src-1", 80, "种子")
+        add_history(db, "src-1", "approved", "来源徽标测试台账")
+        from openjob.db import record_job_source_observation
+
+        # 入库已自动记录 search 观察（keyword/city 与 _job 一致），此处只补推荐来源
+        record_job_source_observation(
+            db, job_id="src-1", source_platform="boss", source_channel="recommendation",
+            source_keyword="", source_city="",
+        )
+        db.close()
+        server.set_base_dir(base)
+
+    def test_jobs_list_returns_source_labels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._seed(tmp)
+            status, _, body = self._request("/api/jobs")
+            payload = json.loads(body)
+            self.assertTrue(status.startswith("200"), body)
+            target = next(job for job in payload if job["id"] == "src-1")
+            self.assertEqual(target["source_channels"], ["search", "recommendation"])
+            self.assertEqual(target["source_labels"], ["搜索流", "推荐页"])
+            # 入库自动记 search 观察 + 种子补推荐来源 = 两行
+            self.assertEqual(len(target["source_observations"]), 2)
+            self.assertEqual({o["channel"] for o in target["source_observations"]}, {"search", "recommendation"})
+
+    def test_job_detail_returns_source_labels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._seed(tmp)
+            status, _, body = self._request("/api/jobs/src-1")
+            payload = json.loads(body)
+            self.assertTrue(status.startswith("200"), body)
+            self.assertEqual(payload["source_labels"], ["搜索流", "推荐页"])
+            self.assertEqual(payload["source_channels"], ["search", "recommendation"])
+            self.assertTrue(payload["history"])
