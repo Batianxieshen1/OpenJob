@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from openjob.collection.base import CollectionError, CollectorHooks
 from openjob.collection.models import (
+    COLLECTION_CHANNEL_LABELS,
     SUPPORTED_BOSS_CHANNELS,
     CollectionProgress,
     JobCandidate,
@@ -21,7 +22,12 @@ from openjob.collection.platforms.job51 import Job51Collector, get_51job_city_co
 from openjob.collection.platforms.zhilian import ZhilianCollector, get_zhilian_city_code
 from openjob.collection.registry import CollectorRegistry
 from openjob.collection_run_store import create_collection_run, update_collection_run
-from openjob.db import get_db, insert_job_if_new, job_identity_exists
+from openjob.db import (
+    get_db,
+    insert_job_if_new,
+    job_identity_exists,
+    record_job_source_observation,
+)
 from openjob.job_filters import matching_blocked_company, matching_deal_breaker
 
 
@@ -276,6 +282,42 @@ class _SharedProcessor:
             max_pages=request.max_pages,
         )
         self.new_job_ids: list[str] = []
+        # 推荐页计划 Task 3：来源级进度（search / recommendation），供 progress.sources。
+        self.source_progress: dict[str, dict[str, Any]] = {}
+
+    def set_current_source(self, channel: str) -> None:
+        entry = self.source_progress.setdefault(channel, {
+            "label": COLLECTION_CHANNEL_LABELS.get(channel, channel),
+            "status": "running",
+            "seen": 0, "new": 0, "duplicate": 0, "filtered": 0, "parse_failed": 0,
+        })
+        entry["status"] = "running"
+        self.event(current_source=channel)
+
+    def finish_source(self, channel: str, *, status: str, reason_code: str = "") -> None:
+        entry = self.source_progress.setdefault(channel, {
+            "label": COLLECTION_CHANNEL_LABELS.get(channel, channel),
+            "seen": 0, "new": 0, "duplicate": 0, "filtered": 0, "parse_failed": 0,
+        })
+        entry["status"] = status
+        if reason_code:
+            entry["reason_code"] = reason_code
+
+    def _record_observation(self, candidate: JobCandidate) -> None:
+        """来源观察：新旧岗位都记录；失败只降级，不影响采集结果。"""
+        try:
+            record_job_source_observation(
+                self.conn,
+                job_id=candidate.storage_id,
+                source_platform=str(candidate.platform),
+                source_channel=str(candidate.source_channel or "search"),
+                source_keyword=str(candidate.source_keyword or ""),
+                source_city=str(candidate.city or ""),
+                source_city_code=str(candidate.city_code or ""),
+                collection_run_id=str(self.run_id or ""),
+            )
+        except Exception:
+            pass
 
     def event(self, *, phase: str | None = None, **values: Any) -> None:
         if phase:
@@ -289,6 +331,9 @@ class _SharedProcessor:
 
     def inspect(self, candidate: JobCandidate) -> bool:
         self.progress.seen += 1
+        channel = str(candidate.source_channel or "search")
+        if channel in self.source_progress:
+            self.source_progress[channel]["seen"] += 1
         if job_identity_exists(
             self.conn,
             candidate.platform,
@@ -296,6 +341,10 @@ class _SharedProcessor:
             legacy_job_id=candidate.storage_id,
         ):
             self.progress.duplicate += 1
+            if channel in self.source_progress:
+                self.source_progress[channel]["duplicate"] += 1
+            # 重复命中也记录来源观察：推荐页命中已有搜索岗位时 UI 能看到双来源
+            self._record_observation(candidate)
             self.event()
             return False
         profile = self.config.get("profile", {}) if isinstance(self.config.get("profile"), dict) else {}
@@ -324,8 +373,15 @@ class _SharedProcessor:
             return True
         if inserted:
             self.new_job_ids.append(candidate.storage_id)
+            channel = str(candidate.source_channel or "search")
+            if channel in self.source_progress:
+                self.source_progress[channel]["new"] += 1
         else:
             self.progress.duplicate += 1
+            channel = str(candidate.source_channel or "search")
+            if channel in self.source_progress:
+                self.source_progress[channel]["duplicate"] += 1
+        self._record_observation(candidate)
         self.event(phase="saving")
         if self.stop_event is not None and self.stop_event.is_set():
             return False
@@ -396,6 +452,11 @@ class CollectionOrchestrator:
                     on_parse_failed=lambda reason, p=processor: self._parse_failed(p, reason),
                     on_event=lambda p=processor, **kwargs: p.event(**kwargs),
                 )
+                # 推荐页计划 Task 3：为 BOSS 多来源初始化来源级进度
+                request_channels = list(getattr(request, "source_channels", None) or ["search"])
+                for channel in request_channels:
+                    processor.set_current_source(channel)
+                self._persist(states, all_new_ids, platform)
                 try:
                     collector = (
                         BossCollector(config=self.config, safety_conn=conn)
@@ -407,6 +468,14 @@ class CollectionOrchestrator:
                     result = PlatformCollectionResult(platform, "blocked", exc.code, exc.message, error=str(exc))
                 except Exception as exc:
                     result = PlatformCollectionResult(platform, "failed", "network_error", f"{platform} 采集失败", error=str(exc)[:500])
+                # 按来源标记完成状态（stopped 等中断场景保持各自状态）
+                for channel in request_channels:
+                    source_status = result.status if result.status in {"completed", "completed_with_shortage"} else result.status
+                    processor.finish_source(
+                        channel,
+                        status=source_status,
+                        reason_code=result.reason_code if result.status != "completed" else "",
+                    )
                 result.new_job_ids = list(processor.new_job_ids)
                 result.counts = self._counts(processor.progress)
                 platform_results.append(result)
@@ -425,6 +494,9 @@ class CollectionOrchestrator:
                     "max_pages": processor.progress.max_pages,
                     "reason_code": result.reason_code,
                     "message": result.message,
+                    "current_source": getattr(processor.progress, "current_source", ""),
+                    "sources": {name: dict(item) for name, item in processor.source_progress.items()},
+                    "source_results": {name: dict(item) for name, item in (result.source_results or {}).items()},
                 })
                 all_new_ids.extend(result.new_job_ids)
                 self._persist(states, all_new_ids, platform, stop_reason=result.reason_code, error=result.error)
