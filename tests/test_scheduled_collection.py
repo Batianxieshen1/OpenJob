@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import unittest
 from typing import Any
 
 from openjob.scheduled_collection_store import get_scheduled_run
@@ -200,3 +201,66 @@ def test_summary_skips_paused_today_slots(tmp_path: Path) -> None:
     summary = scheduler.summary()
 
     assert summary["next_run_at"] == "2026-09-09T09:30"
+
+
+def scheduler_normalize(config):
+    import copy
+    from openjob.web.scheduled_collection import normalize_schedule_config
+
+    return normalize_schedule_config(copy.deepcopy(config))
+
+
+class RecommendationInheritanceTests(unittest.TestCase):
+    """推荐页计划 Task 6：定时采集对推荐页的继承与关闭。"""
+
+    def _config(self, schedule_overrides=None, boss_overrides=None):
+        boss = {"enabled": True, "search": {"keywords": ["数据分析实习"], "cities": ["广州"]}}
+        boss.update(boss_overrides or {})
+        schedule = {"enabled": True, "times": ["09:30"], "max_pages": 1, "platforms": ["boss"]}
+        schedule.update(schedule_overrides or {})
+        return {"collection_schedule": schedule, "platforms": {"boss": boss}}
+
+    def test_legacy_schedule_defaults_to_search_only(self):
+        from openjob.web.scheduled_collection import ScheduledCollectionScheduler
+
+        scheduler = ScheduledCollectionScheduler(
+            db_path_provider=lambda: Path("x"),
+            config_loader=lambda: {},
+            task_runner=None,
+            task_config_builder=lambda cfg: cfg,
+            preflight=lambda *_a: [],
+        )
+        options = scheduler._build_options(self._config(), scheduler_normalize(self._config()))
+        self.assertEqual(options["platforms"]["boss"]["source_channels"], ["search"])
+
+    def test_enabled_schedule_keeps_recommendation_channel(self):
+        from openjob.web.scheduled_collection import ScheduledCollectionScheduler
+
+        scheduler = ScheduledCollectionScheduler(
+            db_path_provider=lambda: Path("x"), config_loader=lambda: {},
+            task_runner=None, task_config_builder=lambda cfg: cfg, preflight=lambda *_a: [],
+        )
+        schedule = scheduler_normalize(self._config(schedule_overrides={"include_recommendation": True}))
+        self.assertTrue(schedule["include_recommendation"])
+        self.assertEqual(schedule["recommendation_max_scrolls"], 2)
+        options = scheduler._build_options(self._config(), schedule)
+        self.assertEqual(options["platforms"]["boss"]["source_channels"], ["search", "recommendation"])
+        self.assertEqual(options["platforms"]["boss"]["recommendation_max_scrolls"], 2)
+
+    def test_recommendation_only_schedule_needs_no_keywords(self):
+        from openjob.web.scheduled_collection import ScheduledCollectionScheduler
+
+        scheduler = ScheduledCollectionScheduler(
+            db_path_provider=lambda: Path("x"), config_loader=lambda: {},
+            task_runner=None, task_config_builder=lambda cfg: cfg, preflight=lambda *_a: [],
+        )
+        cfg = self._config(
+            schedule_overrides={"include_recommendation": True},
+            boss_overrides={"source_channels": ["recommendation"]},
+        )
+        # 手工清空关键词/城市（只推荐页允许）
+        cfg["platforms"]["boss"]["search"] = {}
+        schedule = scheduler_normalize(cfg)
+        options = scheduler._build_options(cfg, schedule)
+        self.assertEqual(options["platforms"]["boss"]["source_channels"], ["recommendation"])
+

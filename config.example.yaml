@@ -53,6 +53,8 @@ collection_schedule:
   max_pages: 1             # 每轮、每个平台的最大搜索页数（1-10）
   platforms: [boss]
   pause_today_date: ""     # 配置页“今日暂停”会写入当天日期，隔日自动失效
+  include_recommendation: false  # 定时采集默认不含推荐页；开启后按 recommendation_max_scrolls 执行
+  recommendation_max_scrolls: 2  # 定时采集推荐页分页轮次（1-10，安全默认 2）
 
 platforms:
   boss:
