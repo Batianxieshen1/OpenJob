@@ -361,3 +361,116 @@ class PermanentDeleteObservationTests(unittest.TestCase):
                 ).fetchone()[0], 0)
             finally:
                 db.close()
+
+
+class IllegalChannelTests(unittest.TestCase):
+    """收尾 Batch C1：非法来源通道拒绝而非静默回退。"""
+
+    def test_empty_channel_falls_back_to_search(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = get_db(Path(tmp) / "openjob.db")
+            try:
+                insert_job_if_new(db, {
+                    "id": "c-empty", "title": "T", "company": "C",
+                    "jd": "x", "url": "https://www.zhipin.com/job_detail/ce.html",
+                    "source_platform": "boss", "source_job_id": "c-empty",
+                    # source_channel 缺失 → 兼容旧调用视为 search
+                })
+                row = dict(db.execute("SELECT source_channel FROM jobs WHERE id='c-empty'").fetchone())
+                self.assertEqual(row["source_channel"], "search")
+            finally:
+                db.close()
+
+    def test_unknown_channel_raises_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = get_db(Path(tmp) / "openjob.db")
+            try:
+                with self.assertRaises(ValueError):
+                    insert_job_if_new(db, {
+                        "id": "c-bad", "title": "T", "company": "C",
+                        "jd": "x", "url": "https://www.zhipin.com/job_detail/cb.html",
+                        "source_platform": "boss", "source_job_id": "c-bad",
+                        "source_channel": "recommend",
+                    })
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM jobs WHERE id='c-bad'").fetchone()[0], 0)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM job_source_observations WHERE job_id='c-bad'").fetchone()[0], 0)
+            finally:
+                db.close()
+
+    def test_non_boss_recommendation_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = get_db(Path(tmp) / "openjob.db")
+            try:
+                with self.assertRaises(ValueError):
+                    insert_job_if_new(db, {
+                        "id": "c-zh", "title": "T", "company": "C",
+                        "jd": "x", "url": "https://www.zhilian.com/xx",
+                        "source_platform": "zhilian", "source_job_id": "c-zh",
+                        "source_channel": "recommendation",
+                    })
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM jobs WHERE id='c-zh'").fetchone()[0], 0)
+            finally:
+                db.close()
+
+
+class MigrationBackfillResumeTests(unittest.TestCase):
+    """收尾 Batch C2：v8→v9 回填逐行幂等，部分回填后重启补齐剩余岗位。"""
+
+    def test_partial_backfill_resumes_and_never_duplicates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "openjob.db"
+            db = get_db(db_path)
+            for i in range(3):
+                insert_job_if_new(db, {
+                    "id": f"b{i}", "title": "T", "company": "C",
+                    "jd": "x", "url": f"https://www.zhipin.com/job_detail/b{i}.html",
+                    "source_platform": "boss", "source_job_id": f"b{i}",
+                    "source_channel": "search",
+                })
+            # 预插入 1 个岗位的 observation（模拟部分回填中断）
+            record_job_source_observation(
+                db, job_id="b0", source_platform="boss", source_channel="search",
+                source_keyword="", source_city="",
+            )
+            db.close()
+            # 重新打开连接触发迁移（user_version 已是 9，但回填逻辑必须逐行幂等）
+            from openjob.db import _backup_if_schema_stale
+
+            db = get_db(db_path)
+            try:
+                from openjob.db import _migrate_v2_9
+
+                _migrate_v2_9(db)
+                counts = {r["source_channel"]: r["c"] for r in db.execute(
+                    "SELECT source_channel, COUNT(*) AS c FROM job_source_observations GROUP BY source_channel"
+                ).fetchall()}
+                self.assertEqual(counts.get("search"), 3)  # b0 不重复、b1/b2 补齐
+            finally:
+                db.close()
+
+    def test_backfill_does_not_overwrite_recommendation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "openjob.db"
+            db = get_db(db_path)
+            insert_job_if_new(db, {
+                "id": "b9", "title": "T", "company": "C",
+                "jd": "x", "url": "https://www.zhipin.com/job_detail/b9.html",
+                "source_platform": "boss", "source_job_id": "b9",
+                "source_channel": "recommendation",
+            })
+            record_job_source_observation(
+                db, job_id="b9", source_platform="boss", source_channel="recommendation",
+                source_keyword="", source_city="",
+            )
+            from openjob.db import _migrate_v2_9
+
+            _migrate_v2_9(db)
+            rec = db.execute(
+                "SELECT COUNT(*) FROM job_source_observations WHERE job_id='b9' AND source_channel='recommendation'"
+            ).fetchone()[0]
+            search = db.execute(
+                "SELECT COUNT(*) FROM job_source_observations WHERE job_id='b9' AND source_channel='search'"
+            ).fetchone()[0]
+            db.close()
+            self.assertEqual(rec, 1)  # 推荐观察不被覆盖
+            self.assertLessEqual(search, 1)  # 回填只补 search，且幂等

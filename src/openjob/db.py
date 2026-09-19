@@ -513,21 +513,24 @@ def _migrate_v2_9(conn: sqlite3.Connection) -> None:
     conn.execute(
         "UPDATE jobs SET source_channel = 'search' WHERE source_channel IS NULL OR source_channel = ''"
     )
-    # 旧岗位各建一条 search observation（已迁移过的库跳过，幂等）
-    already = conn.execute("SELECT COUNT(*) FROM job_source_observations").fetchone()[0]
-    if already == 0:
-        conn.execute(
-            """
-            INSERT INTO job_source_observations
-                (job_id, source_platform, source_channel, source_label,
-                 source_keyword, source_city, source_city_code)
-            SELECT id, COALESCE(source_platform, 'boss'), 'search', '搜索流',
-                   COALESCE(source_keyword, ''),
-                   COALESCE(city, ''),
-                   COALESCE(source_city_code, '')
-            FROM jobs
-            """
-        )
+    # 旧岗位逐行幂等回填 search observation（部分回填中断后重启可补齐；
+    # 不覆盖已有任何 observation，包括 recommendation）
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO job_source_observations
+            (job_id, source_platform, source_channel, source_label,
+             source_keyword, source_city, source_city_code)
+        SELECT
+            id,
+            COALESCE(source_platform, 'boss'),
+            'search',
+            '搜索流',
+            COALESCE(source_keyword, ''),
+            COALESCE(city, ''),
+            COALESCE(source_city_code, '')
+        FROM jobs
+        """
+    )
     conn.commit()
 
 
@@ -649,8 +652,14 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
     }
     from openjob.collection.models import COLLECTION_CHANNEL_LABELS
 
-    channel = str(job.get("source_channel") or "search").strip()
-    values["source_channel"] = channel if channel in COLLECTION_CHANNEL_LABELS else "search"
+    channel = str(job.get("source_channel") or "").strip()
+    if not channel:
+        channel = "search"  # 兼容旧调用未传字段
+    if channel not in COLLECTION_CHANNEL_LABELS:
+        raise ValueError(f"非法来源通道：{channel}")
+    if channel == "recommendation" and str(job.get("source_platform") or "boss") != "boss":
+        raise ValueError(f"{job.get('source_platform')} 平台不支持推荐页来源")
+    values["source_channel"] = channel
     cursor = conn.execute(
         """
         INSERT OR IGNORE INTO jobs (
