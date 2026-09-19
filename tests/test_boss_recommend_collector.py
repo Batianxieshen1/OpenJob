@@ -269,3 +269,162 @@ class RecommendationOnlyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RecommendationExitPathResultTests(unittest.TestCase):
+    """收尾 Batch D：推荐页所有退出路径都必须在 result.source_results 带回
+    recommendation 阶段信息（不被 finally 默认值覆盖）。"""
+
+    def _collect(self, evaluate_map, *, request=None, collected=None):
+        browser, new_tab_calls, navigation_calls, close_calls = _browser_factory(evaluate_map=evaluate_map)
+        collected = collected if collected is not None else []
+        request = request or PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=2,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, _hooks(collected))
+        return result, new_tab_calls, navigation_calls, close_calls
+
+    def test_parser_unsupported_keeps_recommendation_result(self):
+        result, *_ = self._collect({"item-boss": "<html>weird</html>"})
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertEqual(rec.get("reason_code"), "recommendation_parser_unsupported")
+        self.assertEqual(rec.get("status"), "completed_with_shortage")
+
+    def test_card_limit_keeps_recommendation_result(self):
+        state = {"round": 0}
+
+        def evaluate(_target, script):
+            if "item-boss" in script:
+                state["round"] += 1
+                return _recommend_payload(card_url=f"/job_detail/rec-{state['round']}.html")
+            if ".job-sec-text" in script:
+                return _detail_payload()
+            return json.dumps({"risk": None})
+
+        browser, *_ = _browser_factory(evaluate_map={"__never__": "{}"})
+        # 重新用 evaluate 闭包构造（_browser_factory 的 map 不支持动态轮次）
+        browser = BossBrowser(
+            new_tab=lambda _u, **_k: "worker-tab",
+            close_tab=lambda _t: True,
+            evaluate=evaluate,
+            navigate=lambda _t, _u: True,
+            scroll=lambda *_a, **_k: True,
+            wait_for_load=lambda *_a, **_k: True,
+        )
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=5, recommendation_max_cards=2,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, _hooks([]))
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertEqual(rec.get("reason_code"), "recommendation_card_limit")
+
+    def test_no_new_cards_keeps_recommendation_result(self):
+        # 轮1 有新增（seen 空）；轮2 同 URL 无新增 → 连续 1 轮无新增即停
+        # （same_result_limit=1 先于 max_scrolls=2 触发）
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=2,
+            recommendation_same_result_limit=1,
+        )
+        result, *_ = self._collect({"item-boss": _recommend_payload()}, request=request)
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertEqual(rec.get("reason_code"), "recommendation_no_new_cards")
+        self.assertEqual(rec.get("status"), "completed_with_shortage")
+
+    def test_page_open_failed_keeps_recommendation_result(self):
+        def evaluate(_target, script):
+            if "item-boss" in script:
+                return _recommend_payload()
+            return json.dumps({"risk": None})
+
+        browser = BossBrowser(
+            new_tab=lambda _u, **_k: None,  # 打开失败
+            close_tab=lambda _t: True,
+            evaluate=evaluate,
+            navigate=lambda _t, _u: False,
+            scroll=lambda *_a, **_k: True,
+            wait_for_load=lambda *_a, **_k: True,
+        )
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=2,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, _hooks([]))
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertEqual(rec.get("reason_code"), "recommendation_page_open_failed")
+
+    def test_user_stop_keeps_recommendation_result(self):
+        stop_event = Event()
+        browser, *_ = _browser_factory(
+            evaluate_map={"item-boss": _recommend_payload(), ".job-sec-text": _detail_payload()},
+        )
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=3,
+        )
+        hooks = CollectorHooks(
+            stop_event=stop_event,
+            on_list_candidate=lambda _c: True,
+            on_candidate=lambda c: collected.append(c) or (stop_event.set() or True),
+            on_parse_failed=lambda reason: None,
+            on_event=lambda **_kwargs: None,
+        )
+        collected = []
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, hooks)
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertTrue(rec)  # 用户停止时推荐阶段信息也必须带回
+        self.assertEqual(result.status, "stopped")
+
+    def test_risk_stop_keeps_recommendation_result(self):
+        def evaluate(_target, script):
+            if "hasExpectedContent" in script:
+                return json.dumps({"risk": "captcha", "evidence": "captcha_element"})
+            if "item-boss" in script:
+                return _recommend_payload()
+            if ".job-sec-text" in script:
+                return _detail_payload()
+            return json.dumps({"risk": None})
+
+        browser = BossBrowser(
+            new_tab=lambda _u, **_k: "worker-tab",
+            close_tab=lambda _t: True,
+            evaluate=evaluate,
+            navigate=lambda _t, _u: True,
+            scroll=lambda *_a, **_k: True,
+            wait_for_load=lambda *_a, **_k: True,
+        )
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=2,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, _hooks([]))
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertTrue(rec)  # 风控停止也带回推荐阶段信息
+        self.assertEqual(result.status, "blocked")
