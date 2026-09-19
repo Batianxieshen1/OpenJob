@@ -32,6 +32,48 @@ def _boss_candidate(source_job_id: str, channel: str, keyword: str = "数据分�
     )
 
 
+
+
+def run_collect_candidates(db_path: Path, candidates, *, auto_score=True):
+    """模块级脚本化采集：走真实 CollectionOrchestrator + _SharedProcessor 管线。"""
+
+    class _ScriptedCollector:
+        platform = "boss"
+
+        def __init__(self, cands):
+            self._cands = cands
+
+        def collect(self, request, hooks):
+            for candidate in self._cands:
+                if hooks.stop_event is not None and hooks.stop_event.is_set():
+                    break
+                if not hooks.on_list_candidate(candidate):
+                    continue
+                hooks.on_candidate(candidate)
+            from openjob.collection.models import PlatformCollectionResult
+
+            return PlatformCollectionResult(
+                "boss", "completed", "search_exhausted", "脚本采集完成",
+                new_job_ids=[c.storage_id for c in self._cands],
+            )
+
+    class _StubRegistry:
+        def get(self, _name):
+            return _ScriptedCollector(candidates)
+
+    with patch("openjob.ai.scorer.score_jobs") as score_mock:
+        orchestrator = CollectionOrchestrator(
+            {"platforms": {"boss": {"enabled": True, "search": {
+                "keywords": ["数据分析实习"], "cities": ["广州"],
+            }}}},
+            db_path=db_path,
+            registry=_StubRegistry(),
+            run_id="run-obs-1",
+        )
+        summary = orchestrator.run({"auto_score": auto_score})
+    return summary, score_mock
+
+
 class MigrationV29Tests(unittest.TestCase):
     def test_fresh_db_has_v9_and_observations_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -106,6 +148,10 @@ class SourceObservationTests(unittest.TestCase):
                     "source_platform": "boss", "source_job_id": "j2",
                     "source_keyword": "搜索词", "source_channel": "search",
                 })
+                record_job_source_observation(
+                    db, job_id="j2", source_platform="boss", source_channel="search",
+                    source_keyword="搜索词",
+                )
                 record_job_source_observation(
                     db, job_id="j2", source_platform="boss", source_channel="recommendation",
                 )
@@ -207,3 +253,62 @@ class CrossSourceDedupTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FirstObservationCountTests(unittest.TestCase):
+    """收尾 Batch A：首次观察 seen_count 必须为 1（走真实采集管线验证）。"""
+
+    def test_first_new_job_observation_seen_count_is_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "openjob.db"
+            get_db(db_path).close()  # 初始化 schema
+            candidates = [_boss_candidate("first-job", "search")]
+            run_collect_candidates(db_path, candidates, auto_score=False)
+
+            db = get_db(db_path)
+            try:
+                rows = db.execute(
+                    "SELECT seen_count FROM job_source_observations WHERE job_id='first-job'"
+                ).fetchall()
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["seen_count"], 1)
+            finally:
+                db.close()
+
+    def test_second_collection_same_source_increments_to_two(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "openjob.db"
+            get_db(db_path).close()
+            for _ in range(2):
+                run_collect_candidates(db_path, [_boss_candidate("rep-job", "search")], auto_score=False)
+
+            db = get_db(db_path)
+            try:
+                rows = db.execute(
+                    "SELECT seen_count FROM job_source_observations WHERE job_id='rep-job' AND source_channel='search'"
+                ).fetchall()
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["seen_count"], 2)
+            finally:
+                db.close()
+
+    def test_full_channel_lifecycle_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "openjob.db"
+            get_db(db_path).close()
+            # 轮1：search 发现；轮2：search 再发现；轮3：recommendation 发现；轮4：recommendation 再发现
+            run_collect_candidates(db_path, [_boss_candidate("life-job", "search")], auto_score=False)
+            run_collect_candidates(db_path, [_boss_candidate("life-job", "search")], auto_score=False)
+            run_collect_candidates(db_path, [_boss_candidate("life-job", "recommendation")], auto_score=False)
+            run_collect_candidates(db_path, [_boss_candidate("life-job", "recommendation")], auto_score=False)
+
+            db = get_db(db_path)
+            try:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM jobs WHERE id='life-job'").fetchone()[0], 1)
+                rows = {r["source_channel"]: r["seen_count"] for r in db.execute(
+                    "SELECT source_channel, seen_count FROM job_source_observations WHERE job_id='life-job'"
+                ).fetchall()}
+                self.assertEqual(rows.get("search"), 2)
+                self.assertEqual(rows.get("recommendation"), 2)
+            finally:
+                db.close()
