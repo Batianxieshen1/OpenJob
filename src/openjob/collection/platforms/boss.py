@@ -312,6 +312,14 @@ class BossCollector:
                 return limited(exc.reason)
 
         source_results: dict[str, dict[str, Any]] = {}
+        recommendation_phase: dict[str, dict[str, Any]] = {}
+
+        def _record_recommendation_phase(status: str, reason_code: str, message: str, **counts) -> None:
+            recommendation_phase.clear()
+            recommendation_phase.update({
+                "status": status, "reason_code": reason_code, "message": message,
+                "counts": {k: v for k, v in counts.items()},
+            })
 
         def _run_detail_pipeline(candidate: JobCandidate) -> str:
             nonlocal page_failures
@@ -448,7 +456,7 @@ class BossCollector:
             finally:
                 source_results["search"] = {
                     "status": "completed", "reason_code": "search_exhausted", "message": "搜索流完成",
-                    "counts": {"pages": len(combos) and request.max_pages},
+                    "counts": {"pages": request.max_pages},
                 }
             return PlatformCollectionResult(self.platform, "completed", "search_exhausted", "BOSS 搜索结果已采集完毕")
 
@@ -466,6 +474,7 @@ class BossCollector:
             page_no = 1
             reason_code = "recommendation_feed_exhausted"
             message = "BOSS 推荐页已采集完毕"
+            _record_recommendation_phase("running", reason_code, message, cards=0, pages=1)
             try:
                 while recommendation_should_continue(
                     scroll_round=page_no - 1, max_scrolls=rec_max_pages,
@@ -551,10 +560,11 @@ class BossCollector:
                     if _wait_or_stop(hooks.stop_event, 0.2 * delay_multiplier, self.sleep):
                         return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
             finally:
-                source_results["recommendation"] = {
-                    "status": "completed", "reason_code": reason_code, "message": message,
-                    "counts": {"cards": total_cards, "pages": page_no},
-                }
+                _record_recommendation_phase(
+                    "completed" if reason_code == "recommendation_feed_exhausted" else "completed_with_shortage",
+                    reason_code, message, cards=total_cards, pages=page_no,
+                )
+                source_results["recommendation"] = dict(recommendation_phase)
             status = "completed" if reason_code == "recommendation_feed_exhausted" else "completed_with_shortage"
             return PlatformCollectionResult(self.platform, status, reason_code, message)
 
@@ -564,12 +574,19 @@ class BossCollector:
                 outcome = _collect_search_source()
                 outcomes.append(outcome)
                 if outcome.status != "completed":
-                    return outcome
+                    return PlatformCollectionResult(
+                        self.platform, outcome.status, outcome.reason_code, outcome.message,
+                        source_results=dict(source_results),
+                    )
             if "recommendation" in source_channels:
                 outcome = _collect_recommendation_source()
                 outcomes.append(outcome)
                 if outcome.status == "stopped" or outcome.status == "blocked":
-                    return outcome
+                    stopped_result = PlatformCollectionResult(
+                        self.platform, outcome.status, outcome.reason_code, outcome.message,
+                        source_results=dict(source_results),
+                    )
+                    return stopped_result
         finally:
             if worker_target:
                 self.browser.close_tab(worker_target)
