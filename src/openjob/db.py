@@ -664,20 +664,8 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
         values,
     )
     inserted = cursor.rowcount == 1
-    # 来源观察：新岗位与重复命中的已有岗位都记录（重复命中不覆盖主来源，只追加观察）
-    try:
-        record_job_source_observation(
-            conn,
-            job_id=str(values["id"]),
-            source_platform=str(values["source_platform"]),
-            source_channel=str(values["source_channel"]),
-            source_keyword=str(values["source_keyword"] or ""),
-            source_city=str(values["city"] or ""),
-            source_city_code=str(values["source_city_code"] or ""),
-        )
-    except sqlite3.Error:
-        # 观察失败只降级，不把已保存岗位误标为采集失败
-        pass
+    # 来源观察责任层唯一化（收尾 Batch A）：observation 由 _SharedProcessor 按
+    # 采集候选明确记录；本函数不再隐式记录，避免首次新岗位 seen_count 被翻倍。
     conn.commit()
     return inserted
 
