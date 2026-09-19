@@ -344,7 +344,7 @@ class PermanentDeleteObservationTests(unittest.TestCase):
                 # 恢复后仍可查询
                 from openjob.db import restore_jobs
 
-                restore_jobs(db, ["pd-1"])
+                restore_jobs(db, ["pd-1"], confirmed=True)
                 summaries = get_job_source_summaries(db, ["pd-1"])
                 self.assertEqual(summaries["pd-1"]["source_channels"], ["search", "recommendation"])
                 # 再软删 + 永久删除
