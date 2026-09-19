@@ -144,6 +144,7 @@ class CollectionProgress:
     city: str = ""
     page: int = 0
     max_pages: int = 0
+    current_source: str = ""
     reason_code: str = ""
     message: str = ""
 

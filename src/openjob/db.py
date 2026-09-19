@@ -13,7 +13,7 @@ DB_PATH = Path("./data/openjob.db")
 MAX_JOB_IDS = 1000
 # C4：schema 版本号写入 PRAGMA user_version；版本变化时迁移前先自动备份。
 # 有意新增迁移时上调此数字并同步 _MIGRATIONS。
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 _MIGRATIONS = (
     "_migrate_v1_1", "_migrate_v1_2", "_migrate_v1_3", "_migrate_v1_4",
     "_migrate_platform_access_events", "_init_scoring_runs",
@@ -21,6 +21,7 @@ _MIGRATIONS = (
     "_migrate_v2_0", "_migrate_v2_1", "_migrate_v2_2", "_migrate_v2_3",
     "_migrate_v2_4", "_migrate_v2_5", "_migrate_v2_6", "_migrate_v2_7",
     "_migrate_v2_8",
+    "_migrate_v2_9",
 )
 DELETION_PROTECTED_STATUSES = {"sent", "replied", "resume_sent", "needs_resume", "follow_up_sent"}
 DELETION_PROTECTED_HISTORY_ACTIONS = {
@@ -172,6 +173,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_6(conn)
     _migrate_v2_7(conn)
     _migrate_v2_8(conn)
+    _migrate_v2_9(conn)
     _stamp_schema_version(conn)
 
 
@@ -468,6 +470,146 @@ def permanent_delete_jobs(
     return {"requested_count": len(ids), "affected_count": len(ids)}
 
 
+def _migrate_v2_9(conn: sqlite3.Connection) -> None:
+    """推荐页来源追踪（推荐计划 Batch C，幂等）：
+
+    - jobs.source_channel：岗位主来源/首次来源（默认 search，兼容旧查询）；
+    - job_source_observations：全部来源观察（同一岗位可同时来自搜索流与推荐页）。
+    回填：现有岗位统一 source_channel='search'，并各建一条 search observation。
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "source_channel" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN source_channel TEXT NOT NULL DEFAULT 'search'")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS job_source_observations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL,
+            source_platform TEXT NOT NULL,
+            source_channel TEXT NOT NULL,
+            source_label TEXT NOT NULL,
+            source_keyword TEXT NOT NULL DEFAULT '',
+            source_city TEXT NOT NULL DEFAULT '',
+            source_city_code TEXT NOT NULL DEFAULT '',
+            collection_run_id TEXT NOT NULL DEFAULT '',
+            first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            seen_count INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(job_id, source_platform, source_channel, source_keyword, source_city),
+            FOREIGN KEY (job_id) REFERENCES jobs(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_job_source_observations_job ON job_source_observations(job_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_job_source_observations_channel "
+        "ON job_source_observations(source_platform, source_channel, last_seen_at)"
+    )
+    # 回填旧岗位：source_channel 统一 search（不猜成推荐来源）
+    conn.execute(
+        "UPDATE jobs SET source_channel = 'search' WHERE source_channel IS NULL OR source_channel = ''"
+    )
+    # 旧岗位各建一条 search observation（已迁移过的库跳过，幂等）
+    already = conn.execute("SELECT COUNT(*) FROM job_source_observations").fetchone()[0]
+    if already == 0:
+        conn.execute(
+            """
+            INSERT INTO job_source_observations
+                (job_id, source_platform, source_channel, source_label,
+                 source_keyword, source_city, source_city_code)
+            SELECT id, COALESCE(source_platform, 'boss'), 'search', '搜索流',
+                   COALESCE(source_keyword, ''),
+                   COALESCE(city, ''),
+                   COALESCE(source_city_code, '')
+            FROM jobs
+            """
+        )
+    conn.commit()
+
+
+def record_job_source_observation(
+    conn: sqlite3.Connection,
+    *,
+    job_id: str,
+    source_platform: str,
+    source_channel: str,
+    source_label: str = "",
+    source_keyword: str = "",
+    source_city: str = "",
+    source_city_code: str = "",
+    collection_run_id: str = "",
+) -> None:
+    """Insert or update one logical source observation without changing job status.
+
+    重复观察更新 last_seen_at/seen_count/collection_run_id；不触碰岗位状态、
+    评分、招呼语或简历字段。失败由调用方降级为 warning，不阻断采集。
+    """
+    from openjob.collection.models import COLLECTION_CHANNEL_LABELS
+
+    label = source_label or COLLECTION_CHANNEL_LABELS.get(source_channel, source_channel)
+    conn.execute(
+        """
+        INSERT INTO job_source_observations
+            (job_id, source_platform, source_channel, source_label,
+             source_keyword, source_city, source_city_code, collection_run_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(job_id, source_platform, source_channel, source_keyword, source_city)
+        DO UPDATE SET
+            last_seen_at = CURRENT_TIMESTAMP,
+            seen_count = seen_count + 1,
+            collection_run_id = excluded.collection_run_id
+        """,
+        (str(job_id), str(source_platform), str(source_channel), str(label),
+         str(source_keyword or ""), str(source_city or ""), str(source_city_code or ""),
+         str(collection_run_id or "")),
+    )
+    conn.commit()
+
+
+def get_job_source_summaries(
+    conn: sqlite3.Connection,
+    job_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    """Return channel labels and latest observation metadata keyed by job id."""
+    if not job_ids:
+        return {}
+    placeholders = ",".join("?" for _ in job_ids)
+    rows = conn.execute(
+        f"""
+        SELECT job_id, source_platform, source_channel, source_label,
+               source_keyword, source_city, source_city_code,
+               first_seen_at, last_seen_at, seen_count
+        FROM job_source_observations
+        WHERE job_id IN ({placeholders})
+        ORDER BY first_seen_at ASC, id ASC
+        """,
+        [str(job_id) for job_id in job_ids],
+    ).fetchall()
+    summaries: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        job_id = str(row["job_id"])
+        summary = summaries.setdefault(job_id, {
+            "source_channels": [],
+            "source_labels": [],
+            "source_observations": [],
+        })
+        if row["source_channel"] not in summary["source_channels"]:
+            summary["source_channels"].append(row["source_channel"])
+            summary["source_labels"].append(row["source_label"])
+        summary["source_observations"].append({
+            "channel": row["source_channel"],
+            "label": row["source_label"],
+            "keyword": row["source_keyword"],
+            "city": row["source_city"],
+            "first_seen_at": row["first_seen_at"],
+            "last_seen_at": row["last_seen_at"],
+            "seen_count": int(row["seen_count"] or 1),
+        })
+    return summaries
+
+
 def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
     """Insert a job atomically and return True only when a row was inserted.
 
@@ -503,22 +645,41 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
         "source_keyword": job.get("source_keyword", ""),
         "source_city_code": job.get("source_city_code", ""),
     }
+    from openjob.collection.models import COLLECTION_CHANNEL_LABELS
+
+    channel = str(job.get("source_channel") or "search").strip()
+    values["source_channel"] = channel if channel in COLLECTION_CHANNEL_LABELS else "search"
     cursor = conn.execute(
         """
         INSERT OR IGNORE INTO jobs (
             id, title, company, salary, city, experience, education, recruitment_type, jd,
             hr_name, hr_title, hr_active, company_size, company_industry, url,
-            source_platform, source_job_id, source_keyword, source_city_code
+            source_platform, source_job_id, source_keyword, source_city_code, source_channel
         ) VALUES (
             :id, :title, :company, :salary, :city, :experience, :education, :recruitment_type, :jd,
             :hr_name, :hr_title, :hr_active, :company_size, :company_industry, :url,
-            :source_platform, :source_job_id, :source_keyword, :source_city_code
+            :source_platform, :source_job_id, :source_keyword, :source_city_code, :source_channel
         )
         """,
         values,
     )
+    inserted = cursor.rowcount == 1
+    # 来源观察：新岗位与重复命中的已有岗位都记录（重复命中不覆盖主来源，只追加观察）
+    try:
+        record_job_source_observation(
+            conn,
+            job_id=str(values["id"]),
+            source_platform=str(values["source_platform"]),
+            source_channel=str(values["source_channel"]),
+            source_keyword=str(values["source_keyword"] or ""),
+            source_city=str(values["city"] or ""),
+            source_city_code=str(values["source_city_code"] or ""),
+        )
+    except sqlite3.Error:
+        # 观察失败只降级，不把已保存岗位误标为采集失败
+        pass
     conn.commit()
-    return cursor.rowcount == 1
+    return inserted
 
 
 def insert_job(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
