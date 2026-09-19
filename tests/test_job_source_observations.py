@@ -312,3 +312,48 @@ class FirstObservationCountTests(unittest.TestCase):
                 self.assertEqual(rows.get("recommendation"), 2)
             finally:
                 db.close()
+
+
+class PermanentDeleteObservationTests(unittest.TestCase):
+    """收尾 Batch B：永久删除同步清理 observation；软删除/恢复保留。"""
+
+    def test_permanent_delete_removes_source_observations(self):
+        from openjob.db import soft_delete_jobs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = get_db(Path(tmp) / "openjob.db")
+            try:
+                insert_job_if_new(db, {
+                    "id": "pd-1", "title": "数据专员", "company": "C",
+                    "jd": "x", "url": "https://www.zhipin.com/job_detail/pd1.html",
+                    "source_platform": "boss", "source_job_id": "pd-1",
+                    "source_channel": "search",
+                })
+                record_job_source_observation(
+                    db, job_id="pd-1", source_platform="boss", source_channel="recommendation",
+                )
+                soft_delete_jobs(db, ["pd-1"], confirmed=True, reason="测试")
+                # 软删除保留观察
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM job_source_observations WHERE job_id='pd-1'"
+                ).fetchone()[0], 2)
+                # 恢复后仍可查询
+                from openjob.db import restore_jobs
+
+                restore_jobs(db, ["pd-1"])
+                summaries = get_job_source_summaries(db, ["pd-1"])
+                self.assertEqual(summaries["pd-1"]["source_channels"], ["search", "recommendation"])
+                # 再软删 + 永久删除
+                soft_delete_jobs(db, ["pd-1"], confirmed=True, reason="测试")
+                from openjob.db import permanent_delete_jobs
+
+                result = permanent_delete_jobs(db, ["pd-1"], confirmed=True, confirmation="PERMANENT_DELETE")
+                self.assertEqual(result["affected_count"], 1)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM job_source_observations WHERE job_id='pd-1'"
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM jobs WHERE id='pd-1'"
+                ).fetchone()[0], 0)
+            finally:
+                db.close()

@@ -464,6 +464,8 @@ def permanent_delete_jobs(
     with conn:
         placeholders = ",".join("?" for _ in ids)
         conn.execute(f"DELETE FROM history WHERE job_id IN ({placeholders})", ids)
+        # 收尾 Batch B：同步清理来源观察，避免孤儿记录（软删除/恢复不受影响）
+        conn.execute(f"DELETE FROM job_source_observations WHERE job_id IN ({placeholders})", ids)
         cursor = conn.execute(f"DELETE FROM jobs WHERE id IN ({placeholders}) AND deleted_at IS NOT NULL", ids)
         if cursor.rowcount != len(ids):
             raise JobDeletionConflictError("永久删除数量校验失败，事务已回滚")
