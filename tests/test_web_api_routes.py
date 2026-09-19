@@ -2719,7 +2719,11 @@ class JobSourceLabelApiTests(unittest.TestCase):
         add_history(db, "src-1", "approved", "来源徽标测试台账")
         from openjob.db import record_job_source_observation
 
-        # 入库已自动记录 search 观察（keyword/city 与 _job 一致），此处只补推荐来源
+        # 责任层唯一化后：search 与 recommendation 观察都由显式调用记录
+        record_job_source_observation(
+            db, job_id="src-1", source_platform="boss", source_channel="search",
+            source_keyword="", source_city="Shanghai",
+        )
         record_job_source_observation(
             db, job_id="src-1", source_platform="boss", source_channel="recommendation",
             source_keyword="", source_city="",
