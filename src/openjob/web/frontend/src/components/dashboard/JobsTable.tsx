@@ -67,6 +67,30 @@ const POST_SEND_STATUSES = [
   'interview', 'offer', 'hr_rejected', 'closed',
 ]
 
+/** 推荐页计划：岗位来源徽标（搜索流/推荐页/双来源），缺字段时回退不崩溃 */
+function SourceBadge({ job }: { job: Job }) {
+  const labels: string[] = Array.isArray(job.source_labels) ? job.source_labels : []
+  if (!labels.length) {
+    if (job.source_channel === 'recommendation') labels.push('推荐页')
+    else if (job.source_channel === 'search') labels.push('搜索流')
+    else return null
+  }
+  const text = labels.join(' + ')
+  const tone = labels.length > 1
+    ? 'border-primary/40 bg-accent-soft text-primary'
+    : labels[0] === '推荐页'
+      ? 'border-primary/30 bg-accent-soft/60 text-primary'
+      : 'border-card-border bg-surface-hover text-muted'
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}
+      title={`岗位来源：${text}`}
+    >
+      {text}
+    </span>
+  )
+}
+
 /** A1 回流徽章：HR 回复次数与最新摘要 */
 function ReplyBadge({ job }: { job: Job }) {
   const count = Number(job.reply_count || 0)
@@ -192,6 +216,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                   <span className="text-muted-3">·</span>
                   <Badge variant={statusVariant(job.status) as any}>{getStatusLabel(job.status)}</Badge>
 <ReplyBadge job={job} />
+<SourceBadge job={job} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-3">
                   <span className="rounded-full bg-accent-soft px-1.5 py-0.5 font-semibold text-primary">
@@ -318,6 +343,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                       <td className="whitespace-nowrap px-4 py-3 align-middle">
                         <Badge variant={statusVariant(job.status) as any}>{getStatusLabel(job.status)}</Badge>
 <ReplyBadge job={job} />
+<SourceBadge job={job} />
                       </td>
                       <td className="hidden whitespace-nowrap px-4 py-3 align-middle text-xs text-muted lg:table-cell">
                         <span className="inline-flex items-center gap-1.5">

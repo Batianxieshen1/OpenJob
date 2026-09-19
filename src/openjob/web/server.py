@@ -1166,6 +1166,15 @@ def api_jobs():
 	db = _get_web_db()
 	try:
 		jobs, total = query_jobs(db, deleted=deleted, limit=limit, offset=offset)
+		# 推荐页计划 §9.4：多来源标签（缺 observation 时回退 source_channel，不崩溃）
+		from openjob.db import get_job_source_summaries
+
+		summaries = get_job_source_summaries(db, [str(job.get("id")) for job in jobs])
+		for job in jobs:
+			summary = summaries.get(str(job.get("id"))) or {}
+			job["source_channels"] = summary.get("source_channels") or [str(job.get("source_channel") or "search")]
+			job["source_labels"] = summary.get("source_labels") or []
+			job["source_observations"] = summary.get("source_observations") or []
 		response.headers["X-Total-Count"] = str(total)
 		return _json_response(jobs)
 	finally:
@@ -2563,6 +2572,12 @@ def api_job_detail(job_id):
 			(job_id,),
 		).fetchall()
 		job["history"] = [dict(item) for item in history_rows]
+		from openjob.db import get_job_source_summaries
+
+		summary = (get_job_source_summaries(db, [str(job_id)]) or {}).get(str(job_id)) or {}
+		job["source_channels"] = summary.get("source_channels") or [str(job.get("source_channel") or "search")]
+		job["source_labels"] = summary.get("source_labels") or []
+		job["source_observations"] = summary.get("source_observations") or []
 		return _json_response(job)
 	finally:
 		db.close()

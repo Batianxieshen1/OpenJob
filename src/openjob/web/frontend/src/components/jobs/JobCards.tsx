@@ -251,7 +251,7 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
           <InfoBlock label="HR" value={[job.hr_name, job.hr_title].filter(Boolean).join(' · ') || '-'} />
           <InfoBlock label="招聘者活跃" value={job.hr_active || '活跃度未知'} />
           <InfoBlock label="公司" value={[job.company_size, job.company_industry].filter(Boolean).join(' · ') || '-'} />
-          <InfoBlock label="来源平台" value={job.source_platform === 'zhilian' ? '智联招聘｜当前只开放采集' : job.source_platform === '51job' ? '前程无忧｜当前只开放采集' : 'BOSS 直聘'} />
+          <InfoBlock label="来源平台" value={[job.source_platform === 'zhilian' ? '智联招聘｜当前只开放采集' : job.source_platform === '51job' ? '前程无忧｜当前只开放采集' : 'BOSS 直聘', ...(Array.isArray(job.source_labels) && job.source_labels.length ? [`来源：${job.source_labels.join(' + ')}`] : job.source_channel === 'recommendation' ? ['来源：推荐页'] : [])].filter(Boolean).join(' · ')} />
           <InfoBlock label="匹配分" value={String(job.score || '-')} />
           <InfoBlock label="定制简历" value={job.resume_path || '未生成'} />
         </div>

@@ -41,6 +41,8 @@ interface Job {
   resume_path?: string
   last_error?: string
   greeting_fact_status?: string
+  source_channel?: string
+  source_labels?: string[]
   reply_count?: number
   replied_at?: string | null
   last_reply_snippet?: string | null
@@ -86,6 +88,18 @@ export interface CollectionPlatformProgress {
   phase?: string
   reason_code?: string
   message?: string
+  current_source?: string
+  sources?: Record<string, {
+    label?: string
+    status?: string
+    seen?: number
+    new?: number
+    duplicate?: number
+    filtered?: number
+    parse_failed?: number
+    reason_code?: string
+  }>
+  source_results?: Record<string, { status?: string; reason_code?: string; message?: string }>
 }
 
 export interface CollectionProgress {
