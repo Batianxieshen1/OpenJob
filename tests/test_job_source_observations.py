@@ -330,6 +330,10 @@ class PermanentDeleteObservationTests(unittest.TestCase):
                     "source_channel": "search",
                 })
                 record_job_source_observation(
+                    db, job_id="pd-1", source_platform="boss", source_channel="search",
+                    source_keyword="",
+                )
+                record_job_source_observation(
                     db, job_id="pd-1", source_platform="boss", source_channel="recommendation",
                 )
                 soft_delete_jobs(db, ["pd-1"], confirmed=True, reason="测试")
