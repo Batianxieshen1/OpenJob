@@ -18,7 +18,8 @@
 | 发送间隔 | `interval_min: 90` ~ `interval_max: 240` 秒 | 高斯随机分布，模拟真人节奏 |
 | 发送时间窗 | `send_windows: ["09:00-16:00"]` | 窗口外投递任务自动拒绝/截止 |
 | 搜索页上限 | `collection.daily_search_page_limit: 60` | BOSS 单日翻页安全线 |
-| 详情页上限 | `collection.daily_detail_page_limit: 150` | 触达后当天自动停止 BOSS 采集 |
+| 推荐页上限 | `collection.daily_recommendation_page_limit: 10` | BOSS 推荐页单日加载上限（默认关闭，开启后生效；同样计入全局 500 页） |
+| 详情页上限 | `collection.daily_detail_page_limit: 150` | 触达后当天自动停止 BOSS 采集（搜索/推荐共用） |
 
 > ⚠ **实测教训（2026-08-13，V1 时期）**：无头浏览器 1 分钟内连续搜索 2 次，BOSS 即返回
 > code 36「账户异常行为」软风控。结论：

@@ -81,6 +81,7 @@ export function ScheduledCollectionCard({ schedule }: { schedule: ScheduledColle
         {last?.status === 'completed' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" /> : last?.status === 'failed' ? <XCircle className="h-3.5 w-3.5 shrink-0 text-danger" /> : <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />}
         <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${statusTone}`}>{statusText(last?.status)}</span>
         <span className="truncate" title={last?.reason || '不会自动发送招呼语、简历或回复'}>{last?.reason || '不会自动发送任何内容'}</span>
+        <span className="ml-auto shrink-0 text-muted-3">不会自动发送任何内容</span>
       </div>
     </section>
   )

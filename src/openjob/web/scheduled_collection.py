@@ -56,6 +56,16 @@ def normalize_schedule_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("定时采集每平台最大页数必须是整数") from exc
     if not 1 <= max_pages <= 10:
         raise ValueError("定时采集每平台最大页数必须在 1 到 10 之间")
+    # 推荐页计划 Task 6：定时采集默认不包含推荐页（安全默认），可显式开启
+    include_recommendation = raw.get("include_recommendation", False) is True
+    recommendation_max_scrolls = 2
+    if include_recommendation:
+        try:
+            recommendation_max_scrolls = int(raw.get("recommendation_max_scrolls", 2))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("定时采集推荐页分页轮次必须是整数") from exc
+        if not 1 <= recommendation_max_scrolls <= 10:
+            raise ValueError("定时采集推荐页分页轮次必须在 1 到 10 之间")
     pause_today_date = str(raw.get("pause_today_date") or "").strip()
     if pause_today_date:
         try:
@@ -69,6 +79,8 @@ def normalize_schedule_config(config: dict[str, Any]) -> dict[str, Any]:
         "max_pages": max_pages,
         "platforms": platforms,
         "pause_today_date": pause_today_date,
+        "include_recommendation": include_recommendation,
+        "recommendation_max_scrolls": recommendation_max_scrolls,
     }
     config["collection_schedule"] = normalized
     return normalized
@@ -169,6 +181,7 @@ class ScheduledCollectionScheduler:
 
     def _build_options(self, config: dict[str, Any], schedule: dict[str, Any]) -> dict[str, Any]:
         base = normalize_collection_options(config)
+        include_recommendation = bool(schedule.get("include_recommendation"))
         platforms: dict[str, Any] = {}
         for platform in schedule["platforms"]:
             if platform not in base["platforms"]:
@@ -176,6 +189,18 @@ class ScheduledCollectionScheduler:
                 raise ValueError(f"{platform} 未配置可用搜索条件")
             platforms[platform] = dict(base["platforms"][platform])
             platforms[platform]["max_pages"] = schedule["max_pages"]
+            if platform == "boss":
+                # 推荐页计划 Task 6：默认只跑搜索流；显式开启后按计划轮次覆盖
+                channels = list(platforms[platform].get("source_channels") or ["search"])
+                if include_recommendation:
+                    if "recommendation" not in channels:
+                        channels.append("recommendation")
+                    platforms[platform]["recommendation_max_scrolls"] = int(
+                        schedule.get("recommendation_max_scrolls") or 2
+                    )
+                else:
+                    channels = [channel for channel in channels if channel != "recommendation"]
+                platforms[platform]["source_channels"] = channels or ["search"]
         return validate_collection_options({
             "platform_order": list(schedule["platforms"]),
             "auto_score": True,
