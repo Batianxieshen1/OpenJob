@@ -60,6 +60,22 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
         />
       </div>
 
+      {/* 推荐页计划 §9.2：运行中的采集任务按来源分行展示进度 */}
+      {(() => {
+        const bossSources = (activeTask?.progress as { platforms?: Record<string, { sources?: Record<string, { label?: string; status?: string; seen?: number; new?: number; duplicate?: number; reason_code?: string }> }> } | null)?.platforms?.boss?.sources
+        if (!bossSources || !Object.keys(bossSources).length) return null
+        return (
+          <div className="mt-3 space-y-1">
+            {Object.entries(bossSources).map(([channel, info]) => (
+              <div key={channel} className="rounded-xl bg-shell/8 dark:bg-white/5 px-3 py-1.5 text-[11px] leading-5 text-shell/80 dark:text-white/80">
+                {info.label || channel}：扫描 {info.seen || 0} · 新增 {info.new || 0} · 重复 {info.duplicate || 0}
+                {info.reason_code && <span className="ml-1 text-warning">（{info.reason_code}）</span>}
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       <div className="mt-auto pt-4">
         {running ? (
           <button
