@@ -50,7 +50,7 @@ JOB_STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
     "needs_resume": frozenset({"resume_sent", "replied", "rejected", "follow_up_sent", "stale"}),
     "resume_sent": frozenset({"replied", "rejected", "needs_resume", "follow_up_sent", "stale"}),
     "follow_up_sent": frozenset({"replied", "resume_sent", "needs_resume", "rejected", "stale"}),
-    "replied": frozenset({"interview", "hr_rejected", "closed"}),
+    "replied": frozenset({"interview", "hr_rejected", "closed", "needs_resume"}),
     "interview": frozenset({"offer", "closed", "hr_rejected"}),
     "offer": frozenset({"closed"}),
     "hr_rejected": frozenset({"closed"}),

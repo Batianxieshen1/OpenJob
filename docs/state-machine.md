@@ -31,6 +31,7 @@ stateDiagram-v2
     sent --> rejected : HR 拒绝
     sent --> stale
     replied --> interview : 约面试
+    replied --> needs_resume : 回复后索要简历
     replied --> hr_rejected
     replied --> closed
     interview --> offer

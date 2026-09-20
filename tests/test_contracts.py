@@ -63,6 +63,7 @@ class JobStatusTransitionWhitelistTests(unittest.TestCase):
             ("approved", "approved"),
             ("resume_sent", "replied"),
             ("needs_resume", "resume_sent"),
+            ("replied", "needs_resume"),
         ]
         for current, new in allowed:
             validate_job_status_transition(current, new)
