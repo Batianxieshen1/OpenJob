@@ -334,9 +334,10 @@ export function CollectJobsDialog({ open, mode = 'collect', activeTask, onClose,
                       {draft.sourceChannels.includes('recommendation') && (
                         <>
                           <p className="mt-2 text-xs leading-5 text-warning">推荐页来自 BOSS 个性化推荐，不依赖搜索关键词；会增加页面访问和详情解析时间，仍受 BOSS 每日安全额度限制。推荐页只采集，不会自动发送招呼语、简历或回复。</p>
+                          <p className="mt-1 text-xs leading-5 text-muted">「最多处理候选数」限制的是进入详情解析的候选数量：重复岗位不会占用该额度，因此实际扫描的卡片数可能高于此值；页面访问和详情页仍受 BOSS 安全额度限制。</p>
                           <div className="mt-2 grid grid-cols-3 gap-2">
                             <label className="text-xs font-bold text-muted">分页轮次<Input type="number" min={1} max={10} value={draft.recommendationMaxScrolls} onChange={event => updateDraft('boss', 'recommendationMaxScrolls', event.target.value)} /></label>
-                            <label className="text-xs font-bold text-muted">最大卡片数<Input type="number" min={1} max={200} value={draft.recommendationMaxCards} onChange={event => updateDraft('boss', 'recommendationMaxCards', event.target.value)} /></label>
+                            <label className="text-xs font-bold text-muted">最多处理候选数<Input type="number" min={1} max={200} value={draft.recommendationMaxCards} onChange={event => updateDraft('boss', 'recommendationMaxCards', event.target.value)} /></label>
                             <label className="text-xs font-bold text-muted">连续无新增上限<Input type="number" min={1} max={5} value={draft.recommendationSameResultLimit} onChange={event => updateDraft('boss', 'recommendationSameResultLimit', event.target.value)} /></label>
                           </div>
                         </>

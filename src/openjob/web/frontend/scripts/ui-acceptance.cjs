@@ -104,7 +104,8 @@ async function capture(browser) {
   });
   results.push({ test: 'recommend-copy-no-auto-send', ok: dialogAfterRec.includes('不会自动发送招呼语、简历或回复') });
   results.push({ test: 'recommend-copy-personalized', ok: dialogAfterRec.includes('推荐页来自 BOSS 个性化推荐') });
-  results.push({ test: 'recommend-params-visible', ok: dialogAfterRec.includes('分页轮次') && dialogAfterRec.includes('最大卡片数') && dialogAfterRec.includes('连续无新增上限') });
+  results.push({ test: 'recommend-params-visible', ok: dialogAfterRec.includes('分页轮次') && dialogAfterRec.includes('最多处理候选数') && dialogAfterRec.includes('连续无新增上限') });
+  results.push({ test: 'recommend-duplicate-note', ok: dialogAfterRec.includes('重复岗位不会占用') });
   // E3：只推荐页说明
   const searchUnchecked = await page.evaluate(() => {
     const dialog = document.querySelector('[role="dialog"]');
