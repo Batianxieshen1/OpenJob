@@ -2,6 +2,7 @@
 
 import json
 import unittest
+from pathlib import Path
 from threading import Event
 
 from openjob.collection.base import CollectorHooks
