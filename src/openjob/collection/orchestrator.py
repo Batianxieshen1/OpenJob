@@ -468,14 +468,19 @@ class CollectionOrchestrator:
                     result = PlatformCollectionResult(platform, "blocked", exc.code, exc.message, error=str(exc))
                 except Exception as exc:
                     result = PlatformCollectionResult(platform, "failed", "network_error", f"{platform} 采集失败", error=str(exc)[:500])
-                # 按来源标记完成状态（stopped 等中断场景保持各自状态）
+                # 按来源标记各自真实状态（收尾 Batch A）：
+                # 优先读 result.source_results 中该来源的阶段结果，
+                # 避免 search 的完成状态被 recommendation 的 reason code 覆盖。
                 for channel in request_channels:
-                    source_status = result.status if result.status in {"completed", "completed_with_shortage"} else result.status
-                    processor.finish_source(
-                        channel,
-                        status=source_status,
-                        reason_code=result.reason_code if result.status != "completed" else "",
-                    )
+                    source_result = (result.source_results or {}).get(channel)
+                    if source_result:
+                        source_status = str(source_result.get("status") or result.status)
+                        source_reason = str(source_result.get("reason_code") or "")
+                    else:
+                        # 兼容智联/51job 与无来源结果的旧 collector
+                        source_status = result.status
+                        source_reason = result.reason_code if result.status != "completed" else ""
+                    processor.finish_source(channel, status=source_status, reason_code=source_reason)
                 result.new_job_ids = list(processor.new_job_ids)
                 result.counts = self._counts(processor.progress)
                 platform_results.append(result)

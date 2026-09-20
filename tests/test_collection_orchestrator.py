@@ -296,3 +296,87 @@ class SourceChannelContractTests(TestCase):
         )
         self.assertIn("recommendation", result["platforms"]["boss"]["source_channels"])
         self.assertFalse(result["auto_score"])
+
+
+class MixedSourceProgressTests(TestCase):
+    """收尾 Batch A：混合来源 run 中 sources 状态必须按来源独立，不被互相覆盖。"""
+
+    def _scripted_mixed_run(self, *, rec_status, rec_reason):
+        from openjob.collection.models import PlatformCollectionResult
+
+        class _ScriptedCollector:
+            platform = "boss"
+
+            def collect(self, request, hooks):
+                for candidate in ():
+                    pass
+                return PlatformCollectionResult(
+                    "boss", "completed_with_shortage", "recommendation_scroll_limit",
+                    "已达到推荐页最大分页轮次 1",
+                    source_results={
+                        "search": {"status": "completed", "reason_code": "search_exhausted", "message": "搜索流完成"},
+                        "recommendation": {"status": rec_status, "reason_code": rec_reason, "message": "推荐页阶段"},
+                    },
+                )
+
+        class _StubRegistry:
+            def get(self, _name):
+                return _ScriptedCollector()
+
+        with patch("openjob.ai.scorer.score_jobs") as score_mock:
+            orchestrator = CollectionOrchestrator(
+                {"platforms": {"boss": {"enabled": True, "search": {
+                    "keywords": ["数据分析实习"], "cities": ["广州"],
+                }}}},
+                db_path=Path(tempfile.mkdtemp()) / "openjob.db",
+                registry=_StubRegistry(),
+                run_id="mixed-run-1",
+            )
+            summary = orchestrator.run({
+                "auto_score": False,
+                "platforms": {"boss": {
+                    "keywords": ["数据分析实习"], "cities": ["广州"],
+                    "source_channels": ["search", "recommendation"],
+                }},
+            })
+        return summary, score_mock
+
+    def test_search_success_recommendation_scroll_limit(self):
+        summary, _ = self._scripted_mixed_run(
+            rec_status="completed_with_shortage", rec_reason="recommendation_scroll_limit",
+        )
+        sources = summary["platforms"]["boss"]["sources"]
+        self.assertEqual(sources["search"]["status"], "completed")
+        self.assertEqual(sources["search"]["reason_code"], "search_exhausted")
+        self.assertEqual(sources["recommendation"]["status"], "completed_with_shortage")
+        self.assertEqual(sources["recommendation"]["reason_code"], "recommendation_scroll_limit")
+        # source_results 保持真实结果不被改写
+        results = summary["platforms"]["boss"]["source_results"]
+        self.assertEqual(results["search"]["reason_code"], "search_exhausted")
+        self.assertEqual(results["recommendation"]["reason_code"], "recommendation_scroll_limit")
+
+    def test_search_success_recommendation_parser_unsupported(self):
+        summary, _ = self._scripted_mixed_run(
+            rec_status="completed_with_shortage", rec_reason="recommendation_parser_unsupported",
+        )
+        sources = summary["platforms"]["boss"]["sources"]
+        self.assertEqual(sources["search"]["status"], "completed")
+        self.assertEqual(sources["recommendation"]["reason_code"], "recommendation_parser_unsupported")
+
+    def test_search_success_recommendation_blocked(self):
+        summary, _ = self._scripted_mixed_run(
+            rec_status="blocked", rec_reason="captcha",
+        )
+        sources = summary["platforms"]["boss"]["sources"]
+        self.assertEqual(sources["search"]["status"], "completed")
+        self.assertEqual(sources["recommendation"]["status"], "blocked")
+        self.assertEqual(sources["recommendation"]["reason_code"], "captcha")
+
+    def test_search_success_recommendation_user_stopped(self):
+        summary, _ = self._scripted_mixed_run(
+            rec_status="stopped", rec_reason="user_stopped",
+        )
+        sources = summary["platforms"]["boss"]["sources"]
+        self.assertEqual(sources["search"]["status"], "completed")
+        self.assertEqual(sources["recommendation"]["status"], "stopped")
+        self.assertEqual(sources["recommendation"]["reason_code"], "user_stopped")
