@@ -451,7 +451,11 @@ class RiskExitResultTests(unittest.TestCase):
             scroll=lambda *_a, **_k: True,
             wait_for_load=lambda *_a, **_k: True,
         )
-        safety = {}
+        import tempfile as _tempfile
+        from openjob.db import get_db as _get_db
+
+        _safety_dir = _tempfile.mkdtemp()
+        safety_db = _get_db(Path(_safety_dir) / "safety.db")
         request = PlatformCollectionRequest(
             "boss", [], [], {}, source_channels=["recommendation"],
             recommendation_max_scrolls=2,
@@ -461,10 +465,11 @@ class RiskExitResultTests(unittest.TestCase):
             throttle_factory=lambda **_k: _NoWaitThrottle(),
             sleep=lambda _s: None,
             randint=lambda _lo, _hi: 1,
-            safety_conn=type("C", (), {"__enter__": lambda s: s, "__exit__": lambda s, *a: False})(),
+            safety_conn=safety_db,
         ).collect(request, _hooks([]))
         rec = (result.source_results or {}).get("recommendation") or {}
         self.assertEqual(result.status, "blocked")
         self.assertEqual(result.reason_code, "captcha")
         self.assertEqual(rec.get("status"), "blocked")  # 不再被 finally 覆盖为 completed
         self.assertEqual(rec.get("reason_code"), "captcha")
+        safety_db.close()
