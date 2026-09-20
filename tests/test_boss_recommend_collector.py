@@ -480,7 +480,8 @@ class RecommendationCardLimitSemanticsTests(unittest.TestCase):
     """收尾 Batch C：max_cards 限制的是通过 on_list_candidate 的处理候选数。"""
 
     def test_duplicates_do_not_exhaust_card_budget(self):
-        # 15 张卡全部同 URL（全重复），max_cards=3：重复不占用额度 → 不会提前停
+        # 每轮 1 张重复卡（URL 与首轮相同但轮间不同）：重复不占用处理额度 →
+        # 轮次跑满而非卡片上限提前停止
         request = PlatformCollectionRequest(
             "boss", [], [], {}, source_channels=["recommendation"],
             recommendation_max_scrolls=2, recommendation_max_cards=3,
@@ -491,7 +492,7 @@ class RecommendationCardLimitSemanticsTests(unittest.TestCase):
         def evaluate(_target, script):
             if "item-boss" in script:
                 rounds["n"] += 1
-                return _recommend_payload(card_url="/job_detail/rec-dup.html")
+                return _recommend_payload(card_url=f"/job_detail/rec-r{rounds['n']}.html")
             if ".job-sec-text" in script:
                 return _detail_payload()
             return json.dumps({"risk": None})
@@ -524,9 +525,9 @@ class RecommendationCardLimitSemanticsTests(unittest.TestCase):
             randint=lambda _lo, _hi: 1,
         ).collect(request, hooks)
 
-        # 轮次跑满（2 轮）而非卡片上限提前停止
+        # 轮次跑满（2 轮）而非卡片上限提前停止：重复候选不占用处理额度
         self.assertEqual(result.reason_code, "recommendation_scroll_limit")
-        self.assertEqual(on_list_calls["n"], 30)  # 2 轮 × 15 卡全部进入处理
+        self.assertEqual(on_list_calls["n"], 2)  # 每轮 1 张重复卡全部进入处理
 
     def test_new_candidates_respect_card_limit(self):
         # 全新岗位场景：max_cards=3 → 只处理前 3 个候选，其余截断
