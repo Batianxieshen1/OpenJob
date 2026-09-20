@@ -487,6 +487,7 @@ class BossCollector:
                     try:
                         if guard is not None: guard.reserve("recommendation_page", daily_limit=rec_page_limit)
                     except PlatformSafetyStop as exc:
+                        _record_recommendation_phase("completed_with_shortage", exc.reason, f"BOSS 采集已达安全上限：{exc.reason}", cards=total_cards, pages=page_no)
                         return limited(exc.reason)
                     rec_url = recommendation_page_url(page_no)
                     opened = self.browser.new_tab(rec_url, background=True) if worker_target is None else self.browser.navigate(worker_target, rec_url)
@@ -499,14 +500,19 @@ class BossCollector:
                             break
                         continue
                     if _wait_or_stop(hooks.stop_event, 3 * delay_multiplier, self.sleep):
+                        _record_recommendation_phase("stopped", "user_stopped", "用户已停止", cards=total_cards, pages=page_no)
                         return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
                     self.browser.wait_for_load(worker_target, timeout=10)
                     signal = confirm_risk(worker_target)
                     if signal and signal["kind"] == "user_stopped":
+                        _record_recommendation_phase("stopped", "user_stopped", "用户已停止", cards=total_cards, pages=page_no)
                         return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
-                    if signal: return risk(signal["kind"], signal["evidence"])
+                    if signal:
+                        _record_recommendation_phase("blocked", signal["kind"], f"BOSS 采集检测到风险；证据 {signal['evidence']}", cards=total_cards, pages=page_no)
+                        return risk(signal["kind"], signal["evidence"])
                     self.browser.scroll(worker_target, y=2000)
                     if _wait_or_stop(hooks.stop_event, 1.0 * delay_multiplier, self.sleep):
+                        _record_recommendation_phase("stopped", "user_stopped", "用户已停止", cards=total_cards, pages=page_no)
                         return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
                     raw_payload = self.browser.evaluate(worker_target, JS_EXTRACT_RECOMMEND_LIST)
                     batch = parse_recommendation_payload(raw_payload)
@@ -524,6 +530,7 @@ class BossCollector:
                         break
                     for card in batch.cards:
                         if hooks.stop_event is not None and hooks.stop_event.is_set():
+                            _record_recommendation_phase("stopped", "user_stopped", "用户已停止", cards=total_cards, pages=page_no)
                             return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
                         if total_cards > rec_max_cards:
                             break
@@ -536,16 +543,22 @@ class BossCollector:
                         if outcome in {"saved", "filtered", "failed"}:
                             continue
                         if outcome == "callback_stopped":
+                            _record_recommendation_phase("stopped", "callback_stopped", "采集回调已停止", cards=total_cards, pages=page_no)
                             return PlatformCollectionResult(self.platform, "completed", "callback_stopped", "采集回调已停止")
                         if outcome == "stopped":
+                            _record_recommendation_phase("stopped", "user_stopped", "用户已停止", cards=total_cards, pages=page_no)
                             return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
                         if outcome == "page_failures_stop":
+                            _record_recommendation_phase("completed_with_shortage", "consecutive_page_failures", "BOSS 连续页面失败", cards=total_cards, pages=page_no)
                             return page_failure_stop()
                         if outcome.startswith("risk:"):
                             kind, _, evidence = outcome[5:].partition(":")
+                            _record_recommendation_phase("blocked", kind, f"BOSS 采集检测到风险；证据 {evidence}", cards=total_cards, pages=page_no)
                             return risk(kind, evidence)
                         if outcome.startswith("limited:"):
-                            return limited(outcome.split(":", 1)[1])
+                            reason = outcome.split(":", 1)[1]
+                            _record_recommendation_phase("completed_with_shortage", reason, f"BOSS 采集已达安全上限：{reason}", cards=total_cards, pages=page_no)
+                            return limited(reason)
                     if total_cards >= rec_max_cards:
                         reason_code, message = "recommendation_card_limit", f"已达到推荐页最大卡片数 {rec_max_cards}"
                         break

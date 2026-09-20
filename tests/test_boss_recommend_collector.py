@@ -428,3 +428,43 @@ class RecommendationExitPathResultTests(unittest.TestCase):
         rec = (result.source_results or {}).get("recommendation") or {}
         self.assertTrue(rec)  # 风控停止也带回推荐阶段信息
         self.assertEqual(result.status, "blocked")
+
+
+class RiskExitResultTests(unittest.TestCase):
+    """收尾实弹回归：风控停止时 source_results.recommendation 必须是 blocked，不被覆盖。"""
+
+    def test_risk_stop_source_result_is_blocked_not_completed(self):
+        def evaluate(_target, script):
+            if "hasExpectedContent" in script:
+                return json.dumps({"risk": "captcha", "evidence": "captcha_page"})
+            if "item-boss" in script:
+                return _recommend_payload()
+            if ".job-sec-text" in script:
+                return _detail_payload()
+            return json.dumps({"risk": None})
+
+        browser = BossBrowser(
+            new_tab=lambda _u, **_k: "worker-tab",
+            close_tab=lambda _t: True,
+            evaluate=evaluate,
+            navigate=lambda _t, _u: True,
+            scroll=lambda *_a, **_k: True,
+            wait_for_load=lambda *_a, **_k: True,
+        )
+        safety = {}
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=2,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+            safety_conn=type("C", (), {"__enter__": lambda s: s, "__exit__": lambda s, *a: False})(),
+        ).collect(request, _hooks([]))
+        rec = (result.source_results or {}).get("recommendation") or {}
+        self.assertEqual(result.status, "blocked")
+        self.assertEqual(result.reason_code, "captcha")
+        self.assertEqual(rec.get("status"), "blocked")  # 不再被 finally 覆盖为 completed
+        self.assertEqual(rec.get("reason_code"), "captcha")
