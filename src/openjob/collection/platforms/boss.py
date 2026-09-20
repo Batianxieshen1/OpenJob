@@ -477,6 +477,7 @@ class BossCollector:
             seen_urls: set[str] = set()
             same_result_rounds = 0
             total_cards = 0
+            processed_cards = 0
             page_no = 1
             reason_code = "recommendation_feed_exhausted"
             message = "BOSS 推荐页已采集完毕"
@@ -534,14 +535,17 @@ class BossCollector:
                     if batch.is_end_of_feed:
                         reason_code, message = "recommendation_feed_exhausted", "BOSS 推荐页已到最后一页"
                         break
+                    processed_this_run = 0 if page_no == 1 else processed_cards
                     for card in batch.cards:
                         if hooks.stop_event is not None and hooks.stop_event.is_set():
                             _record_recommendation_phase("stopped", "user_stopped", "用户已停止", final=True, cards=total_cards, pages=page_no)
                             return PlatformCollectionResult(self.platform, "stopped", "user_stopped", "用户已停止")
-                        if total_cards > rec_max_cards:
+                        if processed_this_run >= rec_max_cards:
                             break
                         candidate = self._recommend_candidate(card)
                         if not candidate or not hooks.on_list_candidate(candidate): continue
+                        processed_this_run += 1
+                        processed_cards = processed_this_run
                         if self.config and quick_score(card if isinstance(card, dict) else {}, self.config)[0] <= 0:
                             hooks.on_event(message="BOSS 推荐列表预筛不通过", increment_filtered=True)
                             continue
@@ -565,7 +569,7 @@ class BossCollector:
                             reason = outcome.split(":", 1)[1]
                             _record_recommendation_phase("completed_with_shortage", reason, f"BOSS 采集已达安全上限：{reason}", final=True, cards=total_cards, pages=page_no)
                             return limited(reason)
-                    if total_cards >= rec_max_cards:
+                    if processed_cards >= rec_max_cards:
                         reason_code, message = "recommendation_card_limit", f"已达到推荐页最大卡片数 {rec_max_cards}"
                         break
                     same_result_rounds = 0 if new_in_round > 0 else same_result_rounds + 1
