@@ -61,7 +61,7 @@ platforms:
     enabled: true
     source_channels: [search]  # 可选 search / recommendation；推荐页默认关闭
     recommendation_max_scrolls: 4        # 推荐页最大分页轮次（1-10）
-    recommendation_max_cards: 50         # 推荐页最大卡片数（1-200）
+    recommendation_max_cards: 50         # 推荐页最多处理候选数（1-200）；重复岗位不占用额度
     recommendation_same_result_limit: 2  # 连续无新增轮次上限（1-5）
     search:
       keywords: ["关键词1", "关键词2"]

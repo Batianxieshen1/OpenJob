@@ -474,3 +474,97 @@ class RiskExitResultTests(unittest.TestCase):
         self.assertEqual(rec.get("status"), "blocked")  # 不再被 finally 覆盖为 completed
         self.assertEqual(rec.get("reason_code"), "captcha")
         safety_db.close()
+
+
+class RecommendationCardLimitSemanticsTests(unittest.TestCase):
+    """收尾 Batch C：max_cards 限制的是通过 on_list_candidate 的处理候选数。"""
+
+    def test_duplicates_do_not_exhaust_card_budget(self):
+        # 15 张卡全部同 URL（全重复），max_cards=3：重复不占用额度 → 不会提前停
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=2, recommendation_max_cards=3,
+            recommendation_same_result_limit=5,
+        )
+        rounds = {"n": 0}
+
+        def evaluate(_target, script):
+            if "item-boss" in script:
+                rounds["n"] += 1
+                return _recommend_payload(card_url="/job_detail/rec-dup.html")
+            if ".job-sec-text" in script:
+                return _detail_payload()
+            return json.dumps({"risk": None})
+
+        browser = BossBrowser(
+            new_tab=lambda _u, **_k: "worker-tab",
+            close_tab=lambda _t: True,
+            evaluate=evaluate,
+            navigate=lambda _t, _u: True,
+            scroll=lambda *_a, **_k: True,
+            wait_for_load=lambda *_a, **_k: True,
+        )
+        on_list_calls = {"n": 0}
+
+        def on_list(candidate):
+            on_list_calls["n"] += 1
+            return True
+
+        hooks = CollectorHooks(
+            stop_event=None,
+            on_list_candidate=on_list,
+            on_candidate=lambda _c: True,
+            on_parse_failed=lambda reason: None,
+            on_event=lambda **_kwargs: None,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, hooks)
+
+        # 轮次跑满（2 轮）而非卡片上限提前停止
+        self.assertEqual(result.reason_code, "recommendation_scroll_limit")
+        self.assertEqual(on_list_calls["n"], 30)  # 2 轮 × 15 卡全部进入处理
+
+    def test_new_candidates_respect_card_limit(self):
+        # 全新岗位场景：max_cards=3 → 只处理前 3 个候选，其余截断
+        rounds = {"n": 0}
+
+        def evaluate(_target, script):
+            if "item-boss" in script:
+                rounds["n"] += 1
+                cards = [_recommend_payload(card_url=f"/job_detail/new-{rounds['n']}-{i}.html") for i in range(6)]
+                import json as _json
+
+                payload = _json.loads(cards[0])
+                payload["cards"] = [_json.loads(c)["cards"][0] for c in cards]
+                return _json.dumps(payload)
+            if ".job-sec-text" in script:
+                return _detail_payload()
+            return json.dumps({"risk": None})
+
+        browser = BossBrowser(
+            new_tab=lambda _u, **_k: "worker-tab",
+            close_tab=lambda _t: True,
+            evaluate=evaluate,
+            navigate=lambda _t, _u: True,
+            scroll=lambda *_a, **_k: True,
+            wait_for_load=lambda *_a, **_k: True,
+        )
+        collected = []
+        request = PlatformCollectionRequest(
+            "boss", [], [], {}, source_channels=["recommendation"],
+            recommendation_max_scrolls=1, recommendation_max_cards=3,
+            recommendation_same_result_limit=5,
+        )
+        result = BossCollector(
+            browser=browser,
+            throttle_factory=lambda **_k: _NoWaitThrottle(),
+            sleep=lambda _s: None,
+            randint=lambda _lo, _hi: 1,
+        ).collect(request, _hooks(collected))
+
+        self.assertEqual(len(collected), 3)  # 只有 3 个候选进入详情解析
+        self.assertEqual(result.reason_code, "recommendation_card_limit")
