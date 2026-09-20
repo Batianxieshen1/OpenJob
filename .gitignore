@@ -61,3 +61,4 @@ src/openjob/web/frontend/ui-acceptance-screenshots/
 .reasonix/
 # Temp scripts
 _*.py
+.coverage
