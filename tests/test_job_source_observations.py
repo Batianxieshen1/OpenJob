@@ -474,3 +474,16 @@ class MigrationBackfillResumeTests(unittest.TestCase):
             db.close()
             self.assertEqual(rec, 1)  # 推荐观察不被覆盖
             self.assertLessEqual(search, 1)  # 回填只补 search，且幂等
+
+
+class LegacyScriptSafetyTests(unittest.TestCase):
+    """收尾 Batch B：旧推荐脚本不再有直接入库路径。"""
+
+    def test_legacy_script_has_no_direct_insert_or_fake_keyword(self):
+        source = Path(__file__).resolve().parents[1] / "scripts" / "collect_recommended.py"
+        text = source.read_text(encoding="utf-8")
+        self.assertNotIn("insert_job", text)
+        self.assertNotIn("EXTRACT_JS", text)
+        self.assertNotIn('source_keyword="推荐页"', text)
+        self.assertNotIn('"推荐页"', text)
+        self.assertIn("CollectionOrchestrator", text)  # 转发到统一管线
