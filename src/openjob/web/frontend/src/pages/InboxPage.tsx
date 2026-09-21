@@ -48,6 +48,8 @@ export default function InboxPage() {
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [linkTarget, setLinkTarget] = useState<Conversation | null>(null)
   const [linkJobId, setLinkJobId] = useState('')
+  const [linkResults, setLinkResults] = useState<Array<{ id: string; company: string; title: string; score: number }>>([])
+  const [linkSearching, setLinkSearching] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,14 +122,33 @@ export default function InboxPage() {
     }
   }
 
-  const link = async () => {
-    if (!linkTarget || !linkJobId.trim()) return
+  const searchJobsForLink = async (keyword: string) => {
+    if (!linkTarget) return
+    const kw = keyword.trim()
+    if (!kw) { setLinkResults([]); return }
+    setLinkSearching(true)
+    try {
+      const res = await fetch(`/api/jobs/search?query=${encodeURIComponent(kw)}&page_size=8`, { cache: 'no-store' })
+      const payload = await res.json()
+      setLinkResults((payload?.items || []).map((item: { id: string; company: string; title: string; score: number }) => ({
+        id: item.id, company: item.company, title: item.title, score: item.score,
+      })))
+    } catch {
+      setLinkResults([])
+    } finally {
+      setLinkSearching(false)
+    }
+  }
+
+  const link = async (jobId?: string) => {
+    const target = linkJobId.trim() || jobId || ''
+    if (!linkTarget || !target) return
     setBusyId(linkTarget.id)
     try {
       const res = await fetch(`/api/conversations/${linkTarget.id}/link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id: linkJobId.trim() }),
+        body: JSON.stringify({ job_id: target }),
       })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error?.message || payload.error || '关联失败')
@@ -202,18 +223,39 @@ export default function InboxPage() {
 
                 {linkTarget?.id === conv.id && (
                   <div className="mt-3 rounded-xl border border-card-border bg-surface-hover p-3">
-                    <label className="text-xs font-semibold text-foreground" htmlFor={`link-job-${conv.id}`}>输入要关联的岗位 ID（可在岗位池详情里查看）</label>
+                    <label className="text-xs font-semibold text-foreground" htmlFor={`link-job-${conv.id}`}>搜索要关联的岗位（输入公司名或职位关键字）</label>
                     <div className="mt-2 flex gap-2">
                       <input
                         id={`link-job-${conv.id}`}
                         value={linkJobId}
-                        onChange={event => setLinkJobId(event.target.value)}
-                        placeholder="岗位 ID"
-                        className="w-64 rounded-lg border border-card-border bg-card px-3 py-1.5 text-sm outline-none focus:border-primary"
+                        onChange={event => { setLinkJobId(event.target.value); void searchJobsForLink(event.target.value) }}
+                        placeholder="例如：壹享网络科技 / 数据分析"
+                        className="flex-1 rounded-lg border border-card-border bg-card px-3 py-1.5 text-sm outline-none focus:border-primary"
                       />
-                      <Button size="sm" disabled={!linkJobId.trim() || busyId === conv.id} onClick={link}>确认关联</Button>
-                      <Button variant="secondary" size="sm" onClick={() => setLinkTarget(null)}>取消</Button>
+                      <Button variant="secondary" size="sm" disabled={linkSearching} onClick={() => void searchJobsForLink(linkJobId)}>
+                        {linkSearching ? '搜索中…' : '搜索'}
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => { setLinkTarget(null); setLinkResults([]) }}>取消</Button>
                     </div>
+                    {linkResults.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {linkResults.map(job => (
+                          <li key={job.id}>
+                            <button
+                              type="button"
+                              className="w-full rounded-lg border border-card-border bg-card px-3 py-2 text-left text-sm transition-soft hover:border-primary/50"
+                              onClick={() => { setLinkJobId(job.id); void link(job.id) }}
+                            >
+                              <span className="font-medium text-foreground">{job.company}｜{job.title}</span>
+                              <span className="ml-2 text-xs text-muted tabular-nums">{job.score || 0} 分</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {linkJobId.trim() && !linkResults.length && !linkSearching && (
+                      <p className="mt-2 text-xs text-muted">没有匹配的岗位：如果该岗位还没入库，可以先在岗位池手动添加或从 BOSS 链接采集。</p>
+                    )}
                   </div>
                 )}
 
