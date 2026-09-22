@@ -15,6 +15,7 @@ interface JobFilterBarProps {
   invalidSalary?: boolean
   showStatus?: boolean
   showSource?: boolean
+  showSourceChannel?: boolean
 }
 
 export function JobFilterBar({
@@ -26,6 +27,7 @@ export function JobFilterBar({
   invalidSalary = false,
   showStatus = false,
   showSource = false,
+  showSourceChannel = false,
 }: JobFilterBarProps) {
   const update = (key: keyof JobFilters, value: string) => onChange({ ...filters, [key]: value })
   const [expanded, setExpanded] = useState(false)
@@ -90,6 +92,13 @@ export function JobFilterBar({
             {Object.entries(STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
+          </Select>
+        )}
+        {showSourceChannel && (
+          <Select className="min-w-0" value={filters.sourceChannel} onChange={event => update('sourceChannel', event.target.value)} aria-label="来源通道">
+            <option value="">来源通道：全部</option>
+            <option value="search">搜索流</option>
+            <option value="recommendation">推荐页</option>
           </Select>
         )}
         {showSource && (

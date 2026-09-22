@@ -42,6 +42,7 @@ interface Job {
   last_error?: string
   greeting_fact_status?: string
   source_channel?: string
+  source_channels?: string[]
   source_labels?: string[]
   reply_count?: number
   replied_at?: string | null

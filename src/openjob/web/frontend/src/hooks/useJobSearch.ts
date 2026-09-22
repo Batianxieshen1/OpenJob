@@ -49,6 +49,7 @@ export function useJobSearch(
     if (filters.status) params.set('status', filters.status)
     if (filters.createdWithin) params.set('created_within', filters.createdWithin)
     if (filters.sourcePlatform) params.set('source_platform', filters.sourcePlatform)
+    if (filters.sourceChannel) params.set('source_channel', filters.sourceChannel)
     if (filters.education) params.set('education', filters.education)
     if (filters.recruitmentType) params.set('recruitment_type', filters.recruitmentType)
     params.set('sort_by', sortBy)
@@ -76,7 +77,7 @@ export function useJobSearch(
       })
 
     return () => controller.abort()
-  }, [debouncedQuery, filters.minScore, filters.salaryMin, filters.salaryMax, filters.status, filters.createdWithin, filters.sourcePlatform, filters.education, filters.recruitmentType, page, pageSize, sortBy, sortOrder, revision])
+  }, [debouncedQuery, filters.minScore, filters.salaryMin, filters.salaryMax, filters.status, filters.createdWithin, filters.sourcePlatform, filters.sourceChannel, filters.education, filters.recruitmentType, page, pageSize, sortBy, sortOrder, revision])
 
   return { items, total, allTotal, loading, error, refresh: () => setRevision(value => value + 1) }
 }
