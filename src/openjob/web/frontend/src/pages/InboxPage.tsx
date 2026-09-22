@@ -128,7 +128,7 @@ export default function InboxPage() {
     if (!kw) { setLinkResults([]); return }
     setLinkSearching(true)
     try {
-      const res = await fetch(`/api/jobs/search?query=${encodeURIComponent(kw)}&page_size=8`, { cache: 'no-store' })
+      const res = await fetch(`/api/jobs/search?q=${encodeURIComponent(kw)}&page_size=8`, { cache: 'no-store' })
       const payload = await res.json()
       setLinkResults((payload?.items || []).map((item: { id: string; company: string; title: string; score: number }) => ({
         id: item.id, company: item.company, title: item.title, score: item.score,

@@ -1256,6 +1256,16 @@ def api_job_search():
 			return _json_response({"error": "source_platform 参数无效"}, 400)
 		conditions.append("COALESCE(source_platform, 'boss') = ?")
 		params.append(source_platform)
+	source_channel = request.params.get("source_channel", "").strip()
+	if source_channel:
+		if source_channel not in {"search", "recommendation"}:
+			return _json_response({"error": "source_channel 参数无效"}, 400)
+		# 主来源或来源观察命中均可（推荐页采集过的岗位即使主来源是 search 也能筛出）
+		conditions.append(
+			"(COALESCE(source_channel, 'search') = ? OR id IN "
+			"(SELECT job_id FROM job_source_observations WHERE source_channel = ?))"
+		)
+		params.extend([source_channel, source_channel])
 	if recruitment_type:
 		conditions.append("COALESCE(recruitment_type, 'unknown') = ?")
 		params.append(recruitment_type)

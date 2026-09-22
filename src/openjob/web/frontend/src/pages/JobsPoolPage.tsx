@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useDashboard, type Job } from '@/hooks/useDashboard'
 import { useJobSearch, type JobSortKey, type JobSortOrder } from '@/hooks/useJobSearch'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,13 @@ export default function JobsPoolPage() {
   const [page, setPage] = useState(0)
   const [filters, setFilters] = useState<JobFilters>({ ...EMPTY_JOB_FILTERS })
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [batchApproving, setBatchApproving] = useState(false)
+  const [approvePreview, setApprovePreview] = useState<{
+    filteredCount: number
+    skippedCount: number
+    scoreBuckets: Array<{ label: string; count: number }>
+    ids: string[]
+  } | null>(null)
   const [detailJob, setDetailJob] = useState<Job | null>(null)
   const [notice, setNotice] = useState('')
   const [showRecycleBin, setShowRecycleBin] = useState(false)
@@ -222,6 +230,80 @@ const markManuallySent = async (job: Job) => {
     }
   }
 
+  // 收尾：跨页全选 + 筛选结果一键放行（预览评分分布）
+  const filteredInResult = useMemo(() => items.filter(job => job.status === 'filtered').length, [items])
+
+  const buildFilterParams = () => {
+    const params = new URLSearchParams()
+    if (filters.query.trim()) params.set('q', filters.query.trim())
+    if (filters.minScore) params.set('min_score', filters.minScore)
+    if (filters.salaryMin) params.set('salary_min', filters.salaryMin)
+    if (filters.salaryMax) params.set('salary_max', filters.salaryMax)
+    if (filters.status) params.set('status', filters.status)
+    if (filters.createdWithin) params.set('created_within', filters.createdWithin)
+    if (filters.sourcePlatform) params.set('source_platform', filters.sourcePlatform)
+    if (filters.sourceChannel) params.set('source_channel', filters.sourceChannel)
+    if (filters.education) params.set('education', filters.education)
+    if (filters.recruitmentType) params.set('recruitment_type', filters.recruitmentType)
+    params.set('limit', '1000')
+    params.set('sort_by', sortBy)
+    params.set('sort_order', sortOrder)
+    return params
+  }
+
+  const selectAllFiltered = async () => {
+    try {
+      const res = await fetch(`/api/jobs/search?${buildFilterParams().toString()}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('获取筛选结果失败')
+      const data = await res.json()
+      const ids = ((data.items || []) as Array<{ id: string }>).map(job => job.id)
+      setSelectedIds(ids)
+      setNotice(`已全选筛选结果 ${ids.length} 个岗位（上限 1000）。`)
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : '全选失败')
+    }
+  }
+
+  const openApprovePreview = async () => {
+    try {
+      const res = await fetch(`/api/jobs/search?${buildFilterParams().toString()}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('获取筛选结果失败')
+      const data = await res.json()
+      const allItems = (data.items || []) as Array<{ id: string; status: string; score: number }>
+      const filteredJobs = allItems.filter(job => job.status === 'filtered')
+      const scoreBuckets = [
+        { label: '30 分以下', count: filteredJobs.filter(j => (j.score || 0) < 30).length },
+        { label: '30-45 分', count: filteredJobs.filter(j => (j.score || 0) >= 30 && (j.score || 0) < 46).length },
+        { label: '46 分以上', count: filteredJobs.filter(j => (j.score || 0) >= 46).length },
+      ].filter(bucket => bucket.count > 0)
+      setApprovePreview({
+        filteredCount: filteredJobs.length,
+        skippedCount: allItems.length - filteredJobs.length,
+        scoreBuckets,
+        ids: filteredJobs.map(job => job.id),
+      })
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : '获取预览失败')
+    }
+  }
+
+  const confirmApprovePreview = async () => {
+    if (!approvePreview || batchApproving) return
+    setBatchApproving(true)
+    try {
+      const result = await postJobAction('/api/jobs/bulk-approve', { job_ids: approvePreview.ids })
+      setSelectedIds([])
+      setApprovePreview(null)
+      refreshJobs()
+      const skippedCount = Array.isArray(result?.skipped) ? result.skipped.length : 0
+      setNotice(`已放行 ${result?.approved_count ?? 0} 个岗位到确认队列${skippedCount ? `，跳过 ${skippedCount} 个` : ''}。`)
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : '放行失败')
+    } finally {
+      setBatchApproving(false)
+    }
+  }
+
   const restoreJobs = async (jobIds: string[]) => {
     if (!jobIds.length || !window.confirm(`确认恢复 ${jobIds.length} 个岗位吗？恢复后不会自动评分或投递。`)) return
     try {
@@ -347,6 +429,38 @@ const markManuallySent = async (job: Job) => {
           onRestore={ids => void restoreJobs(ids)}
           onPermanentDelete={requestPermanentDelete}
         />
+        {approvePreview && createPortal(
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
+            <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
+              <h3 className="text-xl font-semibold">批量放行筛选结果</h3>
+              <ul className="mt-4 space-y-2 text-sm">
+                <li>筛选结果共 <span className="font-semibold tabular-nums">{approvePreview.filteredCount + approvePreview.skippedCount}</span> 个岗位</li>
+                <li>其中「已过滤」待放行：<span className="font-semibold text-primary tabular-nums">{approvePreview.filteredCount}</span> 个（你的判断覆盖 AI 评分）</li>
+                <li>将被跳过（非已过滤状态）：<span className="tabular-nums">{approvePreview.skippedCount}</span> 个</li>
+              </ul>
+              {approvePreview.scoreBuckets.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-3">
+                  <div className="text-xs font-bold text-muted">放行岗位评分分布</div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    {approvePreview.scoreBuckets.map(bucket => (
+                      <span key={bucket.label} className="rounded-full border border-card-border bg-card px-2.5 py-1">
+                        {bucket.label}：<span className="font-semibold tabular-nums">{bucket.count}</span> 个
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-muted">低分岗位放行后仍走正常流程：生成招呼语 → 你确认 → 才发送。</p>
+                </div>
+              )}
+              <div className="mt-6 flex justify-end gap-3">
+                <Button variant="secondary" size="sm" disabled={batchApproving} onClick={() => setApprovePreview(null)}>再看看</Button>
+                <Button size="sm" disabled={batchApproving} onClick={() => void confirmApprovePreview()}>
+                  {batchApproving ? '放行中…' : `确认放行 ${approvePreview.filteredCount} 个岗位`}
+                </Button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
         {permanentDeleteIds.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
             <div className="w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
@@ -387,8 +501,11 @@ const markManuallySent = async (job: Job) => {
           {allPageSelected ? '取消选择本页' : '选择本页'}
         </Button>
         <span className="rounded-full bg-accent-soft px-3 py-2 font-bold text-primary">已选择 {selectedIds.length} 条</span>
+        <span className="rounded-full border border-card-border bg-card px-3 py-2 text-muted">筛选结果 <span className="font-bold text-foreground tabular-nums">{total}</span> 个 · 已过滤待放行 <span className="font-bold text-foreground tabular-nums">{filteredInResult}</span> 个</span>
         {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>清空选择</Button>}
-        <Button variant="ghost" size="sm" disabled={!selectedIds.length} onClick={() => void bulkApproveSelected()}>放行到确认队列</Button>
+        <Button variant="ghost" size="sm" disabled={!total} onClick={() => void selectAllFiltered()}>全选筛选结果 ({total})</Button>
+        <Button variant="ghost" size="sm" disabled={!total || filteredInResult === 0} onClick={() => void openApprovePreview()}>放行筛选结果（已过滤 {filteredInResult}）</Button>
+        <Button variant="ghost" size="sm" disabled={!selectedIds.length} onClick={() => void bulkApproveSelected()}>放行已选 {selectedIds.length}</Button>
         <Button variant="destructive" size="sm" disabled={!selectedIds.length} onClick={() => void softDelete(selectedIds)}>移入回收站</Button>
         <Button size="sm" disabled={!selectedIds.length} onClick={() => void deliverSelectedJobs()}>
           <Send className="mr-1 h-4 w-4" />BOSS 一键投递已选

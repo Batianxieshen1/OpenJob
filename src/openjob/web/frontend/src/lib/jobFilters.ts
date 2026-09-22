@@ -9,6 +9,7 @@ export interface JobFilters {
   status: string
   createdWithin: string
   sourcePlatform: string
+  sourceChannel: string
   education: string
   recruitmentType: string
 }
@@ -21,6 +22,7 @@ export const EMPTY_JOB_FILTERS: JobFilters = {
   status: '',
   createdWithin: '',
   sourcePlatform: '',
+  sourceChannel: '',
   education: '',
   recruitmentType: '',
 }
@@ -103,6 +105,10 @@ export function filterJobs(jobs: Job[], filters: JobFilters) {
     if (minimumScore !== null && Number(job.score || 0) < minimumScore) return false
     if (filters.status && job.status !== filters.status) return false
     if (filters.sourcePlatform && job.source_platform !== filters.sourcePlatform) return false
+    if (filters.sourceChannel) {
+      const channels = job.source_channels || [job.source_channel || 'search']
+      if (!channels.includes(filters.sourceChannel)) return false
+    }
     if (filters.recruitmentType && (job.recruitment_type || 'unknown') !== filters.recruitmentType) return false
     if (filters.education === 'unknown' && job.education) return false
     if (filters.education && filters.education !== 'unknown' && !(job.education || '').includes(filters.education)) return false
