@@ -276,6 +276,12 @@ export default function ConfirmQueuePage() {
 
       {notice && <div className="rise-in rounded-card border border-card-border bg-card px-4 py-3 text-sm text-foreground">{notice}</div>}
 
+      {workbench.today_day_off && (
+        <div className="rise-in rounded-card border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+          🎲 今日为防检测随机休息日：发送已冻结，岗位全部保留在「待发送招呼语」（每天 5% 概率随机抽取，模拟真人节奏）；明日 09:00 后自动恢复发送。
+        </div>
+      )}
+
       {tab === 'ready_to_send' ? (
         <section className="rounded-module border border-card-border bg-card p-5">
           <div className="sticky top-0 z-20 -mx-5 mb-3 rounded-t-module border-b border-card-border bg-shell/95 px-5 py-3 backdrop-blur">

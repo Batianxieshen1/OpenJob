@@ -1418,6 +1418,9 @@ def api_workbench():
 				"remaining": max(daily_limit - today_sent, 0),
 				"exhausted": today_sent >= daily_limit,
 			},
+			"today_day_off": bool(db.execute(
+				"SELECT 1 FROM risk_events WHERE event_type = 'day_off' AND date(created_at) = date('now', 'localtime') LIMIT 1"
+			).fetchone()),
 			"task": status["active"],
 			"last_task": status["last_task"],
 			"scheduled_collection": scheduled_collection_scheduler.summary(),

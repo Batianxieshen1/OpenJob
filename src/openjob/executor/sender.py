@@ -1218,6 +1218,9 @@ def send_greetings(config: dict, force: bool = False) -> int:
     day_off_prob = throttle_config.get("day_off_probability", 0.05)
     if not force and should_take_day_off(day_off_prob):
         console.print("[yellow]🎲 今日随机休息（防检测），跳过发送[/yellow]")
+        workbench_log = config.get("_workbench_log")
+        if callable(workbench_log):
+            workbench_log("🎲 今日为防检测随机休息日：所有发送已冻结，岗位全部保留；明日额度恢复后自动可发。")
         add_risk_event(db, "day_off", "随机休息日")
         send_report["stop_reason"] = "day_off"
         db.close()

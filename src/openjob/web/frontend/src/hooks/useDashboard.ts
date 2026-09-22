@@ -143,6 +143,7 @@ export interface WorkbenchData {
   send_errors: Job[]
   needs_resume: Job[]
   send_quota: { daily_limit: number; sent: number; remaining: number; exhausted: boolean }
+  today_day_off?: boolean
   delivery_aging?: {
     approved_total: number
     approved_overdue_7d: number
