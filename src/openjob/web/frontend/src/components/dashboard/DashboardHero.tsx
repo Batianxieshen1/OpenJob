@@ -8,11 +8,28 @@ interface DashboardHeroProps {
   monitorRunning: boolean
   refreshing: boolean
   onRefresh: () => void
+  /** P0-1：今日三个关键数字（可点击入口） */
+  pendingCount: number
+  replyCount: number
+  readyToSendCount: number
+  onGoConfirm: () => void
 }
 
-/** Hero 主视觉：eyebrow + 主标题 + 三个任务入口（全流程 / 单独采集 / 单独监测） */
-export function DashboardHero({ onRunFullFlow, onOpenCollect, onRunMonitor, monitorRunning, refreshing, onRefresh }: DashboardHeroProps) {
+/** L1 焦点层：今日一句话状态 + 唯一主行动；启动类动作降为 ghost 辅助 */
+export function DashboardHero({
+  onRunFullFlow,
+  onOpenCollect,
+  onRunMonitor,
+  monitorRunning,
+  refreshing,
+  onRefresh,
+  pendingCount,
+  replyCount,
+  readyToSendCount,
+  onGoConfirm,
+}: DashboardHeroProps) {
   const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
+  const hasPending = pendingCount > 0 || replyCount > 0
   return (
     <section className="relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
       {/* 背景装饰：柔和蓝晕 + 细网格，克制不抢内容 */}
@@ -39,18 +56,43 @@ export function DashboardHero({ onRunFullFlow, onOpenCollect, onRunMonitor, moni
           <br />
           更快找到你
         </h2>
-        <p className="mt-2 max-w-md text-[13px] leading-6 text-muted">
-          从采集、评分到投递确认，统一管理今天的求职行动。
-        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+          <button
+            type="button"
+            onClick={onGoConfirm}
+            className="inline-flex items-center gap-1.5 font-medium text-foreground transition-soft hover:text-primary"
+          >
+            <span className="font-semibold tabular-nums text-primary">{pendingCount}</span> 个待确认岗位
+          </button>
+          <button
+            type="button"
+            onClick={onGoConfirm}
+            className="inline-flex items-center gap-1.5 font-medium text-foreground transition-soft hover:text-primary"
+          >
+            <span className="font-semibold tabular-nums text-primary">{replyCount}</span> 个 HR 在等你回复
+          </button>
+          <span className="inline-flex items-center gap-1.5 text-muted">
+            <span className="font-semibold tabular-nums">{readyToSendCount}</span> 条招呼语待发送
+          </span>
+        </div>
       </div>
 
       <div className="relative mt-5 flex items-center gap-2.5">
-        <Button
-          onClick={onRunFullFlow}
-          className="h-11 rounded-full bg-ink px-6 text-[13px] font-semibold text-shell hover:bg-ink/85"
-        >
-          运行全流程
-        </Button>
+        {hasPending ? (
+          <Button
+            onClick={onGoConfirm}
+            className="h-11 rounded-full bg-primary px-6 text-[13px] font-semibold text-white shadow-pop hover:bg-primary/90"
+          >
+            查看待处理岗位{pendingCount > 0 ? `（${pendingCount}）` : ''}
+          </Button>
+        ) : (
+          <Button
+            onClick={onRunFullFlow}
+            className="h-11 rounded-full bg-primary px-6 text-[13px] font-semibold text-white shadow-pop hover:bg-primary/90"
+          >
+            开始今日采集
+          </Button>
+        )}
         <button
           type="button"
           onClick={onOpenCollect}

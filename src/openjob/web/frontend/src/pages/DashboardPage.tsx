@@ -7,7 +7,6 @@ import { RecycleBinPanel } from '@/components/dashboard/RecycleBinPanel'
 import { ScoreJobsDialog } from '@/components/dashboard/ScoreJobsDialog'
 import { CollectJobsDialog } from '@/components/dashboard/CollectJobsDialog'
 import { ActionItemsCard } from '@/components/dashboard/ActionItemsCard'
-import { BestMatchCard } from '@/components/dashboard/BestMatchCard'
 const TrendsChart = lazy(() => import('@/components/dashboard/TrendsChart').then(m => ({ default: m.TrendsChart })))
 const UsageDonutCard = lazy(() => import('@/components/dashboard/UsageDonutCard').then(m => ({ default: m.UsageDonutCard })))
 import { PriorityItemsCard } from '@/components/dashboard/PriorityItemsCard'
@@ -38,7 +37,6 @@ import {
   XCircle,
 } from 'lucide-react'
 import { DashboardHero } from '@/components/dashboard/DashboardHero'
-const WeeklyActivityChart = lazy(() => import('@/components/dashboard/WeeklyActivityChart').then(m => ({ default: m.WeeklyActivityChart })))
 import { AutomationControlCard } from '@/components/dashboard/AutomationControlCard'
 import { PipelineProgress } from '@/components/dashboard/PipelineProgress'
 import { ScheduledCollectionCard } from '@/components/dashboard/ScheduledCollectionCard'
@@ -420,9 +418,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      {/* Bento 顶区：Hero / 近7日行动 / 自动化控制 / 流程进度 */}
+      {/* L1 焦点层：Hero（一句话状态 + 唯一主行动）｜计划任务缩小为辅助 */}
       <div className="stagger grid grid-cols-1 gap-4 xl:grid-cols-12 [&>*]:min-w-0">
-        <div className="xl:col-span-5">
+        <div className="xl:col-span-8">
           <DashboardHero
             onRunFullFlow={() => { setCollectDialogMode('full'); setCollectDialogOpen(true) }}
             onOpenCollect={() => { setCollectDialogMode('collect'); setCollectDialogOpen(true) }}
@@ -430,48 +428,14 @@ export default function DashboardPage() {
             monitorRunning={activeTask?.mode === 'monitor' && activeTask.status !== 'stopping'}
             refreshing={refreshing}
             onRefresh={() => { void refresh() }}
-          />
-        </div>
-        <div className="xl:col-span-3">
-          <Suspense fallback={<div className="h-[212px] rounded-module skeleton" />}>
-            <WeeklyActivityChart />
-          </Suspense>
-        </div>
-        <div className="xl:col-span-4">
-          <AutomationControlCard
-            activeTask={activeTask}
-            quota={workbench.send_quota}
-            modePending={modePending}
-            onRunFullFlow={() => { setCollectDialogMode('full'); setCollectDialogOpen(true) }}
-            onStopTask={() => { if (activeTask) void handleModeClick(activeTask.mode as WorkbenchMode) }}
+            pendingCount={workbench.pending_confirmation.length}
+            replyCount={pendingReplies.length}
+            readyToSendCount={workbench.pending_greetings.length}
+            onGoConfirm={() => window.location.assign('/confirm')}
           />
         </div>
         <div className="xl:col-span-4">
           <ScheduledCollectionCard schedule={workbench.scheduled_collection} />
-        </div>
-        <div className="xl:col-span-8">
-          <PipelineProgress funnelToday={workbench.funnel_today} pendingCount={workbench.pending_confirmation.length} />
-        </div>
-        <div className="xl:col-span-4">
-          <section className="flex min-h-[108px] flex-col justify-center rounded-module border border-card-border bg-card px-6 py-5 shadow-card">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-semibold text-muted">任务状态</h3>
-              {activeTask && (
-                <span className="flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
-                  <span className="breathe h-1.5 w-1.5 rounded-full bg-primary" />
-                  {activeTask.label}中
-                </span>
-              )}
-            </div>
-            <div className="mt-2 text-[15px] font-semibold text-foreground">
-              {activeTask ? currentTaskStage(activeTask.logs) : '空闲 · 等待启动'}
-            </div>
-            <div className="mt-1 text-xs text-muted">
-              {activeTask
-                ? `任务状态：${taskStatusText(activeTask.status)}`
-                : '启动全流程后，这里会显示实时阶段与进度。'}
-            </div>
-          </section>
         </div>
       </div>
 
@@ -563,7 +527,22 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 第二排 Bento：事项 / 最佳匹配 / 趋势 */}
+      {/* L3 流程层：自动化控制（浅色，运行中深色）/ 流程进度 */}
+      <div className="stagger grid grid-cols-1 gap-4 xl:grid-cols-12 [&>*]:min-w-0">
+        <div className="xl:col-span-5">
+          <AutomationControlCard
+            activeTask={activeTask}
+            quota={workbench.send_quota}
+            modePending={modePending}
+            onStopTask={() => { if (activeTask) void handleModeClick(activeTask.mode as WorkbenchMode) }}
+          />
+        </div>
+        <div className="xl:col-span-7">
+          <PipelineProgress funnelToday={workbench.funnel_today} pendingCount={workbench.pending_confirmation.length} />
+        </div>
+      </div>
+
+      {/* L4 分析层：事项 / 趋势 / 优先事项 */}
       <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12 [&>*]:min-w-0">
         <div className="xl:col-span-4">
           <ActionItemsCard
@@ -596,19 +575,21 @@ export default function DashboardPage() {
             </button>
           )}
         </div>
-        <div className="xl:col-span-4">
-          <BestMatchCard jobs={workbench.pending_confirmation} />
-        </div>
         <div className="md:col-span-2 xl:col-span-4">
           <Suspense fallback={<div className="h-[196px] rounded-module skeleton" />}>
             <TrendsChart />
           </Suspense>
         </div>
+        <div className="xl:col-span-4">
+          <Suspense fallback={<div className="h-[196px] rounded-module skeleton" />}>
+            <UsageDonutCard />
+          </Suspense>
+        </div>
       </div>
 
-      {/* 第三排：优先事项 / AI 用量 */}
+      {/* L4 优先事项 */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 [&>*]:min-w-0">
-        <div className="xl:col-span-8">
+        <div className="xl:col-span-12">
           <PriorityItemsCard
             needsResume={workbench.needs_resume}
             sendErrors={workbench.send_errors}
@@ -616,11 +597,6 @@ export default function DashboardPage() {
             onNotice={setNotice}
             onRefresh={() => { void refresh() }}
           />
-        </div>
-        <div className="xl:col-span-4">
-          <Suspense fallback={<div className="h-[196px] rounded-module skeleton" />}>
-            <UsageDonutCard />
-          </Suspense>
         </div>
       </div>
 
