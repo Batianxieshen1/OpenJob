@@ -417,7 +417,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* L1 焦点层：Hero（一句话状态 + 唯一主行动）｜计划任务缩小为辅助 */}
       <div className="stagger grid grid-cols-1 gap-4 xl:grid-cols-12 [&>*]:min-w-0">
         <div className="xl:col-span-8">

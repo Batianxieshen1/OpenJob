@@ -91,6 +91,7 @@ body {
     'Microsoft YaHei',
     system-ui,
     sans-serif;
+  /* P1-4：拉丁与数字优先 Inter，中文回落系统字体——显式声明保证跨平台一致 */
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -98,6 +99,18 @@ body {
 
 /* 数字统一等宽数字 */
 .tabular-nums,
+
+/* P1-4 Typography scale（中文字号层级） */
+.t-h1 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; letter-spacing: -0.01em; }
+.t-h2 { font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; }
+.t-body { font-size: 0.875rem; line-height: 1.375rem; }
+.t-meta { font-size: 0.75rem; line-height: 1.125rem; color: rgb(var(--text-2)); }
+.t-metric { font-size: 1.75rem; line-height: 2.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .t-h1 { font-size: 1.25rem; line-height: 1.75rem; }
+  .t-metric { font-size: 1.375rem; line-height: 1.75rem; }
+}
 [class*='font-mono'] {
   font-variant-numeric: tabular-nums;
 }
