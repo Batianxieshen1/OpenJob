@@ -496,25 +496,41 @@ const markManuallySent = async (job: Job) => {
         showStatus
         showSource
       />
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-        <Button variant="secondary" size="sm" disabled={!items.length} onClick={toggleCurrentPage}>
-          {allPageSelected ? '取消选择本页' : '选择本页'}
-        </Button>
-        <span className="rounded-full bg-accent-soft px-3 py-2 font-bold text-primary">已选择 {selectedIds.length} 条</span>
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        {/* 选择组 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" disabled={!items.length} onClick={toggleCurrentPage}>
+            {allPageSelected ? '取消选择本页' : '选择本页'}
+          </Button>
+          <Button variant="secondary" size="sm" disabled={!total} onClick={() => void selectAllFiltered()}>全选筛选结果 ({total})</Button>
+          {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>清空选择</Button>}
+        </div>
         <span className="rounded-full border border-card-border bg-card px-3 py-2 text-muted">筛选结果 <span className="font-bold text-foreground tabular-nums">{total}</span> 个 · 已过滤待放行 <span className="font-bold text-foreground tabular-nums">{filteredInResult}</span> 个</span>
-        {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>清空选择</Button>}
-        <Button variant="ghost" size="sm" disabled={!total} onClick={() => void selectAllFiltered()}>全选筛选结果 ({total})</Button>
-        <Button variant="ghost" size="sm" disabled={!total || filteredInResult === 0} onClick={() => void openApprovePreview()}>放行筛选结果（已过滤 {filteredInResult}）</Button>
-        <Button variant="ghost" size="sm" disabled={!selectedIds.length} onClick={() => void bulkApproveSelected()}>放行已选 {selectedIds.length}</Button>
-        <Button variant="destructive" size="sm" disabled={!selectedIds.length} onClick={() => void softDelete(selectedIds)}>移入回收站</Button>
-        <Button size="sm" disabled={!selectedIds.length} onClick={() => void deliverSelectedJobs()}>
-          <Send className="mr-1 h-4 w-4" />BOSS 一键投递已选
-        </Button>
-        <Button size="sm" onClick={() => void startQuickScoring()} disabled={quickScoring || !total}>
-          {quickScoring ? '启动评分中…' : '一键 AI 评分'}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => setShowScoreDialog(true)}>评分选项</Button>
-        <ExportMenu onExport={exportJobs} hasSelection={selectedIds.length > 0} hasFiltered={total > 0} />
+        {/* 放行组：唯一主行动，仅选择后出现 */}
+        {selectedIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-accent-soft/50 px-3 py-1.5">
+            <span className="font-bold text-primary">已选 {selectedIds.length} 条</span>
+            <Button size="sm" onClick={() => void bulkApproveSelected()}>放行到确认队列</Button>
+            <Button size="sm" variant="secondary" disabled={!selectedIds.length} onClick={() => void deliverSelectedJobs()}>
+              <Send className="mr-1 h-3.5 w-3.5" />BOSS 一键投递已选
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => void softDelete(selectedIds)}>移入回收站</Button>
+          </div>
+        )}
+        {filteredInResult > 0 && !selectedIds.length && (
+          <Button variant="secondary" size="sm" disabled={!total} onClick={() => void openApprovePreview()}>
+            放行筛选结果（已过滤 {filteredInResult} 个，含评分预览）
+          </Button>
+        )}
+        {/* 更多：低频分析/输出操作 */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => void startQuickScoring()} disabled={quickScoring || !total}>
+            {quickScoring ? '评分中…' : '一键 AI 评分'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowScoreDialog(true)}>评分选项</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setShowRecycleBin(true); void loadRecycleBin() }}><Trash2 className="mr-1 h-3.5 w-3.5" />回收站 ({recycleJobs.length})</Button>
+          <ExportMenu onExport={exportJobs} hasSelection={selectedIds.length > 0} hasFiltered={total > 0} />
+        </div>
       </div>
       {notice && <div className="mb-4 rounded-xl bg-accent-soft px-4 py-3 text-sm text-primary">{notice}</div>}
       {deliveryTask && (
