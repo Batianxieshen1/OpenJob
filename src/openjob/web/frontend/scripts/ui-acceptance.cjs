@@ -50,7 +50,7 @@ async function capture(browser) {
   const page = await browser.newPage();
   const results = [];
 
-  for (const width of [390, 1280]) {
+  for (const width of [360, 390, 430, 768, 1280]) {
     for (const route of ['/', '/jobs', '/confirm']) {
       const view = await open(page, route, width);
       results.push({
@@ -194,6 +194,28 @@ async function capture(browser) {
   const config = await open(page, '/config?section=collection_schedule', 1280);
   results.push({ test: 'config-scheduled-collection-controls', ok: config.text.includes('定时采集') && config.text.includes('只采集 + AI 评分') });
   results.push({ test: 'config-platform-capability-copy', ok: config.text.includes('不会自动发送或监听') });
+
+  // P1 收尾：深色主题验收（Dashboard/Jobs/Confirm 无溢出 + day_off 提示）
+  for (const [route, name] of [['/', 'dashboard'], ['/jobs', 'jobs'], ['/confirm', 'confirm']]) {
+    const width = name === 'dashboard' ? 1280 : 390;
+    await page.setViewport({ width, height: 844 });
+    const separator = route.includes('?') ? '&' : '?';
+    await page.goto(`${baseUrl}${route}${separator}theme=dark`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await pause(600);
+    const darkCheck = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      theme: document.documentElement.dataset ? document.documentElement.dataset.theme : null,
+    }));
+    results.push({ test: `${name}-dark-${width}-no-overflow`, ok: darkCheck.scrollWidth <= darkCheck.clientWidth });
+  }
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(`${baseUrl}/?theme=dark`, { waitUntil: 'networkidle2', timeout: 30000 });
+  await pause(500);
+  await page.screenshot({ path: path.join(shotDir, 'dashboard-dark-1280.png'), fullPage: false });
+  await page.goto(`${baseUrl}/jobs?theme=dark`, { waitUntil: 'networkidle2', timeout: 30000 });
+  await pause(500);
+  await page.screenshot({ path: path.join(shotDir, 'jobs-dark-1280.png'), fullPage: false });
 
   await capture(browser);
   let allOk = true;
