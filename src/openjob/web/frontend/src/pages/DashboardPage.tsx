@@ -559,7 +559,7 @@ export default function DashboardPage() {
             >
               <div className="text-xs font-semibold text-muted">队列健康（B9）</div>
               <div className="mt-2 flex items-baseline gap-1.5">
-                <span className={`text-2xl font-semibold tabular-nums ${workbench.delivery_aging.approved_overdue_7d > 0 ? 'text-warning' : 'text-foreground'}`}>
+                <span className={`t-metric ${workbench.delivery_aging.approved_overdue_7d > 0 ? 'text-warning' : 'text-foreground'}`}>
                   {workbench.delivery_aging.approved_total}
                 </span>
                 <span className="text-xs text-muted">个已确认待发送</span>

@@ -432,7 +432,7 @@ const markManuallySent = async (job: Job) => {
         {approvePreview && createPortal(
           <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
             <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
-              <h3 className="text-xl font-semibold">批量放行筛选结果</h3>
+              <h3 className="t-h2">批量放行筛选结果</h3>
               <ul className="mt-4 space-y-2 text-sm">
                 <li>筛选结果共 <span className="font-semibold tabular-nums">{approvePreview.filteredCount + approvePreview.skippedCount}</span> 个岗位</li>
                 <li>其中「已过滤」待放行：<span className="font-semibold text-primary tabular-nums">{approvePreview.filteredCount}</span> 个（你的判断覆盖 AI 评分）</li>
@@ -464,7 +464,7 @@ const markManuallySent = async (job: Job) => {
         {permanentDeleteIds.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
             <div className="w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
-              <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-danger" /><div><h3 className="text-xl font-semibold">确认永久删除</h3><p className="mt-2 text-sm leading-6 text-muted">将永久删除 {permanentDeleteIds.length} 条岗位及其历史，无法恢复。存在发送或回复证据的岗位会被后端拒绝删除。</p></div></div>
+              <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-danger" /><div><h3 className="t-h2">确认永久删除</h3><p className="mt-2 text-sm leading-6 text-muted">将永久删除 {permanentDeleteIds.length} 条岗位及其历史，无法恢复。存在发送或回复证据的岗位会被后端拒绝删除。</p></div></div>
               <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-3 text-sm font-bold"><input type="checkbox" checked={permanentDeleteAcknowledged} onChange={event => setPermanentDeleteAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 accent-danger" /><span>我确认永久删除，并了解此操作无法撤销。</span></label>
               <div className="mt-6 flex justify-end gap-3"><Button variant="secondary" size="sm" onClick={() => setPermanentDeleteIds([])}>取消</Button><Button variant="destructive" size="sm" disabled={!permanentDeleteAcknowledged} onClick={() => void confirmPermanentDelete()}>永久删除</Button></div>
             </div>
@@ -478,7 +478,7 @@ const markManuallySent = async (job: Job) => {
     <div className="rounded-3xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">岗位池</h2>
+          <h2 className="t-h1">岗位池</h2>
           <p className="mt-1 text-sm text-muted">集中查看已采集岗位、AI 分数、状态和详情入口。</p>
         </div>
         <div className="flex items-center gap-2">

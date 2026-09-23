@@ -49,7 +49,7 @@ function BatchConfirmDialog({
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
       <div role="dialog" aria-modal="true" aria-label="批量确认" className="w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
-        <h3 className="text-lg font-semibold">{generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
+        <h3 className="t-h2">{generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
         <ul className="mt-4 space-y-2 text-sm">
           <li>本次将为 <span className="font-semibold text-primary tabular-nums">{total}</span> 个岗位生成招呼语（<span className="font-semibold">只生成，不发送</span>）</li>
           <li>平台分布：{Object.entries(platformCounts).map(([p, n]) => `${platformLabel[p] || p} ${n}`).join('，') || '-'}</li>
@@ -250,7 +250,7 @@ export default function ConfirmQueuePage() {
     <div className="mx-auto max-w-[1440px] space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold">投递确认</h1>
+          <h1 className="t-h1">投递确认</h1>
           <p className="text-xs text-muted">
             这里是投递前的人工闸门：AI 只建议，你拍板。勾选岗位 → 一键投递 → 招呼语生成后按安全队列发送。
           </p>
