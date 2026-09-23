@@ -973,6 +973,11 @@ def _execute_deliver_batch(task: WorkbenchTask, config: dict) -> None:
 			raise RuntimeError(
 				f"招呼语生成失败：选择 {len(selected_job_ids)} 个岗位，仅成功生成 {generated_count} 条；未发送任何消息"
 			)
+	if config.get("_workbench_generate_only"):
+		# 两段式投递：生成阶段到此为止，招呼语停在「待发送招呼语」供人工审阅；
+		# 发送由用户审阅后显式确认（direct_send）进入发送队列。
+		_log(task, "已生成全部招呼语并暂停等待人工审阅（本任务未发送任何内容）")
+		return
 	_log(task, "发送招呼语")
 	# The workbench must obey the same send window and day-off guard as the CLI.
 	# ``force`` remains an explicit CLI-only override and is never implied by a
@@ -1940,6 +1945,7 @@ def api_workbench_deliver():
 		if not job_ids:
 			return _json_response({"error": "请选择要投递的岗位"}, 400)
 		direct_send = bool(body.get("direct_send"))
+		generate_only = bool(body.get("generate_only"))
 		validation_db = _get_web_db()
 		try:
 			placeholders = ",".join("?" for _ in job_ids)
@@ -2076,6 +2082,8 @@ def api_workbench_deliver():
 		deliver_options = {"_workbench_job_ids": job_ids}
 		if direct_send:
 			deliver_options["_workbench_skip_greeting"] = True
+		if generate_only:
+			deliver_options["_workbench_generate_only"] = True
 		task = task_runner.start("deliver", _task_config(deliver_options))
 		return _json_response(task)
 	except TaskAlreadyRunningError as e:

@@ -23,11 +23,12 @@ function isActiveToday(job: Job) {
 
 /** B9 六要素批量确认对话框：发送数/平台分布/事实校验/需检查/额度 + 不可撤回警示 */
 function BatchConfirmDialog({
-  jobs, quotaRemaining, submitting, onConfirm, onClose,
+  jobs, quotaRemaining, submitting, generateOnly, onConfirm, onClose,
 }: {
   jobs: Job[]
   quotaRemaining: number
   submitting: boolean
+  generateOnly?: boolean
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -47,22 +48,22 @@ function BatchConfirmDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
-      <div role="dialog" aria-modal="true" aria-label="批量确认发送" className="w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
-        <h3 className="text-lg font-semibold">批量确认发送</h3>
+      <div role="dialog" aria-modal="true" aria-label="批量确认" className="w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
+        <h3 className="text-lg font-semibold">{generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
         <ul className="mt-4 space-y-2 text-sm">
-          <li>本次将发送 <span className="font-semibold text-primary tabular-nums">{total}</span> 条招呼语</li>
+          <li>本次将为 <span className="font-semibold text-primary tabular-nums">{total}</span> 个岗位生成招呼语（<span className="font-semibold">只生成，不发送</span>）</li>
           <li>平台分布：{Object.entries(platformCounts).map(([p, n]) => `${platformLabel[p] || p} ${n}`).join('，') || '-'}</li>
-          <li>已过事实校验（可发送）：<span className="font-semibold text-success tabular-nums">{verified}</span> 条；无招呼语将现场生成：<span className="tabular-nums">{noGreeting}</span> 条</li>
-          <li>需人工检查（未过事实校验，会被跳过）：<span className={cn('tabular-nums', needCheck > 0 && 'font-semibold text-warning')}>{needCheck}</span> 条</li>
-          <li>今日剩余额度：<span className="tabular-nums">{quotaRemaining}</span> 条{total > quotaRemaining && <span className="ml-1 text-warning">（超出部分明日时间窗自动续发）</span>}</li>
+          <li>生成后全部停在「待发送招呼语」等你逐条审阅，你确认后才会进入发送队列</li>
+          <li>已过事实校验：<span className="font-semibold text-success tabular-nums">{verified}</span> 条；无招呼语将现场生成：<span className="tabular-nums">{noGreeting}</span> 条；需人工检查：<span className={cn('tabular-nums', needCheck > 0 && 'font-semibold text-warning')}>{needCheck}</span> 条</li>
+          <li>今日剩余发送额度：<span className="tabular-nums">{quotaRemaining}</span> 条（发送阶段另受时间窗与每日上限约束）</li>
         </ul>
-        <p className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          ⚠ 发送后不可自动撤回：招呼语会按安全队列（时间窗/间隔/每日上限）逐条发出，请确认所选岗位均为你真实想投的。
+        <p className="mt-4 rounded-xl border border-primary/30 bg-accent-soft px-3 py-2 text-xs text-primary">
+          两段式流程：本步只生成不发送 → 到「待发送招呼语」逐条审阅 → 满意后点「一键投递（不重新生成）」进入发送队列。
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>再看看</Button>
           <Button size="sm" disabled={submitting} onClick={onConfirm}>
-            {submitting ? '提交中…' : `确认发送 ${total} 条招呼语`}
+            {submitting ? '提交中…' : `确认生成 ${total} 条招呼语`}
           </Button>
         </div>
       </div>
@@ -133,7 +134,11 @@ export default function ConfirmQueuePage() {
       const res = await fetch('/api/workbench/deliver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(directSend ? { job_ids: ids, direct_send: true } : { job_ids: ids }),
+        body: JSON.stringify(
+          directSend
+            ? { job_ids: ids, direct_send: true }
+            : { job_ids: ids, generate_only: true },
+        ),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -145,7 +150,7 @@ export default function ConfirmQueuePage() {
       setNotice(
         directSend
           ? `已把 ${ids.length} 个岗位加入发送队列（招呼语不重新生成，按安全队列直接发送）。`
-          : `已确认投递 ${ids.length} 个岗位，后端按队列推进（受时间窗与每日额度限制）。`
+          : `已生成 ${ids.length} 个岗位的招呼语，全部停在「待发送招呼语」等你审阅；确认后才会发送（本步未发送任何内容）。`
       )
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '投递失败')
@@ -454,6 +459,7 @@ export default function ConfirmQueuePage() {
           jobs={(batchTarget.directSend ? readyToSendJobs : jobs).filter(job => batchTarget.ids.includes(job.id))}
           quotaRemaining={workbench.send_quota?.remaining ?? 0}
           submitting={batchSubmitting}
+          generateOnly={!batchTarget.directSend}
           onConfirm={runBatchDeliver}
           onClose={() => { if (!batchSubmitting) setBatchTarget(null) }}
         />
