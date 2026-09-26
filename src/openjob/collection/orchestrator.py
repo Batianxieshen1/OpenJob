@@ -50,6 +50,58 @@ def _clean_strings(values: Any) -> list[str]:
     return result
 
 
+# 回写键位约定（与 normalize_collection_options 的读取权威位一一对应）：
+# - keywords/cities/city_codes/max_pages/sort/recruitment_filter → platforms.X.search（base 合并源）
+# - boss 的 source_channels/recommendation_* → platforms.boss 顶层（channels holder 第三位，先于 search 合并对象）
+# - 全部再镜像一份到顶层 search：CLI run/scrape 只读顶层，防两源漂移
+PERSIST_SEARCH_KEYS = ("keywords", "cities", "city_codes", "max_pages", "sort", "recruitment_filter")
+PERSIST_BOSS_CHANNEL_KEYS = (
+    "source_channels",
+    "recommendation_max_scrolls",
+    "recommendation_max_cards",
+    "recommendation_same_result_limit",
+)
+
+
+def persist_collection_preferences(config: dict[str, Any], collection_options: dict[str, Any]) -> None:
+    """把归一化采集参数写回 config dict（原地修改），保证读写键位一致。"""
+    collection = config.get("collection") if isinstance(config.get("collection"), dict) else {}
+    collection["default_order"] = collection_options["platform_order"]
+    collection["auto_score_default"] = collection_options["auto_score"]
+    config["collection"] = collection
+
+    platform_configs = deepcopy(config.get("platforms")) if isinstance(config.get("platforms"), dict) else {}
+    selected = set(collection_options["platform_order"])
+    mirror: dict[str, Any] = {}
+    for platform, value in collection_options["platforms"].items():
+        existing = platform_configs.get(platform) if isinstance(platform_configs.get(platform), dict) else {}
+        entry = dict(existing)
+        entry["enabled"] = platform in selected
+        search_cfg = dict(entry.get("search")) if isinstance(entry.get("search"), dict) else {}
+        for key in PERSIST_SEARCH_KEYS:
+            if key in value:
+                search_cfg[key] = value[key]
+        for key in PERSIST_BOSS_CHANNEL_KEYS:
+            if key in value:
+                entry[key] = value[key]
+                # 迁移清理：这些键的读取权威位在平台顶层，search 内嵌值是
+                # 被遮蔽的死配置（2026-09-26 审计），回写时顺手清走。
+                search_cfg.pop(key, None)
+        entry["search"] = search_cfg
+        platform_configs[platform] = entry
+        if platform == "boss":
+            for key in PERSIST_SEARCH_KEYS:
+                if key in search_cfg:
+                    mirror[key] = search_cfg[key]
+    for platform in ("boss", "zhilian", "51job"):
+        if platform not in selected and isinstance(platform_configs.get(platform), dict):
+            platform_configs[platform]["enabled"] = False
+    config["platforms"] = platform_configs
+    if mirror:
+        legacy = config.get("search") if isinstance(config.get("search"), dict) else {}
+        config["search"] = {**legacy, **mirror}
+
+
 def normalize_collection_options(config: dict[str, Any], raw_options: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build a validated collection request while keeping legacy BOSS config compatible."""
     supplied = deepcopy(raw_options) if isinstance(raw_options, dict) else {}
