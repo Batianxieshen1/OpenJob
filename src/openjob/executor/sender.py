@@ -1223,7 +1223,7 @@ def send_greetings(config: dict, force: bool = False, skip_day_off: bool = False
     day_off_prob = throttle_config.get("day_off_probability", 0.05)
     day_off_marked = bool(db.execute(
         "SELECT 1 FROM risk_events WHERE event_type = 'day_off' "
-        "AND date(created_at) = date('now', 'localtime') LIMIT 1"
+        "AND date(created_at, 'localtime') = date('now', 'localtime') LIMIT 1"
     ).fetchone())
     if not skip_day_off and (day_off_marked or should_take_day_off(day_off_prob)):
         if not day_off_marked:

@@ -106,8 +106,11 @@ export default function InboxPage() {
   const resolve = async (conv: Conversation) => {
     setBusyId(conv.id)
     try {
-      await fetch(`/api/conversations/${conv.id}/resolve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await fetch(`/api/conversations/${conv.id}/resolve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      if (!res.ok) throw new Error('处理失败')
       await load()
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '处理失败')
     } finally {
       setBusyId(null)
     }
@@ -116,8 +119,11 @@ export default function InboxPage() {
   const dismiss = async (conv: Conversation) => {
     setBusyId(conv.id)
     try {
-      await fetch(`/api/conversations/${conv.id}/dismiss`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await fetch(`/api/conversations/${conv.id}/dismiss`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      if (!res.ok) throw new Error('已忽略标记失败')
       await load()
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '操作失败')
     } finally {
       setBusyId(null)
     }
@@ -140,6 +146,17 @@ export default function InboxPage() {
       setLinkSearching(false)
     }
   }
+
+  // 防抖：停止输入 300ms 后再搜索，避免每个击键一次请求
+  useEffect(() => {
+    if (!linkJobId.trim()) {
+      setLinkResults([])
+      return
+    }
+    const timer = window.setTimeout(() => { void searchJobsForLink(linkJobId) }, 300)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkJobId])
 
   const link = async (jobId?: string) => {
     const target = linkJobId.trim() || jobId || ''
@@ -229,7 +246,7 @@ export default function InboxPage() {
                       <input
                         id={`link-job-${conv.id}`}
                         value={linkJobId}
-                        onChange={event => { setLinkJobId(event.target.value); void searchJobsForLink(event.target.value) }}
+                        onChange={event => setLinkJobId(event.target.value)}
                         placeholder="例如：壹享网络科技 / 数据分析"
                         className="flex-1 rounded-lg border border-card-border bg-card px-3 py-1.5 text-sm outline-none focus:border-primary"
                       />

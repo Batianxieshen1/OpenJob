@@ -269,7 +269,9 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
                       throw new Error(data.error || '启动失败')
                     }
                     await refresh()
-                  } catch { /* 启动失败时保持空状态 */ }
+                  } catch (err) {
+                    setNotice(err instanceof Error ? err.message : '启动监测失败')
+                  }
                 }}
               >
                 启动一轮监测

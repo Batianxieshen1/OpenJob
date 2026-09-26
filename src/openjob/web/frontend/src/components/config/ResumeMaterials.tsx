@@ -86,9 +86,17 @@ export function ResumeMaterials({ config, updateConfig }: {
     })
   }, [loadStatus, loadItems])
 
+  // 防抖：query 停止输入 300ms 后才触发请求（typeFilter 变化立即生效）
+  useEffect(() => {
+    if (!status?.valid) return
+    const timer = window.setTimeout(() => void loadItems(), 300)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
   useEffect(() => {
     if (status?.valid) void loadItems()
-  }, [typeFilter, query]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [typeFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpload = async (file: File) => {
     setBusy('upload')

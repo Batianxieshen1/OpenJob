@@ -5,6 +5,7 @@ import { useDebouncedValue, EMPTY_JOB_FILTERS, hasActiveJobFilters, hasInvalidSa
 import { Button } from '@/components/ui/button'
 import { JobFilterBar } from '@/components/jobs/JobFilterBar'
 import { JobActionCard, JobDetailModal, waitingDays } from '@/components/jobs/JobCards'
+import { Notice } from "@/components/ui/Notice"
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 16
@@ -301,7 +302,7 @@ export default function ConfirmQueuePage() {
         </div>
       </header>
 
-      {notice && <div className="rise-in rounded-card border border-card-border bg-card px-4 py-3 text-sm text-foreground">{notice}</div>}
+      {notice && <Notice text={notice} />}
 
       {workbench.today_day_off && (
         <div className="rise-in rounded-card border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">

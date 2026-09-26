@@ -444,9 +444,30 @@ def _report_checkpoint(
 
 
 def _record_score_failure(db, job: dict, detail: str) -> None:
-    """Keep a failed job pending while exposing a safe, retryable failure reason."""
+    """Keep a failed job pending while exposing a safe, retryable failure reason.
+
+    连续失败 ≥3 次的岗位转 error：不再被 scope=pending 重选重烧 API
+    （2026-09-26 审计 B7——跨运行重试无上限）。人工可在岗位池手动恢复。
+    """
     safe_detail = str(detail or "AI 未返回完整评分").strip()[:240]
-    update_job_score(db, job["id"], 0, f"AI评分失败: {safe_detail}")
+    previous = int(job.get("score") or 0)
+    previous_reason = str(job.get("score_reason") or "")
+    attempts = 1
+    if previous == 0 and previous_reason.startswith("AI评分失败"):
+        try:
+            import re as _re
+
+            match = _re.search(r"AI评分失败(?:\(第(\d+)次\))?", previous_reason)
+            if match:
+                attempts = int(match.group(1) or 1) + 1
+        except (ValueError, AttributeError):
+            attempts = 1
+    if attempts >= 3:
+        update_job_score(db, job["id"], 0, f"AI评分失败(第{attempts}次): {safe_detail}")
+        transition_job_status(db, job["id"], "error")
+        add_history(db, job["id"], "score_failed", f"连续 {attempts} 次失败，转 error 待人工处理: {safe_detail}")
+        return
+    update_job_score(db, job["id"], 0, f"AI评分失败(第{attempts}次): {safe_detail}")
     add_history(db, job["id"], "score_failed", safe_detail)
 
 

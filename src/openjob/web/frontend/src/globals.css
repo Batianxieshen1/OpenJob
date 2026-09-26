@@ -36,6 +36,11 @@
   --radius-shell: 28px;
   --ease-product: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-quick: cubic-bezier(0.55, 0, 0.85, 0.4);   /* 离场快于入场 */
+  /* 节奏三档（2026-09-26 审计：全站单一时长 → 分层） */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-large: 320ms;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -105,11 +110,12 @@ body {
 .t-h2 { font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; }
 .t-body { font-size: 0.875rem; line-height: 1.375rem; }
 .t-meta { font-size: 0.75rem; line-height: 1.125rem; color: rgb(var(--text-2)); }
-.t-metric { font-size: 1.75rem; line-height: 2.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 数字是信息不是装饰：比标签大一级即可（2026-09-26 用户反馈"数字太大"） */
+.t-metric { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 640px) {
   .t-h1 { font-size: 1.25rem; line-height: 1.75rem; }
-  .t-metric { font-size: 1.375rem; line-height: 1.75rem; }
+  .t-metric { font-size: 1.25rem; line-height: 1.625rem; }
 }
 [class*='font-mono'] {
   font-variant-numeric: tabular-nums;
@@ -131,10 +137,11 @@ body {
   background: rgb(var(--text-2));
 }
 
-/* 统一动效：150-300ms、同一条缓动曲线、只动 transform/opacity/color */
+/* 统一动效：节奏三档 + 同一组缓动曲线，只动 transform/opacity/color
+   （onetake 原则：测量的曲线、非均匀节奏；离场快于入场） */
 .transition-soft {
   transition-property: transform, opacity, color, background-color, border-color, box-shadow;
-  transition-duration: 180ms;
+  transition-duration: var(--dur-base);
   transition-timing-function: var(--ease-product);
 }
 
@@ -150,21 +157,22 @@ body {
   }
 }
 .rise-in {
-  animation: rise-in 240ms var(--ease-product) both;
+  animation: rise-in var(--dur-base) var(--ease-product) both;
 }
 
-/* 列表交错入场（首屏一次性） */
+/* 列表交错入场（首屏一次性）：指数衰减间隔，前紧后松——
+   固定间隔是 onetake 拒绝的"节拍器"节奏 */
 .stagger > * {
-  animation: rise-in 240ms var(--ease-product) both;
+  animation: rise-in var(--dur-base) var(--ease-product) both;
 }
 .stagger > *:nth-child(1) { animation-delay: 0ms; }
 .stagger > *:nth-child(2) { animation-delay: 40ms; }
-.stagger > *:nth-child(3) { animation-delay: 80ms; }
-.stagger > *:nth-child(4) { animation-delay: 120ms; }
-.stagger > *:nth-child(5) { animation-delay: 160ms; }
-.stagger > *:nth-child(6) { animation-delay: 200ms; }
-.stagger > *:nth-child(7) { animation-delay: 240ms; }
-.stagger > *:nth-child(8) { animation-delay: 280ms; }
+.stagger > *:nth-child(3) { animation-delay: 68ms; }
+.stagger > *:nth-child(4) { animation-delay: 88ms; }
+.stagger > *:nth-child(5) { animation-delay: 102ms; }
+.stagger > *:nth-child(6) { animation-delay: 112ms; }
+.stagger > *:nth-child(7) { animation-delay: 118ms; }
+.stagger > *:nth-child(8) { animation-delay: 122ms; }
 
 /* 运行状态点低频呼吸 */
 @keyframes breathe {
