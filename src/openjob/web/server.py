@@ -344,9 +344,7 @@ def _sanitize_config_for_write(data):
 	return cleaned
 
 
-from openjob.ai.resume_source import (
-	RESUME_TEMPLATE_MARKERS as _RESUME_TEMPLATE_MARKERS,
-)
+from openjob.ai.fact_policy import TEMPLATE_RESUME_MARKERS as _RESUME_TEMPLATE_MARKERS
 from openjob.ai.resume_source import is_trusted_resume_file as _shared_is_trusted_resume_file
 
 

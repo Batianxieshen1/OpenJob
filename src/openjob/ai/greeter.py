@@ -167,28 +167,18 @@ REVIEW_PROMPT = """请评估以下{platform}招呼语的质量。
 def _get_resume_summary(config: dict) -> str:
     """Read only an explicitly uploaded, non-template resume file.
 
-    ``resume.md`` and ``resume.example.md`` are repository examples, never facts.
-    Multi-direction base_resumes remain the preferred and audited source.
+    Trust rules are shared with the scorer (ai.resume_source): example
+    basenames (resume.md / resume.example.md) and template-content markers
+    are never facts. Multi-direction base_resumes remain the preferred and
+    audited source.
     """
     profile = config.get("profile") or {}
     raw = str(profile.get("resume_path") or "").strip()
     if not raw:
         return ""
-    path = Path(raw)
-    try:
-        project_root = Path(__file__).resolve().parents[3]
-        if path.resolve() in {project_root / "resume.md", project_root / "resume.example.md"}:
-            return ""
-    except (OSError, RuntimeError, ValueError):
-        return ""
-    if not path.exists() or not path.is_file():
-        return ""
-    try:
-        content = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return ""
-    if any(marker in content for marker in TEMPLATE_RESUME_MARKERS):
-        return ""
+    from openjob.ai.resume_source import load_trusted_resume_text
+
+    content = load_trusted_resume_text(raw) or ""
     return content[:1800]
 
 
