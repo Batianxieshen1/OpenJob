@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Eye, ExternalLink, XCircle, CheckCircle2, History, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { parseUtc, formatUtcTime } from "@/lib/datetime"
 import { getActionLabel, getStatusLabel } from '@/lib/status'
 import type { Job } from '@/hooks/useDashboard'
 
@@ -41,7 +42,7 @@ function ReplySummaryBlock({ job }: { job: Job }) {
           <MessageCircle className="mr-1.5 inline h-4 w-4 text-success" />
           HR 回复{count > 0 ? <span className="ml-1 text-success tabular-nums">×{count}</span> : <span className="ml-2 text-xs font-normal text-muted">暂无回复记录</span>}
         </div>
-        {job.replied_at && <span className="text-xs text-muted">首响 {new Date(job.replied_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>}
+        {job.replied_at && <span className="text-xs text-muted">首响 {formatUtcTime(job.replied_at)}</span>}
       </div>
       {job.last_reply_snippet && (
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">“{job.last_reply_snippet}”</p>
@@ -72,7 +73,7 @@ function HistoryTimeline({ jobId }: { jobId: string }) {
             <div className="text-sm font-medium text-foreground">
               {getActionLabel(item.action)}
               <span className="ml-2 text-xs font-normal text-muted tabular-nums">
-                {new Date(item.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                {formatUtcTime(item.created_at)}
               </span>
             </div>
             {item.detail && <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted">{item.detail}</p>}
@@ -291,7 +292,9 @@ interface JobActionCardProps {
 export function waitingDays(job: Job): number {
   const base = job.updated_at || job.created_at
   if (!base) return 0
-  const ms = Date.now() - new Date(base).getTime()
+  const parsed = parseUtc(base)
+  if (!parsed) return 0
+  const ms = Date.now() - parsed.getTime()
   if (!Number.isFinite(ms) || ms <= 0) return 0
   return Math.floor(ms / 86_400_000)
 }

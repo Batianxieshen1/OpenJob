@@ -42,6 +42,10 @@ export function PriorityItemsCard({ needsResume, sendErrors, topPending, onNotic
       label: '重试发送',
       onClick: () => {
         if (busyJobId) return
+        const confirmed = window.confirm(
+          `确认重新发送「${job.company}｜${job.title}」的招呼语？\n\n这将真实发送给 HR，不可撤回。`
+        )
+        if (!confirmed) return
         setBusyJobId(job.id)
         fetch('/api/workbench/deliver', {
           method: 'POST',
