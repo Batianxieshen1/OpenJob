@@ -1179,8 +1179,11 @@ def _send_greeting_once(job: dict, greeting: str, throttle_config: dict) -> tupl
     }, target_id
 
 
-def send_greetings(config: dict, force: bool = False) -> int:
-    """Send generated greetings. Returns count of successfully sent."""
+def send_greetings(config: dict, force: bool = False, skip_day_off: bool = False) -> int:
+    """Send generated greetings. Returns count of successfully sent.
+
+    force: 跳过发送时间窗（不跳过休息日与额度）；skip_day_off: 显式跳过休息日。
+    """
     db = get_db()
     throttle_config = dict(config.get("throttle", {}))
     stop_event = config.get("_workbench_stop_event")
@@ -1214,14 +1217,21 @@ def send_greetings(config: dict, force: bool = False) -> int:
         db.close()
         return 0
 
-    # Anti-ban: random day off (可通过 --force 跳过)
+    # Anti-ban: 随机休息日——当日一旦抽中即全天冻结（持久标记，与工作台
+    # "今日休息日"提示共用同一来源，2026-09-26 审计 R3）。--force 只跳时间窗，
+    # 不再隐式跳过休息日；需要跳过请显式传 skip_day_off。
     day_off_prob = throttle_config.get("day_off_probability", 0.05)
-    if not force and should_take_day_off(day_off_prob):
+    day_off_marked = bool(db.execute(
+        "SELECT 1 FROM risk_events WHERE event_type = 'day_off' "
+        "AND date(created_at) = date('now', 'localtime') LIMIT 1"
+    ).fetchone())
+    if not skip_day_off and (day_off_marked or should_take_day_off(day_off_prob)):
+        if not day_off_marked:
+            add_risk_event(db, "day_off", "随机休息日")
         console.print("[yellow]🎲 今日随机休息（防检测），跳过发送[/yellow]")
         workbench_log = config.get("_workbench_log")
         if callable(workbench_log):
             workbench_log("🎲 今日为防检测随机休息日：所有发送已冻结，岗位全部保留；明日额度恢复后自动可发。")
-        add_risk_event(db, "day_off", "随机休息日")
         send_report["stop_reason"] = "day_off"
         db.close()
         return 0
@@ -1264,9 +1274,9 @@ def send_greetings(config: dict, force: bool = False) -> int:
     interval_min = throttle_config.get("interval_min", 60)
     interval_max = throttle_config.get("interval_max", 180)
 
-    # Count today's sent
+    # Count today's sent（本地日界，与页面额度一致——2026-09-26 审计 R3）
     today_sent = db.execute(
-        "SELECT COUNT(*) as cnt FROM history WHERE action='sent' AND date(created_at)=date('now')"
+        "SELECT COUNT(*) as cnt FROM history WHERE action='sent' AND date(created_at,'localtime')=date('now','localtime')"
     ).fetchone()
     already_sent = today_sent["cnt"] if today_sent else 0
 

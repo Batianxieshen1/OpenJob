@@ -179,15 +179,16 @@ def confirm(ctx: click.Context) -> None:
 
 
 @cli.command()
-@click.option("--force", is_flag=True, help="跳过随机休息日检查")
+@click.option("--force", is_flag=True, help="跳过发送时间窗（不跳过休息日与每日额度）")
+@click.option("--skip-day-off", is_flag=True, help="显式跳过防检测随机休息日（破坏防检测节奏，慎用）")
 @click.pass_context
-def send(ctx: click.Context, force: bool) -> None:
+def send(ctx: click.Context, force: bool, skip_day_off: bool) -> None:
     """自动发送已生成的招呼语"""
     from openjob.executor.sender import send_greetings
 
     config = ctx.obj["config"]
     console.print("[bold]开始发送招呼语...[/bold]")
-    sent = send_greetings(config, force=force)
+    sent = send_greetings(config, force=force, skip_day_off=skip_day_off)
     console.print(f"[green]✓[/green] 发送完成: {sent} 条")
     _hint_web()
 

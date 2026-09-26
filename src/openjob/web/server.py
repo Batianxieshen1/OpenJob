@@ -1363,7 +1363,7 @@ def api_workbench():
 		threshold = config.get("scoring", {}).get("threshold", 60)
 		daily_limit = int(config.get("throttle", {}).get("daily_limit", 30) or 30)
 		today_sent_row = db.execute(
-			"SELECT COUNT(*) AS cnt FROM history WHERE action='sent' AND date(created_at)=date('now')"
+			"SELECT COUNT(*) AS cnt FROM history WHERE action='sent' AND date(created_at,'localtime')=date('now','localtime')"
 		).fetchone()
 		today_sent = int(today_sent_row["cnt"] if today_sent_row else 0)
 		status = task_runner.status()
