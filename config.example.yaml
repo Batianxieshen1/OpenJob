@@ -9,7 +9,6 @@ profile:
   recruitment_type: ""  # campus / experienced / both
   greeting_preference: ""  # 只补充招呼语语气与内容偏好，不覆盖事实和安全规则
   resume_output_dir: "./data/resumes"
-  target_roles: ["你的目标岗位1", "目标岗位2", "目标岗位3"]
   target_cities: ["北京"]
   salary_min: 15  # K
   salary_max: 25  # K
@@ -90,7 +89,6 @@ platforms:
 
 scoring:
   threshold: 70
-  max_candidates: 20
 
 throttle:
   daily_limit: 30
@@ -124,7 +122,6 @@ ai:
   # greeting_timeout_seconds: 180
   greeting_review_threshold: 7
   greeting_max_iterations: 2
-  resume_max_pages: 3
   # api_key 可通过对应环境变量设置（ANTHROPIC_API_KEY / DEEPSEEK_API_KEY / ARK_API_KEY / OPENAI_API_KEY）
   # api_key: "your-api-key"
   # base_url: "https://api.anthropic.com"

@@ -765,7 +765,7 @@ def _execute_full(task: WorkbenchTask, config: dict) -> None:
 
 	db = _get_web_db()
 	try:
-		threshold = int(config.get("scoring", {}).get("threshold", 60) or 60)
+		threshold = int(config.get("scoring", {}).get("threshold", 71) or 71)
 		pending_confirmation = [
 			job for job in get_jobs_pending_confirmation(db)
 			if int(job.get("score") or 0) >= threshold
@@ -1360,7 +1360,7 @@ def api_workbench():
 	db = _get_web_db()
 	try:
 		config = load_config(CONFIG_PATH)
-		threshold = config.get("scoring", {}).get("threshold", 60)
+		threshold = config.get("scoring", {}).get("threshold", 71)
 		daily_limit = int(config.get("throttle", {}).get("daily_limit", 30) or 30)
 		today_sent_row = db.execute(
 			"SELECT COUNT(*) AS cnt FROM history WHERE action='sent' AND date(created_at,'localtime')=date('now','localtime')"

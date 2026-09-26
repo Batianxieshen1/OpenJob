@@ -569,7 +569,7 @@ def score_jobs(
             console.print("[yellow]没有待评分的岗位[/yellow]")
             return 0, 0
 
-        threshold = config.get("scoring", {}).get("threshold", 60)
+        threshold = config.get("scoring", {}).get("threshold", 71)
         remaining_job_ids = [str(job["id"]) for job in pending_jobs]
         _report_checkpoint(config, remaining_job_ids, status="running")
 

@@ -354,7 +354,7 @@ def generate_tailored_resume(job_id: str, config: dict) -> Path | None:
 def generate_all_resumes(config: dict) -> int:
     """Generate tailored resumes for all scored jobs. Returns count generated."""
     db = get_db()
-    threshold = config.get("scoring", {}).get("threshold", 60)
+    threshold = config.get("scoring", {}).get("threshold", 71)
 
     # Get scored jobs without resume
     rows = db.execute(
