@@ -1,3 +1,4 @@
+import { formatUtcTime } from "@/lib/datetime"
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Job } from '@/hooks/useDashboard'
@@ -43,7 +44,7 @@ export function RecycleBinPanel({
             <table className="w-full text-sm">
               <thead><tr className="border-b border-card-border bg-accent-soft text-xs text-muted"><th className="w-10 px-3 py-3">选</th><th className="px-4 py-3 text-left">公司</th><th className="px-4 py-3 text-left">职位</th><th className="px-4 py-3 text-left">原状态</th><th className="px-4 py-3 text-left">删除时间</th><th className="px-4 py-3 text-right">操作</th></tr></thead>
               <tbody>
-                {jobs.map(job => <tr key={job.id} className="border-b border-card-border bg-card"><td className="px-3 py-3 text-center"><input type="checkbox" checked={selectedIds.includes(job.id)} onChange={() => onToggleSelected(job.id)} className="h-4 w-4 accent-primary" /></td><td className="px-4 py-3 font-semibold">{job.company}</td><td className="px-4 py-3">{job.title}</td><td className="px-4 py-3 text-muted">{job.status}</td><td className="px-4 py-3 text-xs text-muted">{job.deleted_at || '-'}</td><td className="px-4 py-3 text-right"><Button variant="secondary" size="sm" onClick={() => onRestore([job.id])}>恢复</Button><Button className="ml-2" variant="destructive" size="sm" onClick={() => onPermanentDelete([job.id])}>永久删除</Button></td></tr>)}
+                {jobs.map(job => <tr key={job.id} className="border-b border-card-border bg-card"><td className="px-3 py-3 text-center"><input type="checkbox" checked={selectedIds.includes(job.id)} onChange={() => onToggleSelected(job.id)} className="h-4 w-4 accent-primary" /></td><td className="px-4 py-3 font-semibold">{job.company}</td><td className="px-4 py-3">{job.title}</td><td className="px-4 py-3 text-muted">{job.status}</td><td className="px-4 py-3 text-xs text-muted">{formatUtcTime(job.deleted_at) || '-'}</td><td className="px-4 py-3 text-right"><Button variant="secondary" size="sm" onClick={() => onRestore([job.id])}>恢复</Button><Button className="ml-2" variant="destructive" size="sm" onClick={() => onPermanentDelete([job.id])}>永久删除</Button></td></tr>)}
                 {!jobs.length && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted">回收站为空</td></tr>}
               </tbody>
             </table>

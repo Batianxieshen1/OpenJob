@@ -1,3 +1,4 @@
+import { parseUtc } from "@/lib/datetime"
 import { useEffect, useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
@@ -30,8 +31,8 @@ function buildSeries(records: Array<{ action: string; created_at: string }>): Tr
   }
   const index = new Map(buckets.map((b, i) => [b.label, i]))
   for (const record of records) {
-    const created = new Date(record.created_at.replace(' ', 'T'))
-    if (Number.isNaN(created.getTime())) continue
+    const created = parseUtc(record.created_at)
+    if (!created) continue
     const i = index.get(`${created.getMonth() + 1}/${created.getDate()}`)
     if (i === undefined) continue
     if (SCRAPE_ACTIONS.has(record.action)) buckets[i].scraped += 1

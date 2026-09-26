@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MessageCircle, Send } from 'lucide-react'
+import { parseUtc } from "@/lib/datetime"
 import { cn } from '@/lib/utils'
 
 interface DeliveryItem {
@@ -32,8 +33,8 @@ const ACTION_META: Record<string, { label: string; tone: string }> = {
 }
 
 function formatTime(value: string) {
-  const time = new Date(value)
-  if (Number.isNaN(time.getTime())) return value
+  const time = parseUtc(value)
+  if (!time) return value
   return time.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 

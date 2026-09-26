@@ -228,10 +228,20 @@ def _build_scoring_prompt(job: dict, resume: str, config: dict | None = None, *,
     config = config or {}
     resume_limit = 1400 if compact else 3000
     jd_limit = 900 if compact else 2000
+    # JD/title/company 来自外部平台，是不可信文本：与 greeter/resume_engine 同样
+    # 中性化+定界，防止恶意 JD 操纵评分输出（2026-09-26 审计）。
+    from openjob.ai.fact_policy import sanitize_untrusted_text
+
+    sanitized_jd, jd_risks = sanitize_untrusted_text(
+        _truncate_prompt_text(clean_job_description(job.get("jd", "")), jd_limit)
+    )
+    sanitized_title, _ = sanitize_untrusted_text(str(job["title"] or ""), label="职位名")
+    sanitized_company, _ = sanitize_untrusted_text(str(job["company"] or ""), label="公司名")
+    config["_last_scoring_injection_risks"] = jd_risks
     return SCORING_PROMPT.format(
         resume=_truncate_prompt_text(resume, resume_limit),
-        title=job["title"],
-        company=job["company"],
+        title=sanitized_title,
+        company=sanitized_company,
         salary=job["salary"],
         experience=job["experience"],
         education=job.get("education", "") or "未识别",
@@ -244,7 +254,7 @@ def _build_scoring_prompt(job: dict, resume: str, config: dict | None = None, *,
             "experienced": "社招",
             "both": "校招/社招均可",
         }.get(config.get("profile", {}).get("recruitment_type", ""), "未填写"),
-        jd=_truncate_prompt_text(clean_job_description(job.get("jd", "")), jd_limit),
+        jd=sanitized_jd,
     )
 
 

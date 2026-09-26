@@ -245,20 +245,35 @@ const markManuallySent = async (job: Job) => {
     if (filters.sourceChannel) params.set('source_channel', filters.sourceChannel)
     if (filters.education) params.set('education', filters.education)
     if (filters.recruitmentType) params.set('recruitment_type', filters.recruitmentType)
-    params.set('limit', '1000')
     params.set('sort_by', sortBy)
     params.set('sort_order', sortOrder)
     return params
   }
 
-  const selectAllFiltered = async () => {
-    try {
-      const res = await fetch(`/api/jobs/search?${buildFilterParams().toString()}`, { cache: 'no-store' })
+  // 后端 /api/jobs/search 单页上限 100，分页循环取全量（安全上限 2000 条）
+  const fetchFilteredJobs = async (): Promise<Array<{ id: string; status: string; score: number }>> => {
+    const all: Array<{ id: string; status: string; score: number }> = []
+    const pageSize = 100
+    for (let offset = 0; offset < 2000; offset += pageSize) {
+      const params = buildFilterParams()
+      params.set('limit', String(pageSize))
+      params.set('offset', String(offset))
+      const res = await fetch(`/api/jobs/search?${params.toString()}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('获取筛选结果失败')
       const data = await res.json()
-      const ids = ((data.items || []) as Array<{ id: string }>).map(job => job.id)
+      const items = (data.items || []) as Array<{ id: string; status: string; score: number }>
+      all.push(...items)
+      if (items.length < pageSize) break
+    }
+    return all
+  }
+
+  const selectAllFiltered = async () => {
+    try {
+      const items = await fetchFilteredJobs()
+      const ids = items.map(job => job.id)
       setSelectedIds(ids)
-      setNotice(`已全选筛选结果 ${ids.length} 个岗位（上限 1000）。`)
+      setNotice(`已全选筛选结果 ${ids.length} 个岗位。`)
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : '全选失败')
     }
@@ -266,10 +281,7 @@ const markManuallySent = async (job: Job) => {
 
   const openApprovePreview = async () => {
     try {
-      const res = await fetch(`/api/jobs/search?${buildFilterParams().toString()}`, { cache: 'no-store' })
-      if (!res.ok) throw new Error('获取筛选结果失败')
-      const data = await res.json()
-      const allItems = (data.items || []) as Array<{ id: string; status: string; score: number }>
+      const allItems = await fetchFilteredJobs()
       const filteredJobs = allItems.filter(job => job.status === 'filtered')
       const scoreBuckets = [
         { label: '30 分以下', count: filteredJobs.filter(j => (j.score || 0) < 30).length },
@@ -412,6 +424,41 @@ const markManuallySent = async (job: Job) => {
     }
   }
 
+  // 放行预览弹窗：portal 提为变量，主视图与回收站两个分支都可渲染
+  //（此前渲染在回收站分支早返回内，主视图点「放行筛选结果」看不到弹窗）
+  const approvePreviewDialog = approvePreview && createPortal(
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
+      <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
+        <h3 className="t-h2">批量放行筛选结果</h3>
+        <ul className="mt-4 space-y-2 text-sm">
+          <li>筛选结果共 <span className="font-semibold tabular-nums">{approvePreview.filteredCount + approvePreview.skippedCount}</span> 个岗位</li>
+          <li>其中「已过滤」待放行：<span className="font-semibold text-primary tabular-nums">{approvePreview.filteredCount}</span> 个（你的判断覆盖 AI 评分）</li>
+          <li>将被跳过（非已过滤状态）：<span className="tabular-nums">{approvePreview.skippedCount}</span> 个</li>
+        </ul>
+        {approvePreview.scoreBuckets.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-3">
+            <div className="text-xs font-bold text-muted">放行岗位评分分布</div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {approvePreview.scoreBuckets.map(bucket => (
+                <span key={bucket.label} className="rounded-full border border-card-border bg-card px-2.5 py-1">
+                  {bucket.label}：<span className="font-semibold tabular-nums">{bucket.count}</span> 个
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs leading-5 text-muted">低分岗位放行后仍走正常流程：生成招呼语 → 你确认 → 才发送。</p>
+          </div>
+        )}
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" size="sm" disabled={batchApproving} onClick={() => setApprovePreview(null)}>再看看</Button>
+          <Button size="sm" disabled={batchApproving} onClick={() => void confirmApprovePreview()}>
+            {batchApproving ? '放行中…' : `确认放行 ${approvePreview.filteredCount} 个岗位`}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+
   if (showRecycleBin) {
     return (
       <div className="space-y-3">
@@ -429,38 +476,7 @@ const markManuallySent = async (job: Job) => {
           onRestore={ids => void restoreJobs(ids)}
           onPermanentDelete={requestPermanentDelete}
         />
-        {approvePreview && createPortal(
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
-            <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
-              <h3 className="t-h2">批量放行筛选结果</h3>
-              <ul className="mt-4 space-y-2 text-sm">
-                <li>筛选结果共 <span className="font-semibold tabular-nums">{approvePreview.filteredCount + approvePreview.skippedCount}</span> 个岗位</li>
-                <li>其中「已过滤」待放行：<span className="font-semibold text-primary tabular-nums">{approvePreview.filteredCount}</span> 个（你的判断覆盖 AI 评分）</li>
-                <li>将被跳过（非已过滤状态）：<span className="tabular-nums">{approvePreview.skippedCount}</span> 个</li>
-              </ul>
-              {approvePreview.scoreBuckets.length > 0 && (
-                <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-3">
-                  <div className="text-xs font-bold text-muted">放行岗位评分分布</div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    {approvePreview.scoreBuckets.map(bucket => (
-                      <span key={bucket.label} className="rounded-full border border-card-border bg-card px-2.5 py-1">
-                        {bucket.label}：<span className="font-semibold tabular-nums">{bucket.count}</span> 个
-                      </span>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-muted">低分岗位放行后仍走正常流程：生成招呼语 → 你确认 → 才发送。</p>
-                </div>
-              )}
-              <div className="mt-6 flex justify-end gap-3">
-                <Button variant="secondary" size="sm" disabled={batchApproving} onClick={() => setApprovePreview(null)}>再看看</Button>
-                <Button size="sm" disabled={batchApproving} onClick={() => void confirmApprovePreview()}>
-                  {batchApproving ? '放行中…' : `确认放行 ${approvePreview.filteredCount} 个岗位`}
-                </Button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+        {approvePreviewDialog}
         {permanentDeleteIds.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
             <div className="w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
@@ -569,6 +585,7 @@ const markManuallySent = async (job: Job) => {
         onSortChange={changeSort}
       />
       {detailJob && <JobDetailModal job={detailJob} onClose={() => setDetailJob(null)} />}
+      {approvePreviewDialog}
       <ScoreJobsDialog
         open={showScoreDialog}
         selectedJobIds={selectedIds}

@@ -1,3 +1,4 @@
+import { parseUtc } from "@/lib/datetime"
 import { useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts'
 
@@ -31,8 +32,8 @@ function buildLast7Days(records: Array<{ action: string; created_at: string }>):
   buckets.forEach((b, i) => index.set(b.date, i))
 
   for (const record of records) {
-    const created = new Date(record.created_at.replace(' ', 'T'))
-    if (Number.isNaN(created.getTime())) continue
+    const created = parseUtc(record.created_at)
+    if (!created) continue
     const key = `${created.getMonth() + 1}/${created.getDate()}`
     const i = index.get(key)
     if (i === undefined) continue
