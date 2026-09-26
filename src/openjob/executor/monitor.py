@@ -1706,11 +1706,11 @@ def _has_dismissed_pending_reply(db, job_id: str, messages: list[dict] | None = 
     return dismissed_fingerprint == _reply_fingerprint_from_messages(messages)
 
 
-def _check_follow_ups(config: dict, throttle, replied_job_ids: set | None = None) -> int:
+def _check_follow_ups(config: dict, replied_job_ids: set | None = None) -> int:
     """Send a follow-up message to jobs that have been in 'sent' status for configured hours with no HR reply.
 
     replied_job_ids: set of job IDs that already had HR replies this cycle — always skip these.
-    Respects config: follow_up.enabled, follow_up.interval_hours, follow_up.max_times, follow_up.skip_weekends.
+    Respects config: follow_up.enabled, follow_up.interval_hours, follow_up.skip_weekends.
     Returns count of follow-ups sent.
     """
     from datetime import datetime, timedelta
@@ -1952,7 +1952,7 @@ def monitor_and_send_resumes(config: dict) -> dict:
         return summary
     console.print("\n[bold cyan]═══ 第二步：跟进无回复岗位 ═══[/bold cyan]")
     try:
-        follow_up_count = _check_follow_ups(monitor_config, throttle, replied_job_ids=replied_job_ids)
+        follow_up_count = _check_follow_ups(monitor_config, replied_job_ids=replied_job_ids)
     except MonitorRiskDetected as exc:
         console.print(f"[red]⚠ 监测检测到风险信号 {exc.kind}，已立即停止[/red]")
         summary["stop_reason"] = exc.kind

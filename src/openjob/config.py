@@ -148,7 +148,6 @@ DEFAULTS: dict[str, Any] = {
     },
     "scoring": {
         "threshold": 71,
-        "max_candidates": 20,
     },
     "throttle": {
         "daily_limit": 30,
