@@ -1409,7 +1409,7 @@ def api_workbench():
 				"exhausted": today_sent >= daily_limit,
 			},
 			"today_day_off": bool(db.execute(
-				"SELECT 1 FROM risk_events WHERE event_type = 'day_off' AND date(created_at) = date('now', 'localtime') LIMIT 1"
+				"SELECT 1 FROM risk_events WHERE event_type = 'day_off' AND date(created_at, 'localtime') = date('now', 'localtime') LIMIT 1"
 			).fetchone()),
 			"task": status["active"],
 			"last_task": status["last_task"],

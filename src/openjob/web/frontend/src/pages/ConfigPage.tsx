@@ -119,7 +119,11 @@ export default function ConfigPage() {
   }
 
   const handleResumeDelete = async () => {
-    await fetch('/api/resume', { method: 'DELETE' })
+    const res = await fetch('/api/resume', { method: 'DELETE' })
+    if (!res.ok) {
+      setResumeUploadError('简历删除失败，请重试')
+      return
+    }
     setResumeInfo(null)
     updateConfig('profile.resume_path', '')
   }

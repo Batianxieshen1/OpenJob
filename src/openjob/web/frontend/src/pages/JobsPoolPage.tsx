@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/Notice"
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDashboard, type Job } from '@/hooks/useDashboard'
@@ -466,7 +467,7 @@ const markManuallySent = async (job: Job) => {
           <Button variant="ghost" size="sm" onClick={() => setShowRecycleBin(false)}>返回岗位池</Button>
           <Button variant="secondary" size="sm" onClick={() => void loadRecycleBin()} disabled={recycleLoading}>刷新回收站</Button>
         </div>
-        {notice && <div className="rounded-xl bg-accent-soft px-4 py-3 text-sm text-primary">{notice}</div>}
+        {notice && <Notice text={notice} className="rounded-xl" />}
         <RecycleBinPanel
           jobs={recycleJobs}
           selectedIds={recycleSelectedIds}
@@ -522,9 +523,9 @@ const markManuallySent = async (job: Job) => {
           {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>清空选择</Button>}
         </div>
         <span className="rounded-full border border-card-border bg-card px-3 py-2 text-muted">筛选结果 <span className="font-bold text-foreground tabular-nums">{total}</span> 个 · 已过滤待放行 <span className="font-bold text-foreground tabular-nums">{filteredInResult}</span> 个</span>
-        {/* 放行组：唯一主行动，仅选择后出现 */}
+        {/* 放行组：唯一主行动，仅选择后出现；rise-in = 从选择行为"长出来" */}
         {selectedIds.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-accent-soft/50 px-3 py-1.5">
+          <div className="rise-in flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-accent-soft/50 px-3 py-1.5">
             <span className="font-bold text-primary">已选 {selectedIds.length} 条</span>
             <Button size="sm" onClick={() => void bulkApproveSelected()}>放行到确认队列</Button>
             <Button size="sm" variant="secondary" disabled={!selectedIds.length} onClick={() => void deliverSelectedJobs()}>
@@ -548,7 +549,7 @@ const markManuallySent = async (job: Job) => {
           <ExportMenu onExport={exportJobs} hasSelection={selectedIds.length > 0} hasFiltered={total > 0} />
         </div>
       </div>
-      {notice && <div className="mb-4 rounded-xl bg-accent-soft px-4 py-3 text-sm text-primary">{notice}</div>}
+      {notice && <Notice text={notice} className="mb-4 rounded-xl" />}
       {deliveryTask && (
         <div className="mb-4 rounded-2xl border border-card-border bg-surface-hover p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">

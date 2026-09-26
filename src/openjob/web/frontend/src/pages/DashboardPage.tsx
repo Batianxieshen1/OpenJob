@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/Notice"
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useDashboard, type CollectionProgress, type HistoryItem, type Job, type WorkbenchTask } from '@/hooks/useDashboard'
 import { useJobSearch, type JobSortKey, type JobSortOrder } from '@/hooks/useJobSearch'
@@ -439,7 +440,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {notice && <div className="rise-in rounded-2xl bg-accent-soft px-4 py-3 text-sm text-primary">{notice}</div>}
+      {notice && <Notice text={notice} className="rounded-2xl" />}
       {preflightChecks.some(check => check.status !== 'pass') && (
         <PreflightPanel checks={preflightChecks} checking={Boolean(modePending)} onRetry={retryPreflight} />
       )}

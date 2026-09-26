@@ -1,5 +1,6 @@
 import { Radar, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useCountUp } from '@/hooks/useCountUp'
 
 interface DashboardHeroProps {
   onRunFullFlow: () => void
@@ -30,6 +31,10 @@ export function DashboardHero({
 }: DashboardHeroProps) {
   const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
   const hasPending = pendingCount > 0 || replyCount > 0
+  // 数字从旧值滚动到新值（onetake carry），tabular-nums 防宽度抖动
+  const animatedPending = useCountUp(pendingCount)
+  const animatedReply = useCountUp(replyCount)
+  const animatedReady = useCountUp(readyToSendCount)
   return (
     <section className="relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
       {/* 背景装饰：柔和蓝晕 + 细网格，克制不抢内容 */}
@@ -51,7 +56,7 @@ export function DashboardHero({
 
       <div className="relative">
         <div className="text-[11px] font-semibold tracking-[0.22em] text-primary">OPENJOB DAILY</div>
-        <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight xl:text-[32px]">
+        <h2 className="mt-2 text-[22px] font-semibold leading-tight tracking-tight xl:text-[24px]">
           今天，让合适的岗位
           <br />
           更快找到你
@@ -62,17 +67,17 @@ export function DashboardHero({
             onClick={onGoConfirm}
             className="inline-flex items-center gap-1.5 font-medium text-foreground transition-soft hover:text-primary"
           >
-            <span className="font-semibold tabular-nums text-primary">{pendingCount}</span> 个待确认岗位
+            <span className="font-semibold tabular-nums text-primary">{animatedPending}</span> 个待确认岗位
           </button>
           <button
             type="button"
             onClick={onGoConfirm}
             className="inline-flex items-center gap-1.5 font-medium text-foreground transition-soft hover:text-primary"
           >
-            <span className="font-semibold tabular-nums text-primary">{replyCount}</span> 个 HR 在等你回复
+            <span className="font-semibold tabular-nums text-primary">{animatedReply}</span> 个 HR 在等你回复
           </button>
           <span className="inline-flex items-center gap-1.5 text-muted">
-            <span className="font-semibold tabular-nums">{readyToSendCount}</span> 条招呼语待发送
+            <span className="font-semibold tabular-nums">{animatedReady}</span> 条招呼语待发送
           </span>
         </div>
       </div>

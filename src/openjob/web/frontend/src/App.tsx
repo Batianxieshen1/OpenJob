@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
 import { BottomNav } from './components/layout/BottomNav'
@@ -23,6 +23,29 @@ function PageFallback() {
   )
 }
 
+/** 路由 key 变化 → 新页面以 rise-in「长出来」，而不是瞬间替换
+ *  （onetake 边界携带原则；prefers-reduced-motion 由 .rise-in 内处理）。 */
+function AnimatedRoutes() {
+  const location = useLocation()
+  return (
+    <div key={location.pathname} className="rise-in">
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/jobs" element={<JobsPoolPage />} />
+          <Route path="/resume" element={<ResumePage />} />
+          <Route path="/stats" element={<StatsPage />} />
+          <Route path="/confirm" element={<ConfirmQueuePage />} />
+          <Route path="/monitor" element={<MonitorPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/config" element={<ConfigPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -33,19 +56,7 @@ export default function App() {
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <Header />
             <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-24 pt-5 md:px-7 md:pb-6 xl:px-9">
-              <Suspense fallback={<PageFallback />}>
-                <Routes>
-                  <Route path="/" element={<DashboardPage />} />
-                  <Route path="/jobs" element={<JobsPoolPage />} />
-                  <Route path="/resume" element={<ResumePage />} />
-                  <Route path="/stats" element={<StatsPage />} />
-                  <Route path="/confirm" element={<ConfirmQueuePage />} />
-                  <Route path="/monitor" element={<MonitorPage />} />
-                  <Route path="/inbox" element={<InboxPage />} />
-                  <Route path="/config" element={<ConfigPage />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Suspense>
+              <AnimatedRoutes />
             </main>
           </div>
         </div>
