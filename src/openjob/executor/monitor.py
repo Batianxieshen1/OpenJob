@@ -715,15 +715,29 @@ def _check_if_portfolio_sent(messages: list[dict], portfolio_url: str = "") -> b
     return False
 
 
+def _resume_summary_for_reply(config: dict) -> str:
+    """Resume background for AI auto-reply, via shared trust rules.
+
+    Example basenames (resume.md) and template content are never facts; when
+    nothing trusted is configured the AI gets an explicit placeholder instead
+    of guessing a background (2026-09 template incident follow-up).
+    """
+    from openjob.ai.resume_source import load_trusted_resume_text
+
+    raw = str((config.get("profile") or {}).get("resume_path") or "").strip()
+    if not raw:
+        return "（未配置简历）"
+    text = load_trusted_resume_text(raw) or ""
+    return text[:800] if text else "（未配置简历）"
+
+
 def _generate_auto_reply(messages: list[dict], job: dict, config: dict) -> str | None:
     """Generate a natural reply based on conversation context."""
     # Build conversation context
     conv_text = "\n".join([f"{'我' if m['sender'] == 'me' else 'HR'}: {m['text']}" for m in messages[-10:]])
 
-    # Read resume summary from file
-    from pathlib import Path
-    resume_path = Path(config.get("profile", {}).get("resume_path", "./resume.md"))
-    resume_summary = resume_path.read_text(encoding="utf-8")[:800] if resume_path.exists() else "（未配置简历）"
+    # Read resume summary via shared trust rules (never template/example files)
+    resume_summary = _resume_summary_for_reply(config)
 
     prompt = f"""你是一位求职者，正在BOSS直聘上和HR沟通。请根据对话上下文生成一条自然、礼貌的回复。
 

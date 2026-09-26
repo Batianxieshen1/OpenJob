@@ -138,3 +138,36 @@ class TestSingleSourceOfTruth:
 		summary = _get_resume_summary(config)
 		assert summary.startswith(REAL_MD[:20])
 		assert len(summary) <= 1800
+
+
+class TestMonitorReplyResumeTrust:
+	"""monitor._generate_auto_reply 的"我的背景"必须走共享信任规则。"""
+
+	def test_unconfigured_returns_placeholder(self):
+		from openjob.executor.monitor import _resume_summary_for_reply
+
+		assert _resume_summary_for_reply({"profile": {"resume_path": ""}}) == "（未配置简历）"
+		assert _resume_summary_for_reply({"profile": {}}) == "（未配置简历）"
+
+	def test_template_file_returns_placeholder(self, tmp_path):
+		from openjob.executor.monitor import _resume_summary_for_reply
+
+		p = tmp_path / "poison.md"
+		p.write_text(TEMPLATE_MD, encoding="utf-8")
+		assert _resume_summary_for_reply({"profile": {"resume_path": str(p)}}) == "（未配置简历）"
+
+	def test_example_basename_returns_placeholder(self, tmp_path):
+		from openjob.executor.monitor import _resume_summary_for_reply
+
+		p = tmp_path / "resume.md"
+		p.write_text(REAL_MD, encoding="utf-8")
+		assert _resume_summary_for_reply({"profile": {"resume_path": str(p)}}) == "（未配置简历）"
+
+	def test_real_file_returns_capped_content(self, tmp_path):
+		from openjob.executor.monitor import _resume_summary_for_reply
+
+		p = tmp_path / "mine.md"
+		p.write_text(REAL_MD + "长" * 2000, encoding="utf-8")
+		out = _resume_summary_for_reply({"profile": {"resume_path": str(p)}})
+		assert out.startswith(REAL_MD[:10])
+		assert len(out) <= 800
