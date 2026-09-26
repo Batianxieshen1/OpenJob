@@ -3,7 +3,6 @@
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 import json
-from pathlib import Path
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -126,15 +125,16 @@ class ScoreOutcome:
 def _load_resume(config: dict) -> str:
     """Load resume from configured path; fall back to the default base resume (multi-base).
 
-    空 resume_path 会让 Path('') 变成当前目录（读取报 Permission denied），
-    此时改用 base_resumes 的默认底稿——与简历引擎的选稿回退语义一致。
+    resume_path 只有通过共享信任规则（非示例文件名、非模板内容）才被采信，
+    否则回退 base_resumes 默认底稿——与启动检查的信任语义一致，
+    防止示例文件（如 resume.md 模板）静默驱动评分。
     """
-    resume_path = Path(config.get("profile", {}).get("resume_path") or "")
-    if str(resume_path) not in (".", "") and resume_path.is_file():
-        try:
-            return resume_path.read_text(encoding="utf-8")
-        except OSError:
-            pass
+    from openjob.ai.resume_source import load_trusted_resume_text
+
+    resume_path = config.get("profile", {}).get("resume_path")
+    text = load_trusted_resume_text(resume_path)
+    if text:
+        return text
     try:
         import sqlite3
 

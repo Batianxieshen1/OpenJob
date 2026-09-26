@@ -344,32 +344,15 @@ def _sanitize_config_for_write(data):
 	return cleaned
 
 
-_RESUME_TEMPLATE_MARKERS = (
-	"张三", "李四", "某某大学", "某某公司", "138-0000-0000",
-	"zhangsan@example.com", "示例简历", "示例公司",
+from openjob.ai.resume_source import (
+	RESUME_TEMPLATE_MARKERS as _RESUME_TEMPLATE_MARKERS,
 )
+from openjob.ai.resume_source import is_trusted_resume_file as _shared_is_trusted_resume_file
 
 
 def _is_trusted_resume_file(raw_path: object) -> bool:
 	"""Return whether a configured file is an explicit, non-template resume source."""
-	try:
-		path = Path(str(raw_path or "").strip())
-	except (TypeError, ValueError, OSError):
-		return False
-	if not str(path):
-		return False
-	try:
-		if path.resolve() in {BASE_DIR.resolve() / "resume.md", BASE_DIR.resolve() / "resume.example.md"}:
-			return False
-	except (OSError, RuntimeError, ValueError):
-		return False
-	if not path.is_file():
-		return False
-	try:
-		content = path.read_text(encoding="utf-8")
-	except (OSError, UnicodeError):
-		return False
-	return bool(content.strip()) and not any(marker in content for marker in _RESUME_TEMPLATE_MARKERS)
+	return _shared_is_trusted_resume_file(raw_path)
 
 
 def _has_any_resume_source() -> bool:
