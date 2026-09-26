@@ -79,7 +79,11 @@ from openjob.contracts import (
 	TASK_LIFECYCLE_TRANSITIONS,
 	TASK_STATUS_LABELS,
 )
-from openjob.collection.orchestrator import CollectionOrchestrator, normalize_collection_options
+from openjob.collection.orchestrator import (
+	CollectionOrchestrator,
+	normalize_collection_options,
+	persist_collection_preferences,
+)
 from openjob.collection.platforms.zhilian import load_zhilian_city_snapshot
 from openjob.collection.platforms.job51 import load_51job_city_snapshot
 from openjob.collection_run_store import (
@@ -1855,23 +1859,9 @@ def api_workbench_task_start():
 		if collection_options is not None:
 			# Persist only non-secret collection preferences so the next dialog can
 			# restore each platform's independent fields and queue order.
-			base_config["collection"] = {
-				**(base_config.get("collection") if isinstance(base_config.get("collection"), dict) else {}),
-				"default_order": collection_options["platform_order"],
-				"auto_score_default": collection_options["auto_score"],
-			}
-			platform_configs = deepcopy(base_config.get("platforms")) if isinstance(base_config.get("platforms"), dict) else {}
-			selected_platforms = set(collection_options["platform_order"])
-			for platform, value in collection_options["platforms"].items():
-				platform_configs[platform] = {
-					**(platform_configs.get(platform) if isinstance(platform_configs.get(platform), dict) else {}),
-					"enabled": platform in selected_platforms,
-					"search": value,
-				}
-			for platform in ("boss", "zhilian", "51job"):
-				if platform not in selected_platforms and isinstance(platform_configs.get(platform), dict):
-					platform_configs[platform]["enabled"] = False
-			base_config["platforms"] = platform_configs
+			# 键位与 normalize_collection_options 的读取权威位一致，并镜像到顶层
+			# search（CLI 只读顶层）——消除两源漂移（2026-09-26 审计 R2）。
+			persist_collection_preferences(base_config, collection_options)
 			_write_config(base_config)
 		if mode == "collect":
 			# 采集是每日节奏的锚点，顺手做一次数据库快照（失败不阻塞采集）
