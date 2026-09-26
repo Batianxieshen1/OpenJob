@@ -100,3 +100,41 @@ class TestLoadResumeFallback:
 	def test_missing_path_falls_back_to_default_base_resume(self, memory_db):
 		config = {"profile": {"resume_path": str(_nope := __import__("pathlib").Path("Z:/no/such.md"))}}
 		assert scorer._load_resume(config) == "真实底稿：数据分析方向内容"
+
+
+class TestSingleSourceOfTruth:
+	def test_resume_source_has_no_local_marker_tuple(self):
+		"""黑名单只允许定义在 fact_policy.py（WP-S1 注释约定），resume_source 必须引用。"""
+		import inspect
+
+		from openjob.ai import resume_source
+
+		src = inspect.getsource(resume_source)
+		assert "RESUME_TEMPLATE_MARKERS = (" not in src
+		assert resume_source.is_trusted_resume_file  # module loads fine
+
+	def test_greeter_rejects_template_resume_path(self, tmp_path):
+		from openjob.ai.greeter import _get_resume_summary
+
+		p = tmp_path / "poison.md"
+		p.write_text(TEMPLATE_MD, encoding="utf-8")
+		config = {"profile": {"resume_path": str(p)}}
+		assert _get_resume_summary(config) == ""
+
+	def test_greeter_rejects_example_basename(self, tmp_path):
+		from openjob.ai.greeter import _get_resume_summary
+
+		p = tmp_path / "resume.md"
+		p.write_text(REAL_MD, encoding="utf-8")
+		config = {"profile": {"resume_path": str(p)}}
+		assert _get_resume_summary(config) == ""
+
+	def test_greeter_accepts_real_resume(self, tmp_path):
+		from openjob.ai.greeter import _get_resume_summary
+
+		p = tmp_path / "mine.md"
+		p.write_text(REAL_MD + "补充" * 1000, encoding="utf-8")
+		config = {"profile": {"resume_path": str(p)}}
+		summary = _get_resume_summary(config)
+		assert summary.startswith(REAL_MD[:20])
+		assert len(summary) <= 1800

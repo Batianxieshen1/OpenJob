@@ -8,10 +8,9 @@ example shadowed the real base resume), so both layers share these rules.
 
 from pathlib import Path
 
-RESUME_TEMPLATE_MARKERS = (
-	"张三", "李四", "某某大学", "某某公司", "138-0000-0000",
-	"zhangsan@example.com", "示例简历", "示例公司",
-)
+# 单一定义原则：模板标记黑名单只允许存在于 fact_policy.py，
+# 所有简历源信任判断从这里统一引用。
+from openjob.ai.fact_policy import TEMPLATE_RESUME_MARKERS as _TEMPLATE_MARKERS
 
 # Bundled example files; real resumes come from the config page or base_resumes.
 _EXAMPLE_BASENAMES = {"resume.md", "resume.example.md"}
@@ -31,7 +30,7 @@ def is_trusted_resume_file(raw_path: object) -> bool:
 		content = path.read_text(encoding="utf-8")
 	except (OSError, UnicodeError):
 		return False
-	return bool(content.strip()) and not any(marker in content for marker in RESUME_TEMPLATE_MARKERS)
+	return bool(content.strip()) and not any(marker in content for marker in _TEMPLATE_MARKERS)
 
 
 def load_trusted_resume_text(raw_path: object) -> str | None:
