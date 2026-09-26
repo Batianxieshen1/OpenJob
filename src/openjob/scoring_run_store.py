@@ -73,10 +73,15 @@ def update_scoring_run(
 	progress: dict[str, Any] | None = None,
 	pause_reason: str | None = None,
 	error: str | None = None,
+	resume_source: str | None = None,
+	resume_sha256: str | None = None,
 ) -> dict[str, Any] | None:
 	sets = ["updated_at = CURRENT_TIMESTAMP"]
 	params: list[Any] = []
-	for column, value in (("status", status), ("task_id", task_id), ("pause_reason", pause_reason), ("error", error)):
+	for column, value in (
+		("status", status), ("task_id", task_id), ("pause_reason", pause_reason), ("error", error),
+		("resume_source", resume_source), ("resume_sha256", resume_sha256),
+	):
 		if value is not None:
 			sets.append(f"{column} = ?")
 			params.append(str(value)[:1000])

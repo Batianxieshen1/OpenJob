@@ -188,6 +188,42 @@ def _truncate_prompt_text(text: str, limit: int) -> str:
     return f"{text[:head]}{marker}{text[-(available - head):]}"
 
 
+def resume_provenance(config: dict, resume_text: str) -> tuple[str, str]:
+    """Return (source_label, sha256_prefix) for the resume used in this scoring run.
+
+    ``resume_text`` must be the exact text fed to the scorer so the fingerprint
+    always matches what was actually evaluated.
+    """
+    import hashlib
+
+    from openjob.ai.resume_source import is_trusted_resume_file
+
+    raw = str((config.get("profile") or {}).get("resume_path") or "").strip()
+    if raw and is_trusted_resume_file(raw):
+        source = f"file:{raw}"
+    elif resume_text:
+        source = "base_resume:default"
+    else:
+        source = "none"
+    digest = hashlib.sha256(resume_text.encode("utf-8")).hexdigest()[:16] if resume_text else ""
+    return source, digest
+
+
+def _record_run_provenance(config: dict, resume_text: str) -> None:
+    """Persist resume provenance onto the owning scoring run (best-effort)."""
+    run_id = str(config.get("_score_run_id") or "")
+    if not run_id:
+        return
+    try:
+        from openjob.db import DB_PATH
+        from openjob.scoring_run_store import update_scoring_run
+
+        source, digest = resume_provenance(config, resume_text)
+        update_scoring_run(DB_PATH, run_id, resume_source=source, resume_sha256=digest)
+    except Exception:
+        pass
+
+
 def _build_scoring_prompt(job: dict, resume: str, config: dict | None = None, *, compact: bool = False) -> str:
     config = config or {}
     resume_limit = 1400 if compact else 3000
@@ -517,6 +553,7 @@ def score_jobs(
         if not resume:
             console.print("[red]无法读取简历文件[/red]")
             return 0, 0
+        _record_run_provenance(config, resume)
 
         if rescore_filtered:
             reset_count = reset_ai_filtered_jobs(db)

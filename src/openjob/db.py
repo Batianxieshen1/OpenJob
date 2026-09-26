@@ -13,7 +13,7 @@ DB_PATH = Path("./data/openjob.db")
 MAX_JOB_IDS = 1000
 # C4：schema 版本号写入 PRAGMA user_version；版本变化时迁移前先自动备份。
 # 有意新增迁移时上调此数字并同步 _MIGRATIONS。
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 _MIGRATIONS = (
     "_migrate_v1_1", "_migrate_v1_2", "_migrate_v1_3", "_migrate_v1_4",
     "_migrate_platform_access_events", "_init_scoring_runs",
@@ -22,6 +22,7 @@ _MIGRATIONS = (
     "_migrate_v2_4", "_migrate_v2_5", "_migrate_v2_6", "_migrate_v2_7",
     "_migrate_v2_8",
     "_migrate_v2_9",
+    "_migrate_v2_10",
 )
 DELETION_PROTECTED_STATUSES = {"sent", "replied", "resume_sent", "needs_resume", "follow_up_sent"}
 DELETION_PROTECTED_HISTORY_ACTIONS = {
@@ -174,6 +175,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_7(conn)
     _migrate_v2_8(conn)
     _migrate_v2_9(conn)
+    _migrate_v2_10(conn)
     _stamp_schema_version(conn)
 
 
@@ -534,6 +536,25 @@ def _migrate_v2_9(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_v2_10(conn: sqlite3.Connection) -> None:
+    """评分可观测性（评分事故后续，幂等）：
+
+    - scoring_runs.resume_source / resume_sha256：记录每次评分用的简历来源与内容
+      指纹，使"这次评分用的是哪份简历"可审计（2026-09 模板污染事故藏 29 天的根因）；
+    - jobs.scored_at：岗位最后一次被评分的时间。
+    均可空/带默认值，旧数据不回填（无法追认）。
+    """
+    run_cols = {row[1] for row in conn.execute("PRAGMA table_info(scoring_runs)").fetchall()}
+    if "resume_source" not in run_cols:
+        conn.execute("ALTER TABLE scoring_runs ADD COLUMN resume_source TEXT NOT NULL DEFAULT ''")
+    if "resume_sha256" not in run_cols:
+        conn.execute("ALTER TABLE scoring_runs ADD COLUMN resume_sha256 TEXT NOT NULL DEFAULT ''")
+    job_cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "scored_at" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN scored_at TIMESTAMP")
+    conn.commit()
+
+
 def record_job_source_observation(
     conn: sqlite3.Connection,
     *,
@@ -689,7 +710,7 @@ def insert_job(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
 def update_job_score(conn: sqlite3.Connection, job_id: str, score: int, reason: str) -> None:
     """Update job matching score."""
     conn.execute(
-        "UPDATE jobs SET score = ?, score_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL",
+        "UPDATE jobs SET score = ?, score_reason = ?, scored_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL",
         (score, reason, job_id)
     )
     conn.commit()
