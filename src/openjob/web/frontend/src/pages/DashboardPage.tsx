@@ -1,3 +1,4 @@
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { Notice } from "@/components/ui/Notice"
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useDashboard, type CollectionProgress, type HistoryItem, type Job, type WorkbenchTask } from '@/hooks/useDashboard'
@@ -560,9 +561,10 @@ export default function DashboardPage() {
             >
               <div className="text-xs font-semibold text-muted">队列健康（B9）</div>
               <div className="mt-2 flex items-baseline gap-1.5">
-                <span className={`t-metric ${workbench.delivery_aging.approved_overdue_7d > 0 ? 'text-warning' : 'text-foreground'}`}>
-                  {workbench.delivery_aging.approved_total}
-                </span>
+                <AnimatedNumber
+                  value={workbench.delivery_aging.approved_total}
+                  className={`t-metric ${workbench.delivery_aging.approved_overdue_7d > 0 ? 'text-warning' : 'text-foreground'}`}
+                />
                 <span className="text-xs text-muted">个已确认待发送</span>
               </div>
               <p className="mt-1 text-xs text-muted">

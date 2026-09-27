@@ -26,9 +26,9 @@ export function BottomNav() {
   return (
     <>
       {moreOpen && (
-        <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden" onMouseDown={() => setMoreOpen(false)}>
+        <div className="overlay-in fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden" onMouseDown={() => setMoreOpen(false)}>
           <div
-            className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-card-border bg-card p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl"
+            className="pop-in absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-card-border bg-card p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl"
             onMouseDown={event => event.stopPropagation()}
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-card-border" aria-hidden />

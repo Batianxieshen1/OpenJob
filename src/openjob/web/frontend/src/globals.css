@@ -183,6 +183,74 @@ body {
   animation: breathe 2.4s var(--ease-product) infinite;
 }
 
+/* ── 动效二期（M1 基建）：弹窗/下拉/离场/抬升/脉冲/勾选 ── */
+
+/* 弹窗与下拉内容弹入：从触发点"长出来"（onetake popIn） */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.pop-in {
+  animation: pop-in var(--dur-base) var(--ease-product) both;
+}
+.pop-origin-top {
+  transform-origin: top center;
+}
+
+/* 遮罩层淡入（快于内容，先有"景深"再有主体） */
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.overlay-in {
+  animation: overlay-in var(--dur-fast) var(--ease-product) both;
+}
+
+/* 离场：快于入场（onetake：离场要快，不值得留恋） */
+@keyframes fade-out-quick {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.98); }
+}
+.fade-out {
+  animation: fade-out-quick var(--dur-fast) var(--ease-in-quick) both;
+}
+
+/* 可交互卡片 hover 抬升（低调：-2px + 边框亮 + 阴影深） */
+.card-lift {
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-product);
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* 数字/徽标变化脉冲：数据到达的"击打感"，一次即止 */
+@keyframes tick-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+.tick-pop {
+  animation: tick-pop 280ms var(--ease-product) both;
+}
+
+/* 勾选角标弹出（onetake tick：到达即弹） */
+@keyframes check-spring {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.check-spring {
+  animation: check-spring var(--dur-base) var(--ease-product) both;
+}
+
 /* 按钮物理按压感（全局） */
 button:not(:disabled):active {
   transform: scale(0.98);

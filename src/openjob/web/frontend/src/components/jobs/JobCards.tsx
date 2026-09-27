@@ -229,7 +229,7 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-6"
+      className="overlay-in fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-6"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
     >
       <div
@@ -238,7 +238,7 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
         aria-modal="true"
         aria-label={`岗位详情：${job.company} ${job.title}`}
         tabIndex={-1}
-        className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-overlay border border-card-border bg-card p-6 shadow-pop outline-none"
+        className="pop-in max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-overlay border border-card-border bg-card p-6 shadow-pop outline-none"
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
@@ -305,7 +305,7 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: J
   const overdue = days > 7
   return (
     <div
-      className={`relative rounded-card border p-4 transition-soft ${
+      className={`card-lift relative rounded-card border p-4 transition-soft ${
         overdue && !selected
           ? 'border-card-border bg-surface-hover opacity-75'
           : selected
@@ -314,7 +314,7 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: J
       }`}
     >
       {selected && (
-        <span aria-hidden className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white shadow-pop">
+        <span aria-hidden className="check-spring absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white shadow-pop">
           <CheckCircle2 className="h-3.5 w-3.5" />
         </span>
       )}

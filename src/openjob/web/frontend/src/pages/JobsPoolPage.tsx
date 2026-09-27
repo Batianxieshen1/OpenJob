@@ -1,3 +1,4 @@
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { Notice } from "@/components/ui/Notice"
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -428,8 +429,8 @@ const markManuallySent = async (job: Job) => {
   // 放行预览弹窗：portal 提为变量，主视图与回收站两个分支都可渲染
   //（此前渲染在回收站分支早返回内，主视图点「放行筛选结果」看不到弹窗）
   const approvePreviewDialog = approvePreview && createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
-      <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
+    <div className="overlay-in fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
+      <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="pop-in w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
         <h3 className="t-h2">批量放行筛选结果</h3>
         <ul className="mt-4 space-y-2 text-sm">
           <li>筛选结果共 <span className="font-semibold tabular-nums">{approvePreview.filteredCount + approvePreview.skippedCount}</span> 个岗位</li>
@@ -479,8 +480,8 @@ const markManuallySent = async (job: Job) => {
         />
         {approvePreviewDialog}
         {permanentDeleteIds.length > 0 && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
-            <div className="w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
+          <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
+            <div className="pop-in w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
               <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-danger" /><div><h3 className="t-h2">确认永久删除</h3><p className="mt-2 text-sm leading-6 text-muted">将永久删除 {permanentDeleteIds.length} 条岗位及其历史，无法恢复。存在发送或回复证据的岗位会被后端拒绝删除。</p></div></div>
               <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-3 text-sm font-bold"><input type="checkbox" checked={permanentDeleteAcknowledged} onChange={event => setPermanentDeleteAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 accent-danger" /><span>我确认永久删除，并了解此操作无法撤销。</span></label>
               <div className="mt-6 flex justify-end gap-3"><Button variant="secondary" size="sm" onClick={() => setPermanentDeleteIds([])}>取消</Button><Button variant="destructive" size="sm" disabled={!permanentDeleteAcknowledged} onClick={() => void confirmPermanentDelete()}>永久删除</Button></div>
@@ -522,7 +523,7 @@ const markManuallySent = async (job: Job) => {
           <Button variant="secondary" size="sm" disabled={!total} onClick={() => void selectAllFiltered()}>全选筛选结果 ({total})</Button>
           {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>清空选择</Button>}
         </div>
-        <span className="rounded-full border border-card-border bg-card px-3 py-2 text-muted">筛选结果 <span className="font-bold text-foreground tabular-nums">{total}</span> 个 · 已过滤待放行 <span className="font-bold text-foreground tabular-nums">{filteredInResult}</span> 个</span>
+        <span key={total} className="tick-pop inline-block rounded-full border border-card-border bg-card px-3 py-2 text-muted">筛选结果 <AnimatedNumber value={total} className="font-bold text-foreground tabular-nums" /> 个 · 已过滤待放行 <AnimatedNumber value={filteredInResult} className="font-bold text-foreground tabular-nums" /> 个</span>
         {/* 放行组：唯一主行动，仅选择后出现；rise-in = 从选择行为"长出来" */}
         {selectedIds.length > 0 && (
           <div className="rise-in flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-accent-soft/50 px-3 py-1.5">
@@ -557,7 +558,7 @@ const markManuallySent = async (job: Job) => {
               <div className="text-sm font-semibold">投递队列</div>
               <p className="mt-1 text-xs text-muted">只展示已人工确认的 BOSS 发送任务；智联和 51job 不会进入此队列。</p>
             </div>
-            <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-primary">
+            <span key={deliveryTask.status} className="tick-pop rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-primary">
               {deliveryTask.status === 'running' ? '处理中' : deliveryTask.status === 'completed' ? '已完成' : deliveryTask.status === 'failed' ? '失败' : deliveryTask.status}
             </span>
           </div>

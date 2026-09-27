@@ -130,8 +130,8 @@ export function ScoreJobsDialog({ open, selectedJobIds, onClose, onStart }: Scor
   const activeRun = runs.find(run => run.status === 'running' || run.status === 'paused')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5">
-      <div className="w-full max-w-xl rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
+    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-5">
+      <div className="pop-in w-full max-w-xl rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold tracking-[0.18em] text-primary">AI SCORING</div>

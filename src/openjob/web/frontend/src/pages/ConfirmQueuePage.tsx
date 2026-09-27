@@ -1,3 +1,4 @@
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDashboard, type Job } from '@/hooks/useDashboard'
@@ -48,8 +49,8 @@ function BatchConfirmDialog({
   const total = jobs.length
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
-      <div role="dialog" aria-modal="true" aria-label="批量确认" className="w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
+    <div className="overlay-in fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
+      <div role="dialog" aria-modal="true" aria-label="批量确认" className="pop-in w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
         <h3 className="t-h2">{generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
         {generateOnly ? (
           <>
@@ -287,7 +288,7 @@ export default function ConfirmQueuePage() {
               tab === 'confirm' ? 'bg-ink text-shell' : 'text-muted hover:text-foreground'
             )}
           >
-            待确认生成（{jobs.length}）
+            待确认生成（<AnimatedNumber value={jobs.length} />）
           </button>
           <button
             type="button"
@@ -297,7 +298,7 @@ export default function ConfirmQueuePage() {
               tab === 'ready_to_send' ? 'bg-ink text-shell' : 'text-muted hover:text-foreground'
             )}
           >
-            待发送招呼语（{readyToSendJobs.length}）
+            待发送招呼语（<AnimatedNumber value={readyToSendJobs.length} />）
           </button>
         </div>
       </header>
@@ -311,7 +312,7 @@ export default function ConfirmQueuePage() {
       )}
 
       {tab === 'ready_to_send' ? (
-        <section className="rounded-module border border-card-border bg-card p-5">
+        <section key="ready" className="rise-in rounded-module border border-card-border bg-card p-5">
           <div className="sticky top-0 z-20 -mx-5 mb-3 rounded-t-module border-b border-card-border bg-shell/95 px-5 py-3 backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-xs text-muted">

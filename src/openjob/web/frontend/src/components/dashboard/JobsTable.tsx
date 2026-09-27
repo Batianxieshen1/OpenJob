@@ -295,7 +295,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                 {hasActions && <th className="min-w-[200px] px-3 py-3 text-center font-semibold">操作</th>}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="stagger">
               {jobs.map(job => {
                 const isExpanded = expanded === job.id
                 const isExternalPlatform = job.source_platform === 'zhilian' || job.source_platform === '51job'
