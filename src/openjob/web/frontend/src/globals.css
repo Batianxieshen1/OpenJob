@@ -329,6 +329,50 @@ body {
   from { opacity: 0; }
   to { opacity: 0.75; }
 }
+
+/* 环境光：底部蓝晕缓缓升到中部（背景的"呼吸"，非装饰粒子） */
+.splash-glow {
+  background: radial-gradient(560px 300px at 50% 118%, rgb(79 124 255 / 0.42), transparent 70%);
+  animation: splash-glow-rise 1.5s var(--ease-product) both;
+}
+@keyframes splash-glow-rise {
+  from { opacity: 0; transform: translateY(18%); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 写入线：wordmark 下方，从中心向两侧展开 */
+.splash-rule {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -10px;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, rgb(122 162 255 / 0.9), transparent);
+  transform: scaleX(0);
+  animation: splash-rule-in 460ms var(--ease-product) 420ms both;
+}
+@keyframes splash-rule-in {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+/* 流程词：依次浮现，讲"今天它要做什么" */
+.splash-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  color: rgb(255 255 255 / 0.78);
+  animation: splash-step-in 380ms var(--ease-product) both;
+}
+.splash-arrow {
+  color: rgb(255 255 255 / 0.32);
+  margin-left: 8px;
+}
+@keyframes splash-step-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 0.78; transform: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .splash-screen { display: none; }
 }
