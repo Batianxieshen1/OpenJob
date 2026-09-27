@@ -69,9 +69,9 @@ export function DeliveryLogPanel() {
           <h2 className="text-sm font-semibold">投递记录（近 7 天）</h2>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-success">已发 <span className="font-semibold tabular-nums">{log.summary.sent}</span></span>
-          <span className="text-danger">失败 <span className="font-semibold tabular-nums">{log.summary.failed}</span></span>
-          <span className="text-warning">拦截 <span className="font-semibold tabular-nums">{log.summary.blocked}</span></span>
+          <span className={log.summary.sent > 0 ? 'text-success' : 'text-muted-3'}>已发 <span className={log.summary.sent > 0 ? 'font-semibold tabular-nums' : 'tabular-nums'}>{log.summary.sent}</span></span>
+          <span className={log.summary.failed > 0 ? 'text-danger' : 'text-muted-3'}>失败 <span className={log.summary.failed > 0 ? 'font-semibold tabular-nums' : 'tabular-nums'}>{log.summary.failed}</span></span>
+          <span className={log.summary.blocked > 0 ? 'text-warning' : 'text-muted-3'}>拦截 <span className={log.summary.blocked > 0 ? 'font-semibold tabular-nums' : 'tabular-nums'}>{log.summary.blocked}</span></span>
           <button className="text-muted transition-soft hover:text-foreground" onClick={() => void load()}>刷新</button>
         </div>
       </div>

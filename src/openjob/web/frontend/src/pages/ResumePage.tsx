@@ -346,6 +346,11 @@ export default function ResumePage() {
         <div className="rounded-card border border-dashed border-card-border px-6 py-16 text-center">
           <p className="text-sm text-muted">先选择一个岗位，再点击「按此 JD 优化」生成定制简历。</p>
           <p className="mt-1 text-xs text-muted">还没有合适的岗位？先去工作台采集并完成 AI 评分。</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <a href="/jobs" className="rounded-full border border-card-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition-soft hover:border-primary/40 hover:text-primary">去岗位池挑岗位</a>
+            <a href="/config?section=resume_materials" className="rounded-full border border-card-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition-soft hover:border-primary/40 hover:text-primary">维护简历素材库</a>
+            <a href="/confirm" className="rounded-full border border-card-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition-soft hover:border-primary/40 hover:text-primary">看待确认队列</a>
+          </div>
         </div>
       )}
 

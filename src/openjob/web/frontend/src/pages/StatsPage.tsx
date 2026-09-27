@@ -50,8 +50,9 @@ function share(count: number, total: number) {
   return total > 0 ? Math.round((count / total) * 100) : 0
 }
 
-function BarList({ items, labels, accent = false }: { items: NameCount[]; labels?: Record<string, string>; accent?: boolean }) {
+function BarList({ items, labels, accent = false, grandTotal }: { items: NameCount[]; labels?: Record<string, string>; accent?: boolean; grandTotal?: number }) {
   const peak = Math.max(...items.map(i => i.count), 1)
+  const denominator = grandTotal || peak
   return (
     <ul className="space-y-2.5">
       {items.map(item => (
@@ -59,7 +60,7 @@ function BarList({ items, labels, accent = false }: { items: NameCount[]; labels
           <div className="flex items-baseline justify-between gap-2 text-[13px]">
             <span className="truncate text-foreground">{displayName(item.name, labels)}</span>
             <span className="shrink-0 text-xs tabular-nums text-muted">
-              {item.count} <span className="text-muted-3">· {share(item.count, peak)}%</span>
+              {item.count} <span className="text-muted-3">· {share(item.count, denominator)}%</span>
             </span>
           </div>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-hover">
@@ -320,8 +321,8 @@ export default function StatsPage() {
       <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12 [&>*]:min-w-0">
         {stats.city && stats.city.length > 0 && (
           <div className="xl:col-span-6">
-            <ModuleCard title="城市分布" hint="岗位数与占比">
-              <BarList items={stats.city.slice(0, 8)} />
+            <ModuleCard title="城市分布" hint="岗位数 · 占全部岗位">
+              <BarList items={stats.city.slice(0, 8)} grandTotal={stats.total} />
             </ModuleCard>
           </div>
         )}
@@ -341,8 +342,8 @@ export default function StatsPage() {
         )}
         {stats.salary && stats.salary.length > 0 && (
           <div className="xl:col-span-6">
-            <ModuleCard title="薪资分布" hint="月薪 K / 日薪">
-              <BarList items={stats.salary.slice(0, 8)} accent />
+            <ModuleCard title="薪资分布" hint="月薪 K / 日薪 · 占全部岗位">
+              <BarList items={stats.salary.slice(0, 8)} accent grandTotal={stats.total} />
             </ModuleCard>
           </div>
         )}

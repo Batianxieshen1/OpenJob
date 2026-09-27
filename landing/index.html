@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenJob — 让岗位，来找工作你</title>
+<meta name="description" content="OpenJob：本地优先的求职自动化工作台。采集 → AI 五维评分 → 人工确认 → 安全发送。AI 只建议，你拍板。">
+<style>
+  :root {
+    --bg: #05060a; --card: #0c0e14; --card2: #10131b; --border: #1c2029;
+    --text: #eceef2; --muted: #8a93a3; --primary: #5b8cff; --primary-soft: rgba(91,140,255,.14);
+    --ease: cubic-bezier(.22,1,.36,1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  ::selection { background: rgba(91,140,255,.35); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── 导航 ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    background: rgba(5,6,10,.6); border-bottom: 1px solid rgba(28,32,41,.6);
+  }
+  .nav-in { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .12em; font-size: 14px; }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 12px var(--primary); }
+  .nav-right { display: flex; align-items: center; gap: 18px; font-size: 13px; }
+  .nav-right a { color: var(--muted); text-decoration: none; transition: color 150ms var(--ease); }
+  .nav-right a:hover { color: var(--text); }
+  .cta-mini {
+    background: var(--text); color: var(--bg); padding: 7px 16px; border-radius: 99px;
+    font-weight: 600; text-decoration: none; transition: transform 150ms var(--ease), opacity 150ms;
+  }
+  .cta-mini:hover { transform: scale(1.04); }
+
+  /* ── Hero ── */
+  header { position: relative; padding: 168px 0 120px; text-align: center; overflow: hidden; }
+  #aurora { position: absolute; inset: -10%; width: 120%; height: 120%; filter: blur(70px) saturate(1.1); opacity: .8; }
+  .hero-badge {
+    position: relative; display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border); border-radius: 99px; padding: 6px 16px;
+    font-size: 12.5px; color: var(--muted); background: rgba(12,14,20,.7);
+  }
+  .hero-badge b { color: var(--primary); font-weight: 600; }
+  h1 {
+    position: relative; margin-top: 26px;
+    font-size: clamp(40px, 8vw, 76px); font-weight: 800; letter-spacing: -.02em; line-height: 1.14;
+  }
+  h1 .l { display: inline-block; opacity: 0; transform: translateY(.55em) rotate(2deg); animation: l-in 700ms var(--ease) forwards; }
+  h1 .accent { background: linear-gradient(100deg, #7ea4ff, #b9c8ff 55%, #7ea4ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  @keyframes l-in { to { opacity: 1; transform: none; } }
+  .hero-sub {
+    position: relative; margin: 22px auto 0; max-width: 560px;
+    color: var(--muted); font-size: 16.5px; line-height: 1.75;
+    opacity: 0; animation: fade-up 700ms var(--ease) 720ms forwards;
+  }
+  .hero-cta {
+    position: relative; margin-top: 36px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+    opacity: 0; animation: fade-up 700ms var(--ease) 900ms forwards;
+  }
+  .cta-main, .cta-ghost {
+    padding: 13px 30px; border-radius: 99px; font-size: 14.5px; font-weight: 600;
+    text-decoration: none; transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), border-color 160ms;
+  }
+  .cta-main { background: var(--text); color: var(--bg); }
+  .cta-main:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(236,238,242,.14); }
+  .cta-ghost { border: 1px solid var(--border); color: var(--text); }
+  .cta-ghost:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .hero-meta { position: relative; margin-top: 46px; color: #525b6b; font-size: 12px; letter-spacing: .18em; }
+
+  /* ── 通用 section ── */
+  section { padding: 96px 0; }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: .22em; color: var(--primary); text-transform: uppercase; }
+  h2 { margin-top: 14px; font-size: clamp(26px, 4vw, 40px); font-weight: 750; letter-spacing: -.01em; }
+  .sec-sub { margin-top: 12px; color: var(--muted); font-size: 15px; max-width: 620px; line-height: 1.8; }
+
+  /* ── 流程 ── */
+  .flow { display: flex; align-items: stretch; gap: 0; margin-top: 44px; flex-wrap: wrap; }
+  .flow-step { flex: 1 1 180px; position: relative; padding: 22px 20px 22px 0; }
+  .flow-step + .flow-step { padding-left: 20px; border-left: 1px solid var(--border); }
+  .flow-step .no { font-size: 12px; color: var(--primary); font-weight: 700; letter-spacing: .1em; }
+  .flow-step h3 { margin-top: 8px; font-size: 17px; }
+  .flow-step p { margin-top: 6px; color: var(--muted); font-size: 13.5px; line-height: 1.7; }
+
+  /* ── Bento ── */
+  .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: 48px; }
+  .cell {
+    position: relative; overflow: hidden;
+    background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 26px;
+    transition: transform 200ms var(--ease), border-color 200ms var(--ease);
+  }
+  .cell:hover { transform: translateY(-3px); border-color: rgba(91,140,255,.45); }
+  .cell::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(420px 220px at var(--mx, 50%) var(--my, 0%), rgba(91,140,255,.09), transparent 65%);
+    opacity: 0; transition: opacity 250ms var(--ease);
+  }
+  .cell:hover::after { opacity: 1; }
+  .c4 { grid-column: span 4; } .c3 { grid-column: span 3; } .c2 { grid-column: span 2; }
+  @media (max-width: 860px) { .c4, .c3, .c2 { grid-column: span 6; } }
+  .cell h3 { font-size: 17px; margin-top: 14px; }
+  .cell p { margin-top: 8px; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+  .cell .ico {
+    width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: var(--primary-soft); color: var(--primary); font-size: 17px; font-weight: 700;
+  }
+  /* 五维迷你条 */
+  .dims { margin-top: 18px; display: grid; gap: 9px; font-size: 12px; color: var(--muted); }
+  .dims .row { display: grid; grid-template-columns: 64px 1fr 34px; align-items: center; gap: 10px; }
+  .dims .bar { height: 5px; border-radius: 99px; background: var(--card2); overflow: hidden; }
+  .dims .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #5b8cff, #9db4ff); width: 0; transition: width 900ms var(--ease); }
+  .on .dims .bar i { width: var(--w); }
+  /* 四层守卫链 */
+  .chain { margin-top: 18px; display: flex; flex-direction: column; gap: 0; font-size: 13px; }
+  .chain .link { display: flex; align-items: center; gap: 12px; padding: 9px 0; color: var(--muted); }
+  .chain .link + .link { border-top: 1px dashed var(--border); }
+  .chain .n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: var(--primary); flex-shrink: 0; }
+  .chain b { color: var(--text); font-weight: 600; }
+  /* 双通道 */
+  .chans { margin-top: 18px; display: grid; gap: 8px; }
+  .chan { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 13px; }
+  .chan .pill { font-size: 11px; padding: 2px 10px; border-radius: 99px; background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  /* 观察样本行 */
+  .chips { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 7px; }
+  .chips span { border: 1px solid var(--border); border-radius: 99px; padding: 4px 12px; font-size: 12px; color: var(--muted); }
+  .chips span.hot { border-color: rgba(91,140,255,.5); color: var(--primary); }
+
+  /* ── 宣言 ── */
+  .manifesto { text-align: center; padding: 130px 0; position: relative; }
+  .manifesto blockquote {
+    font-size: clamp(30px, 5vw, 52px); font-weight: 800; letter-spacing: -.01em; line-height: 1.3;
+  }
+  .manifesto blockquote .dim { color: #3a4150; }
+  .manifesto .who { margin-top: 20px; color: var(--muted); font-size: 13px; }
+
+  /* ── CTA 尾 ── */
+  footer { border-top: 1px solid var(--border); padding: 70px 0 60px; text-align: center; }
+  footer h2 { font-size: clamp(24px, 4vw, 38px); }
+  footer .cta-main { display: inline-block; margin-top: 30px; }
+  .foot-note { margin-top: 34px; color: #525b6b; font-size: 12.5px; line-height: 2; }
+  .foot-note a { color: var(--muted); }
+
+  /* ── 滚动浮现 ── */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity 700ms var(--ease), transform 700ms var(--ease); }
+  .reveal.on { opacity: 1; transform: none; }
+  .reveal.d1 { transition-delay: 90ms; } .reveal.d2 { transition-delay: 180ms; } .reveal.d3 { transition-delay: 270ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+    h1 .l { opacity: 1; transform: none; }
+    .hero-sub, .hero-cta { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-in">
+    <div class="brand"><span class="dot"></span>OPENJOB</div>
+    <div class="nav-right">
+      <a href="#features">能力</a>
+      <a href="#principle">原则</a>
+      <a class="cta-mini" href="#start">开始使用</a>
+    </div>
+  </div>
+</nav>
+
+<header class="wrap">
+  <canvas id="aurora"></canvas>
+  <div class="hero-badge"><b>●</b> 本地优先 · 开源 · 每日自动化</div>
+  <h1 id="heroTitle" aria-label="让合适的岗位，来找工作你。"></h1>
+  <p class="hero-sub">OpenJob 是一台装在自己电脑里的求职工作台：自动采集与评分，把值得投的岗位整理好——而每一次接触 HR 的动作，都由你亲手按下。</p>
+  <div class="hero-cta">
+    <a class="cta-main" href="#start">开始使用</a>
+    <a class="cta-ghost" href="#features">看看它怎么工作</a>
+  </div>
+  <div class="hero-meta">采集 · 评分 · 确认 · 发送 —— 一条流水线，一个人说了算</div>
+</header>
+
+<section id="features" class="wrap">
+  <div class="kicker reveal">How it works</div>
+  <h2 class="reveal">一条流水线，四道工序</h2>
+  <p class="sec-sub reveal">从平台岗位到确认投递，每一步的产物都留在你自己的电脑里。</p>
+  <div class="flow">
+    <div class="flow-step reveal"><div class="no">01</div><h3>采集</h3><p>搜索流 + 推荐页双通道，关键词与城市按你的求职方向配置，每日定时自动跑。</p></div>
+    <div class="flow-step reveal d1"><div class="no">02</div><h3>评分</h3><p>AI 按五个维度打分并说明理由，说不出证据的岗位过不了线。</p></div>
+    <div class="flow-step reveal d2"><div class="no">03</div><h3>确认</h3><p>过线岗位排队等你拍板：逐条审、批量审、或按分数预览后放行。</p></div>
+    <div class="flow-step reveal d3"><div class="no">04</div><h3>发送</h3><p>四层守卫之后的招呼语才可能发出——而按下发送键的，永远是你。</p></div>
+  </div>
+</section>
+
+<section class="wrap" id="principle">
+  <div class="kicker reveal">Capabilities</div>
+  <h2 class="reveal">为「认真找工作的人」设计的每一层</h2>
+  <div class="bento">
+
+    <div class="cell c4 reveal">
+      <div class="ico">◎</div>
+      <h3>AI 五维评分，每个分数有出处</h3>
+      <p>不是拍脑袋的匹配度百分比——职责、证据、硬要求、工具行业、实际条件逐项给分，理由里写清缺什么。</p>
+      <div class="dims" data-dims>
+        <div class="row"><span>职责匹配</span><div class="bar"><i style="--w:86%"></i></div><span>34</span></div>
+        <div class="row"><span>可迁移证据</span><div class="bar"><i style="--w:80%"></i></div><span>20</span></div>
+        <div class="row"><span>硬性要求</span><div class="bar"><i style="--w:73%"></i></div><span>11</span></div>
+        <div class="row"><span>工具与行业</span><div class="bar"><i style="--w:50%"></i></div><span>5</span></div>
+        <div class="row"><span>实际条件</span><div class="bar"><i style="--w:80%"></i></div><span>8</span></div>
+      </div>
+    </div>
+
+    <div class="cell c2 reveal d1">
+      <div class="ico">⛨</div>
+      <h3>四层发送守卫</h3>
+      <p>一封招呼语要连过四关才可能离开本机。</p>
+      <div class="chain">
+        <div class="link"><span class="n">1</span><span><b>事实门槛</b> · 无溯源不放行</span></div>
+        <div class="link"><span class="n">2</span><span><b>发送前复检</b> · 二次核对</span></div>
+        <div class="link"><span class="n">3</span><span><b>平台链接守卫</b> · 假岗位拦下</span></div>
+        <div class="link"><span class="n">4</span><span><b>页面额度</b> · 平台风控红线</span></div>
+      </div>
+    </div>
+
+    <div class="cell c2 reveal">
+      <div class="ico">⇄</div>
+      <h3>双通道采集</h3>
+      <p>主动搜索与平台推荐页一起扫，来源逐条留档。</p>
+      <div class="chans">
+        <div class="chan"><span>搜索流</span><span class="pill">关键词 × 城市</span></div>
+        <div class="chan"><span>推荐页</span><span class="pill">每日灰度</span></div>
+      </div>
+    </div>
+
+    <div class="cell c2 reveal d1">
+      <div class="ico">▤</div>
+      <h3>简历按 JD 定制</h3>
+      <p>底稿 + 素材库 + 目标 JD，逐块审阅后导出——不编造任何经历。</p>
+      <div class="chips">
+        <span>底稿多方向</span><span>素材溯源</span><span class="hot">零虚构</span>
+      </div>
+    </div>
+
+    <div class="cell c2 reveal d2">
+      <div class="ico">◱</div>
+      <h3>本地优先</h3>
+      <p>数据库、简历、配置全在本机。不上传、不同步、不联网也能看。</p>
+      <div class="chips">
+        <span>SQLite 本地库</span><span class="hot">数据不出机</span>
+      </div>
+    </div>
+
+    <div class="cell c3 reveal">
+      <div class="ico">◈</div>
+      <h3>投后闭环</h3>
+      <p>发出只是开始：HR 回复找回、待发简历提醒、跟进留痕——每条对话可追溯到岗位。</p>
+      <div class="chips">
+        <span>回复监测</span><span>简历待办</span><span>会话关联</span><span>周报</span>
+      </div>
+    </div>
+
+    <div class="cell c3 reveal d1">
+      <div class="ico">◔</div>
+      <h3>自动化有分寸</h3>
+      <p>每日定时采集、防检测休息日、发送时间窗与额度——自动的是重复劳动，不自动的是决策。</p>
+      <div class="chips">
+        <span>定时采集</span><span>随机休息日</span><span>时间窗 09:00–16:00</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="manifesto wrap">
+  <div class="kicker reveal">Principle</div>
+  <blockquote class="reveal" style="margin-top: 18px;">
+    <span class="dim">AI 只建议，</span>你拍板。
+  </blockquote>
+  <p class="who reveal">—— OpenJob 唯一一条不会妥协的铁律</p>
+</div>
+
+<footer id="start" class="wrap">
+  <div class="kicker reveal">Start</div>
+  <h2 class="reveal">把重复劳动交给机器，<br>把判断留给自己。</h2>
+  <a class="cta-main reveal" href="https://github.com/Batianxieshen1/OpenJob" target="_blank" rel="noopener noreferrer">GitHub 上看源码 →</a>
+  <p class="foot-note">
+    OpenJob · 本地优先的求职自动化工作台 · 仅供个人求职使用，请遵守目标平台的服务条款<br>
+    <a href="http://127.0.0.1:8686/">打开本地工作台</a>
+  </p>
+</footer>
+
+<script>
+/* Hero 逐字升起 */
+  const text = '让合适的岗位，\n来找工作你。';
+  const el = document.getElementById('heroTitle');
+  let i = 0;
+  text.split('\n').forEach(line => {
+    const row = document.createElement('span');
+    row.style.display = 'block';
+    [...line].forEach(ch => {
+      const s = document.createElement('span');
+      s.className = 'l' + (i >= 6 ? ' accent' : '');
+      s.textContent = ch;
+      s.style.animationDelay = (120 + i * 55) + 'ms';
+      row.appendChild(s);
+      i++;
+    });
+    el.appendChild(row);
+  });
+})();
+
+/* 极光背景（与产品开机画面同源） */
+  const canvas = document.getElementById('aurora');
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { canvas.style.display = 'none'; return; }
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = 160, H = canvas.height = 90;
+  const blobs = [
+    { rgb: [20, 44, 110], sx: .8, sy: .4, fx: .8, fy: .6, r: .7 },
+    { rgb: [30, 64, 160], sx: .35, sy: .75, fx: 1.2, fy: .5, r: .55 },
+    { rgb: [70, 60, 150], sx: .65, sy: .8, fx: .6, fy: 1.0, r: .6 },
+  ];
+  (function render(now) {
+    const t = now / 1000;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#05060a';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    blobs.forEach((b, i) => {
+      const x = (b.sx + .14 * Math.sin(t * b.fx + i * 2)) * W;
+      const y = (b.sy + .16 * Math.cos(t * b.fy + i * 1.6)) * H;
+      const r = b.r * (0.92 + .1 * Math.sin(t * 1.2 + i)) * W;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(${b.rgb.join(',')},.5)`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    });
+    requestAnimationFrame(render);
+  })(0);
+})();
+
+/* 滚动浮现 */
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } });
+  }, { threshold: 0.18 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+})();
+
+/* 五维条进入视口后生长 */
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } });
+  }, { threshold: 0.4 });
+  document.querySelectorAll('[data-dims]').forEach(el => io.observe(el));
+})();
+
+/* Bento 卡鼠标跟随光晕 */
+  document.querySelectorAll('.cell').forEach(cell => {
+    cell.addEventListener('pointermove', e => {
+      const r = cell.getBoundingClientRect();
+      cell.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+      cell.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+    });
+  });
+})();
+</script>
+</body>
+</html>

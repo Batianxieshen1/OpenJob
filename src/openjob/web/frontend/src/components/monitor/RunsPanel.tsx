@@ -21,13 +21,24 @@ interface ErrorSummary {
 }
 
 const RUN_STATUS_TONE: Record<string, string> = {
-  completed: 'text-success',
-  completed_with_errors: 'text-warning',
-  failed: 'text-danger',
-  stopped: 'text-muted',
-  interrupted: 'text-warning',
-  paused: 'text-warning',
-  running: 'text-primary',
+  completed: 'text-success border-success/30 bg-success/10',
+  completed_with_errors: 'text-warning border-warning/30 bg-warning/10',
+  failed: 'text-danger border-danger/30 bg-danger/10',
+  stopped: 'text-muted border-card-border bg-card',
+  interrupted: 'text-warning border-warning/30 bg-warning/10',
+  paused: 'text-warning border-warning/30 bg-warning/10',
+  running: 'text-primary border-primary/30 bg-accent-soft',
+}
+
+const SHORT_STATUS: Record<string, string> = {
+  completed: '已完成',
+  completed_with_shortage: '部分完成',
+  completed_with_errors: '有错误',
+  failed: '失败',
+  stopped: '已停止',
+  interrupted: '已中断',
+  paused: '已暂停',
+  running: '运行中',
 }
 
 function formatDuration(start?: string | null, end?: string | null) {
@@ -55,11 +66,15 @@ function RunTable({ title, rows }: { title: string; rows: RunRow[] }) {
         <ul className="mt-2 space-y-1.5">
           {rows.slice(0, 8).map(row => (
             <li key={row.id} className="flex items-center justify-between gap-2 text-xs">
-              <span className="text-muted tabular-nums">{formatTime(row.created_at)}</span>
-              <span className={cn('font-semibold', RUN_STATUS_TONE[row.status] || 'text-muted')}>{row.status}</span>
-              <span className="text-muted tabular-nums">{formatDuration(row.created_at, row.finished_at)}</span>
+              <div className="min-w-0">
+                <div className="font-semibold tabular-nums text-foreground">{formatTime(row.created_at)}</div>
+                <div className="text-[11px] text-muted tabular-nums">耗时 {formatDuration(row.created_at, row.finished_at)}</div>
+              </div>
+              <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold', RUN_STATUS_TONE[row.status] || 'text-muted border-card-border')}>
+                {SHORT_STATUS[row.status] || row.status}
+              </span>
               {(row.error || row.stop_reason) && (
-                <span className="max-w-[180px] truncate text-warning" title={row.error || row.stop_reason || ''}>
+                <span className="hidden max-w-[150px] truncate text-warning sm:block" title={row.error || row.stop_reason || ''}>
                   {row.error || row.stop_reason}
                 </span>
               )}
