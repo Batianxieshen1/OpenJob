@@ -34,8 +34,10 @@ function resolveInitialTheme(): Theme {
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement
+  root.classList.add('theme-anim')
   root.classList.toggle('dark', theme === 'dark')
   root.classList.toggle('light', theme === 'light')
+  window.setTimeout(() => root.classList.remove('theme-anim'), 250)
 }
 
 function formatClock(now: Date): string {

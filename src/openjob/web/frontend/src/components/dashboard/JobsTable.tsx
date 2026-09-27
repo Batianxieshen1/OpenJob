@@ -388,26 +388,30 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                         </td>
                       )}
                     </tr>
-                    {isExpanded && (
-                      <tr className="border-b border-card-border bg-surface-hover">
-                        <td colSpan={columnCount} className="px-6 py-4">
-                          <div className="grid grid-cols-1 gap-4 text-sm lg:grid-cols-3">
-                            <div className="rounded-2xl border border-card-border bg-card p-4">
-                              <p className="mb-2 text-xs font-semibold text-primary">JD摘要</p>
-                              <p className="line-clamp-6 leading-6 text-muted">{job.jd || '无'}</p>
-                            </div>
-                            <div className="rounded-2xl border border-card-border bg-card p-4">
-                              <p className="mb-2 text-xs font-semibold text-primary">招呼语</p>
-                              <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.greeting || '未生成'}</p>
-                            </div>
-                            <div className="rounded-2xl border border-card-border bg-card p-4">
-                              <p className="mb-2 text-xs font-semibold text-primary">评分理由</p>
-                              <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.score_reason || '无'}</p>
+                    {/* 展开行始终渲染：grid-rows 0fr↔1fr 高度过渡（N1），
+                        收起时 aria-hidden 防止屏幕阅读器读到隐藏内容 */}
+                    <tr aria-hidden={!isExpanded} className="border-b border-card-border bg-surface-hover">
+                      <td colSpan={columnCount} className="p-0">
+                        <div className="expand-wrap" data-open={isExpanded}>
+                          <div className="overflow-hidden">
+                            <div className={isExpanded ? 'grid grid-cols-1 gap-4 p-4 text-sm lg:grid-cols-3' : 'p-0 text-sm'}>
+                              <div className="rounded-2xl border border-card-border bg-card p-4">
+                                <p className="mb-2 text-xs font-semibold text-primary">JD摘要</p>
+                                <p className="line-clamp-6 leading-6 text-muted">{job.jd || '无'}</p>
+                              </div>
+                              <div className="rounded-2xl border border-card-border bg-card p-4">
+                                <p className="mb-2 text-xs font-semibold text-primary">招呼语</p>
+                                <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.greeting || '未生成'}</p>
+                              </div>
+                              <div className="rounded-2xl border border-card-border bg-card p-4">
+                                <p className="mb-2 text-xs font-semibold text-primary">评分理由</p>
+                                <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.score_reason || '无'}</p>
+                              </div>
                             </div>
                           </div>
-                        </td>
-                      </tr>
-                    )}
+                        </div>
+                      </td>
+                    </tr>
                   </Fragment>
                 )
               })}

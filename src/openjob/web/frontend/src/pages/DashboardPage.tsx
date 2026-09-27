@@ -544,9 +544,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* L4 分析层：事项 / 趋势 / 优先事项 */}
-      <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12 [&>*]:min-w-0">
-        <div className="xl:col-span-4">
+      {/* L4 分析层：事项 / 趋势 / 优先事项（滚动浮现 N2） */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12 [&>*]:min-w-0">
+        <div className="reveal xl:col-span-4">
           <ActionItemsCard
             pendingCount={workbench.pending_confirmation.length}
             needsResumeCount={workbench.needs_resume.length}
@@ -578,12 +578,12 @@ export default function DashboardPage() {
             </button>
           )}
         </div>
-        <div className="md:col-span-2 xl:col-span-4">
+        <div className="reveal md:col-span-2 xl:col-span-4">
           <Suspense fallback={<div className="h-[196px] rounded-module skeleton" />}>
             <TrendsChart />
           </Suspense>
         </div>
-        <div className="xl:col-span-4">
+        <div className="reveal xl:col-span-4">
           <Suspense fallback={<div className="h-[196px] rounded-module skeleton" />}>
             <UsageDonutCard />
           </Suspense>

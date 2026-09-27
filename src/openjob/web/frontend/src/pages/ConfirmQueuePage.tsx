@@ -313,7 +313,7 @@ export default function ConfirmQueuePage() {
 
       {tab === 'ready_to_send' ? (
         <section key="ready" className="rise-in rounded-module border border-card-border bg-card p-5">
-          <div className="sticky top-0 z-20 -mx-5 mb-3 rounded-t-module border-b border-card-border bg-shell/95 px-5 py-3 backdrop-blur">
+          <div className="sticky-shadow-on-scroll sticky top-0 z-20 -mx-5 mb-3 rounded-t-module border-b border-card-border bg-shell/95 px-5 py-3 backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-xs text-muted">
                 招呼语已生成并通过事实校验的岗位 <span className="font-semibold text-foreground tabular-nums">{readyToSendJobs.length}</span> 个，等待进入发送队列
@@ -394,7 +394,7 @@ export default function ConfirmQueuePage() {
       ) : (
       <>
       {/* 批量操作栏：吸顶，滚动时始终可操作 */}
-      <div className="sticky top-0 z-30 rounded-card border border-card-border bg-shell/95 px-4 py-3 shadow-card backdrop-blur">
+      <div className="sticky-shadow-on-scroll sticky top-0 z-30 rounded-card border border-card-border bg-shell/95 px-4 py-3 shadow-card backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted">

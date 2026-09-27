@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCheck, ClipboardCopy, Inbox, Link2, Sparkles, XCircle } from 'lucide-react'
+import { Check, CheckCheck, ClipboardCopy, Inbox, Link2, Sparkles, XCircle } from 'lucide-react'
 import { parseUtc } from "@/lib/datetime"
 import { cn } from '@/lib/utils'
 
@@ -287,7 +287,7 @@ export default function InboxPage() {
                         {draft.fact_status === 'verified' ? '草稿已过事实校验' : '草稿未过事实校验（请核对后谨慎使用）'}
                       </span>
                       <Button variant="secondary" size="sm" onClick={() => copyDraft(conv)}>
-                        <ClipboardCopy className="mr-2 h-4 w-4" />{copiedId === conv.id ? '已复制' : '复制到剪贴板'}
+                        {copiedId === conv.id ? <Check className="check-spring mr-2 h-4 w-4" /> : <ClipboardCopy className="mr-2 h-4 w-4" />}{copiedId === conv.id ? '已复制' : '复制到剪贴板'}
                       </Button>
                     </div>
                     {draft.draft && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{draft.draft}</p>}

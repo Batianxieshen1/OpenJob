@@ -251,6 +251,57 @@ body {
   animation: check-spring var(--dur-base) var(--ease-product) both;
 }
 
+/* ── 动效三期（N1-N3）：展开高度过渡 / 滚动浮现 / 主题切换 ── */
+
+/* 展开/收起：grid-rows 0fr↔1fr 高度过渡（内容从"被藏住"到"露出来"） */
+.expand-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-base) var(--ease-product);
+}
+.expand-wrap[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.expand-wrap > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 滚动浮现：进入视口下沿 55% 处完成（Chrome 115+ scroll-driven，
+   纯 CSS 零 JS；不支持或减少动效时由 @supports/@media 兜底直接显示） */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: rise-in var(--dur-large) var(--ease-product) both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+
+/* 主题切换过渡：切主题时临时挂 .theme-anim（200ms 后移除，平时零开销） */
+.theme-anim,
+.theme-anim *,
+.theme-anim *::before,
+.theme-anim *::after {
+  transition: background-color var(--dur-base) var(--ease-product),
+    border-color var(--dur-base) var(--ease-product),
+    color var(--dur-base) var(--ease-product) !important;
+}
+
+/* sticky 头滚动阴影（scroll-driven，不支持的浏览器保持现状） */
+@supports (animation-timeline: scroll()) {
+  @keyframes sticky-shadow {
+    from { box-shadow: 0 0 0 rgb(0 0 0 / 0); }
+    to { box-shadow: 0 6px 16px rgb(0 0 0 / 0.08); }
+  }
+  .sticky-shadow-on-scroll {
+    animation: sticky-shadow linear both;
+    animation-timeline: scroll(nearest);
+    animation-range: 0 60px;
+  }
+}
+
 /* 按钮物理按压感（全局） */
 button:not(:disabled):active {
   transform: scale(0.98);
