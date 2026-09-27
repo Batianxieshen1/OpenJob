@@ -15,8 +15,8 @@ function shouldPlay(): boolean {
   }
 }
 
-/** 流动极光背景：四个柔和色团在深底上游动（小 canvas 渲染 + CSS 大模糊）。
- *  onetake silk/lightField 的轻量版——"背景没有内容也活着"，零粒子零装饰。 */
+/** 流动极光背景（暗黑科技版）：低饱和深色团 + 上浮微光尘埃。
+ *  小 canvas 渲染 + CSS 大模糊——深邃而非艳丽，零粒子装饰。 */
 function useAuroraCanvas(enabled: boolean) {
   const ref = useRef<HTMLCanvasElement>(null)
 
@@ -28,18 +28,27 @@ function useAuroraCanvas(enabled: boolean) {
     if (!ctx) return
     const W = (canvas.width = 120)
     const H = (canvas.height = 68)
+    // 低饱和深色团：钴蓝/暗青/暗紫，透明度压低——深邃不艳
     const blobs = [
-      { rgb: [23, 48, 122], sx: 0.9, sy: 0.55, fx: 0.9, fy: 0.7, r: 0.62 },
-      { rgb: [47, 107, 255], sx: 0.5, sy: 0.7, fx: 1.3, fy: 0.5, r: 0.5 },
-      { rgb: [109, 91, 255], sx: 0.72, sy: 0.35, fx: 0.7, fy: 1.1, r: 0.55 },
-      { rgb: [30, 109, 140], sx: 0.35, sy: 0.3, fx: 1.1, fy: 0.9, r: 0.45 },
+      { rgb: [16, 34, 82], sx: 0.9, sy: 0.55, fx: 0.9, fy: 0.7, r: 0.62 },
+      { rgb: [24, 56, 150], sx: 0.5, sy: 0.7, fx: 1.3, fy: 0.5, r: 0.5 },
+      { rgb: [58, 48, 128], sx: 0.72, sy: 0.35, fx: 0.7, fy: 1.1, r: 0.55 },
+      { rgb: [12, 62, 82], sx: 0.35, sy: 0.3, fx: 1.1, fy: 0.9, r: 0.45 },
     ]
+    // 微光尘埃：缓慢上浮的小光点
+    const dust = Array.from({ length: 26 }, (_, i) => ({
+      x: (i * 137.5) % 120,
+      y: (i * 79.3) % 68,
+      s: 0.4 + ((i * 37) % 9) / 10,
+      v: 0.6 + ((i * 53) % 10) / 12,
+      a: 0.18 + ((i * 29) % 10) / 34,
+    }))
     let raf = 0
     const t0 = performance.now()
     const render = (now: number) => {
       const t = (now - t0) / 1000
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = '#0b0e14'
+      ctx.fillStyle = '#06080d'
       ctx.fillRect(0, 0, W, H)
       ctx.globalCompositeOperation = 'lighter'
       for (let i = 0; i < blobs.length; i++) {
@@ -48,12 +57,19 @@ function useAuroraCanvas(enabled: boolean) {
         const y = (b.sy + 0.14 * Math.cos(t * b.fy + i * 1.7)) * H
         const r = b.r * (0.9 + 0.12 * Math.sin(t * 1.4 + i)) * W
         const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-        g.addColorStop(0, `rgba(${b.rgb.join(',')},0.55)`)
+        g.addColorStop(0, `rgba(${b.rgb.join(',')},0.4)`)
         g.addColorStop(1, 'rgba(0,0,0,0)')
         ctx.fillStyle = g
         ctx.beginPath()
         ctx.arc(x, y, r, 0, Math.PI * 2)
         ctx.fill()
+      }
+      // 尘埃上浮
+      for (const d of dust) {
+        d.y -= d.v * 0.12
+        if (d.y < -2) d.y = H + 2
+        ctx.fillStyle = `rgba(165, 195, 255, ${d.a})`
+        ctx.fillRect(d.x, d.y, d.s, d.s)
       }
       raf = requestAnimationFrame(render)
     }
@@ -96,6 +112,8 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
     >
       {/* 流动极光：色团在深底上游动（CSS 放大 + 大模糊，环境而非装饰） */}
       <canvas ref={auroraRef} aria-hidden className="splash-canvas pointer-events-none absolute inset-0 h-full w-full" />
+      {/* 透视网格地平线：缓缓向前飞行（结构感动效，复古未来风） */}
+      <div aria-hidden className="splash-grid pointer-events-none absolute inset-x-0 bottom-0" />
       {/* 环境光：从底部缓缓升起的蓝晕（ebb 的 lightField 简化版，克制） */}
       <div aria-hidden className="splash-glow pointer-events-none absolute inset-0" />
       <div className="splash-word relative text-[30px] font-extrabold tracking-[0.28em]">
@@ -106,6 +124,8 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         ))}
         {/* 写入线：从中心向两侧展开（block cursor 写名字的余韵） */}
         <span aria-hidden className="splash-rule" />
+        {/* 扫光：字母落定后一道高光横向掠过 */}
+        <span aria-hidden className="splash-shine" />
       </div>
       <div className="splash-sub text-xs tracking-[0.4em]">求职自动化工作台</div>
       <div className="splash-steps relative flex items-center gap-2.5 text-[11px]">

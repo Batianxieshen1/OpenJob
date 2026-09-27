@@ -310,8 +310,45 @@ body {
   overflow: hidden;
 }
 .splash-canvas {
-  filter: blur(46px) saturate(1.25);
+  filter: blur(46px) saturate(1.1);
   transform: scale(1.18); /* 模糊边缘不露底 */
+}
+
+/* 透视网格地平线：向前飞行的网格（复古未来风，低透明度不抢字） */
+.splash-grid {
+  bottom: -14%;
+  height: 58%;
+  background-image:
+    linear-gradient(rgb(96 138 255 / 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(96 138 255 / 0.15) 1px, transparent 1px);
+  background-size: 42px 42px;
+  transform: perspective(340px) rotateX(58deg);
+  transform-origin: center top;
+  animation: grid-flow 2.4s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent, black 26%, black);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 26%, black);
+}
+@keyframes grid-flow {
+  from { background-position: 0 0; }
+  to { background-position: 0 42px; }
+}
+
+/* 扫光：一道高光斜向掠过 wordmark */
+.splash-word {
+  overflow: hidden;
+  padding: 0 10px;
+}
+.splash-shine {
+  position: absolute;
+  top: -30%;
+  bottom: -30%;
+  width: 22%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.3), transparent);
+  transform: translateX(-180%) skewX(-16deg);
+  animation: shine-sweep 640ms var(--ease-product) 540ms both;
+}
+@keyframes shine-sweep {
+  to { transform: translateX(560%) skewX(-16deg); }
 }
 .splash-leave {
   animation: splash-leave 420ms var(--ease-in-quick) both;
