@@ -302,6 +302,37 @@ body {
   }
 }
 
+/* ── 每日开机画面（SplashScreen）：深色底白字，与主题无关；
+      字符逐个升起 → 整体轻微放大消散（"打开"的方向感） ── */
+.splash-screen {
+  background: linear-gradient(160deg, #0d1017, #17307a 150%);
+  color: #fff;
+}
+.splash-leave {
+  animation: splash-leave 420ms var(--ease-in-quick) both;
+  pointer-events: none;
+}
+@keyframes splash-leave {
+  to { opacity: 0; transform: scale(1.03); }
+}
+.splash-letter {
+  animation: splash-rise 480ms var(--ease-product) both;
+}
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(26px) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+.splash-sub {
+  animation: splash-fade 400ms var(--ease-product) 500ms both;
+}
+@keyframes splash-fade {
+  from { opacity: 0; }
+  to { opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-screen { display: none; }
+}
+
 /* 按钮物理按压感（全局） */
 button:not(:disabled):active {
   transform: scale(0.98);

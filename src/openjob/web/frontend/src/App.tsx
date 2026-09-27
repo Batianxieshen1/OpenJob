@@ -1,8 +1,9 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
 import { BottomNav } from './components/layout/BottomNav'
+import { SplashScreen } from './components/SplashScreen'
 
 // 路由级代码分割：首屏只加载工作台，其余页面按需拉取
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
@@ -47,8 +48,20 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
+  // 每日一次的开机画面（当天第二次起、刷新、reduced-motion 均不播）
+  const [splash, setSplash] = useState(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      if (localStorage.getItem('openjob-splash-seen') === today) return false
+      localStorage.setItem('openjob-splash-seen', today)
+      return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    } catch {
+      return false
+    }
+  })
   return (
     <BrowserRouter>
+      {splash && <SplashScreen onDone={() => setSplash(false)} />}
       {/* 浅灰画布上的悬浮 App Shell：大圆角 + 柔和投影（桌面）；移动端贴边全幅 */}
       <div className="h-dvh bg-canvas p-0 text-foreground sm:p-4 lg:p-6">
         <div className="app-shell mx-auto flex h-full max-w-[1560px] overflow-hidden rounded-none bg-shell shadow-shell sm:rounded-shell">
