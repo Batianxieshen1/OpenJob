@@ -48,9 +48,13 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
-  // 每日一次的开机画面（当天第二次起、刷新、reduced-motion 均不播）
+  // 每日一次的开机画面（当天第二次起、刷新、reduced-motion 均不播）；
+  // URL 带 ?splash=1 时无视当日记录强制播放（演示/验收用）
   const [splash, setSplash] = useState(() => {
     try {
+      if (new URLSearchParams(window.location.search).get('splash') === '1') {
+        return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      }
       const today = new Date().toISOString().slice(0, 10)
       if (localStorage.getItem('openjob-splash-seen') === today) return false
       localStorage.setItem('openjob-splash-seen', today)
