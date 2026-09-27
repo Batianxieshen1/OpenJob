@@ -97,10 +97,10 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
             {activeTask?.status === 'stopping' ? '停止中…' : `停止${activeTask?.label || '任务'}`}
           </button>
         ) : (
-          <div className={`flex h-11 w-full items-center justify-center rounded-full border border-dashed text-xs ${
-            dark ? 'border-shell/30 text-shell/70 dark:text-white/70' : 'border-card-border text-muted'
+          <div className={`flex h-8 w-full items-center justify-center rounded-full border border-dashed text-[11px] ${
+            dark ? 'border-shell/30 text-shell/60 dark:text-white/60' : 'border-card-border text-muted-3'
           }`}>
-            采集与发送的启动入口在上方主按钮
+            启动入口在上方主按钮
           </div>
         )}
       </div>

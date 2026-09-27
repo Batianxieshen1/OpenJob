@@ -44,7 +44,9 @@ export function PipelineProgress({ funnelToday, pendingCount }: PipelineProgress
         {/* 连接线 */}
         <div className="absolute left-0 right-0 top-[13px] h-0.5 rounded-full bg-card-border" />
         <div
-          className="absolute left-0 top-[13px] h-0.5 rounded-full bg-primary transition-all duration-700"
+          className={`absolute left-0 top-[13px] h-0.5 rounded-full transition-all duration-700 ${
+            currentIndex > 0 && currentIndex < stages.length ? 'flow-line' : 'bg-primary'
+          }`}
           style={{ width: currentIndex <= 0 ? 0 : `${((currentIndex - 0.5) / (stages.length - 1)) * 100}%` }}
         />
         <ol className="relative flex justify-between">

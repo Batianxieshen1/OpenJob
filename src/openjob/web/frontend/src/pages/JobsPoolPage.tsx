@@ -508,8 +508,6 @@ const markManuallySent = async (job: Job) => {
         filters={filters}
         onChange={setFilters}
         onReset={() => setFilters({ ...EMPTY_JOB_FILTERS })}
-        resultCount={total}
-        totalCount={allTotal}
         invalidSalary={hasInvalidSalaryRange(filters)}
         showStatus
         showSource
@@ -570,6 +568,7 @@ const markManuallySent = async (job: Job) => {
       )}
       {error && <div className="mb-4 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
       <JobsTable
+        refreshKey={JSON.stringify(filters)}
         jobs={items}
         page={page}
         pageSize={pageSize}

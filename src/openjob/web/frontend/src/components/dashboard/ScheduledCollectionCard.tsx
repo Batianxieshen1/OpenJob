@@ -62,19 +62,10 @@ export function ScheduledCollectionCard({ schedule }: { schedule: ScheduledColle
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-xl border border-card-border px-2 py-2">
-          <div className="text-[10px] text-muted">今日完成</div>
-          <div className="mt-0.5 text-sm font-semibold tabular-nums">{schedule.today_executed}</div>
-        </div>
-        <div className="rounded-xl border border-card-border px-2 py-2">
-          <div className="text-[10px] text-muted">最近新增</div>
-          <div className="mt-0.5 text-sm font-semibold tabular-nums">{last?.new_jobs_count ?? 0}</div>
-        </div>
-        <div className="rounded-xl border border-card-border px-2 py-2">
-          <div className="text-[10px] text-muted">最近高分</div>
-          <div className="mt-0.5 text-sm font-semibold tabular-nums">{last?.high_score_count ?? 0}</div>
-        </div>
+      <div className="mt-3 rounded-xl border border-card-border px-3 py-2 text-[11px] text-muted">
+        今日完成 <span className="font-semibold tabular-nums text-foreground">{schedule.today_executed}</span>
+        <span className="mx-1.5 text-border-c">·</span>最近新增 <span className="font-semibold tabular-nums text-foreground">{last?.new_jobs_count ?? 0}</span>
+        <span className="mx-1.5 text-border-c">·</span>最近高分 <span className="font-semibold tabular-nums text-foreground">{last?.high_score_count ?? 0}</span>
       </div>
 
       <div className="mt-auto flex items-center gap-2 pt-3 text-[11px] text-muted">

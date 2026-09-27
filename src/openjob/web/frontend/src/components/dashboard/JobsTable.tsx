@@ -8,6 +8,7 @@ import type { Job } from '@/hooks/useDashboard'
 import type { JobSortKey, JobSortOrder } from '@/hooks/useJobSearch'
 
 interface JobsTableProps {
+  refreshKey?: string
   jobs: Job[]
   page: number
   pageSize: number
@@ -124,7 +125,8 @@ function ScoreBadge({ score }: { score: number }) {
   )
 }
 
-export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedIds, onToggleSelected, onSoftDelete, onMarkManuallySent, onApprove, onDetail, loading = false, sortBy, sortOrder, onSortChange }: JobsTableProps) {
+export function JobsTable({ refreshKey,
+   jobs, page, pageSize, total, onPageChange, selectedIds, onToggleSelected, onSoftDelete, onMarkManuallySent, onApprove, onDetail, loading = false, sortBy, sortOrder, onSortChange }: JobsTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [pageInput, setPageInput] = useState(String(page + 1))
   const totalPages = Math.ceil(total / pageSize)
@@ -284,7 +286,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
         <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
-              <tr className="border-b border-card-border bg-accent-soft text-xs text-muted">
+              <tr className="border-b border-card-border bg-surface-hover text-xs text-muted">
                 <th className="w-10 px-3 py-3 text-center font-semibold">选</th>
                 <th className="px-4 py-3 text-left font-semibold">岗位</th>
                 <th className="hidden w-24 px-4 py-3 text-left font-semibold md:table-cell">城市</th>
@@ -295,7 +297,7 @@ export function JobsTable({ jobs, page, pageSize, total, onPageChange, selectedI
                 {hasActions && <th className="min-w-[200px] px-3 py-3 text-center font-semibold">操作</th>}
               </tr>
             </thead>
-            <tbody className="stagger">
+            <tbody key={refreshKey} className="stagger">
               {jobs.map(job => {
                 const isExpanded = expanded === job.id
                 const isExternalPlatform = job.source_platform === 'zhilian' || job.source_platform === '51job'

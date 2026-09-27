@@ -1,6 +1,8 @@
+import { useFlip } from "@/hooks/useFlip"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ChevronDown } from 'lucide-react'
 import { useDashboard, type Job } from '@/hooks/useDashboard'
 import { useDebouncedValue, EMPTY_JOB_FILTERS, hasActiveJobFilters, hasInvalidSalaryRange, filterJobs, type JobFilters } from '@/lib/jobFilters'
 import { Button } from '@/components/ui/button'
@@ -106,6 +108,7 @@ export default function ConfirmQueuePage() {
   const [page, setPage] = useState(0)
   const [batchTarget, setBatchTarget] = useState<{ ids: string[]; directSend: boolean } | null>(null)
   const [batchSubmitting, setBatchSubmitting] = useState(false)
+
   const [tab, setTab] = useState<'confirm' | 'ready_to_send'>('confirm')
   const [sendSelected, setSendSelected] = useState<string[]>([])
   const [editingGreeting, setEditingGreeting] = useState<{ jobId: string; text: string } | null>(null)
@@ -134,6 +137,8 @@ export default function ConfirmQueuePage() {
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages - 1)
   const pageJobs = useMemo(() => sorted.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE), [sorted, safePage])
+  const [moreOpsOpen, setMoreOpsOpen] = useState(false)
+  const flipRef = useFlip([pageJobs.map(job => job.id).join(','), selected.join(',')])
   const actionable = useMemo(() => selected.filter(id => filtered.some(job => job.id === id)), [selected, filtered])
 
   useEffect(() => {
@@ -420,12 +425,39 @@ export default function ConfirmQueuePage() {
               <span className="hidden text-xs text-warning md:inline">另有 {workbench.send_errors.length} 个发送失败岗位在岗位池待处理</span>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => setSelected(filtered.map(job => job.id))}>全选本页结果</Button>
             <Button variant="secondary" size="sm" onClick={() => setSelected([])}>清空</Button>
-            <Button variant="secondary" size="sm" onClick={staleExitOverdue}>超 7 天过期退出</Button>
-            <Button variant="secondary" size="sm" onClick={() => rejectSelected(actionable)}>放弃已选 {actionable.length}</Button>
-            <Button size="sm" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
+            <div className="relative">
+              <button
+                type="button"
+                aria-expanded={moreOpsOpen}
+                onClick={() => setMoreOpsOpen(prev => !prev)}
+                className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium text-muted transition-soft hover:text-foreground"
+              >
+                更多操作
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${moreOpsOpen ? 'rotate-180' : ''}`} aria-hidden />
+              </button>
+              {moreOpsOpen && (
+                <div className="pop-in pop-origin-top absolute left-0 top-9 z-30 min-w-[190px] rounded-2xl border border-card-border bg-card p-1.5 shadow-pop">
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpsOpen(false); staleExitOverdue() }}
+                    className="flex w-full items-center rounded-xl px-2.5 py-1.5 text-left text-xs text-warning transition-soft hover:bg-warning/10"
+                  >
+                    超 7 天过期退出
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpsOpen(false); rejectSelected(actionable) }}
+                    className="flex w-full items-center rounded-xl px-2.5 py-1.5 text-left text-xs text-danger transition-soft hover:bg-danger/10"
+                  >
+                    放弃已选 {actionable.length}
+                  </button>
+                </div>
+              )}
+            </div>
+            <Button size="sm" className="ml-auto" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
           </div>
         </div>
       </div>
@@ -435,15 +467,14 @@ export default function ConfirmQueuePage() {
           filters={filters}
           onChange={setFilters}
           onReset={() => setFilters({ ...EMPTY_JOB_FILTERS })}
-          resultCount={sorted.length}
-          totalCount={jobs.length}
           invalidSalary={hasInvalidSalaryRange(filters)}
         />
         {pageJobs.length ? (
           <>
-            <div className="stagger grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div ref={flipRef} className="stagger grid grid-cols-1 gap-3 lg:grid-cols-2">
               {pageJobs.map(job => (
                 <JobActionCard
+                  flipId={job.id}
                   key={job.id}
                   job={job}
                   selected={selected.includes(job.id)}

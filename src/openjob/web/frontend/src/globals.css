@@ -48,9 +48,9 @@
     --canvas: 11 13 18;        /* #0B0D12 画布底 */
     --shell: 20 22 29;         /* #14161D 应用壳 */
     --bg: 20 22 29;
-    --surface: 26 29 37;       /* #1A1D25 Soft Card */
-    --surface-hover: 33 37 47; /* #21252F */
-    --border-c: 41 46 58;      /* #292E3A */
+    --surface: 30 33 42;       /* #1A1D25 Soft Card */
+    --surface-hover: 38 42 54; /* #21252F */
+    --border-c: 47 53 67;      /* #292E3A */
     --text: 232 234 237;       /* #E8EAED */
     --text-2: 154 163 176;     /* #9AA3B0 */
     --text-3: 122 130 143;
@@ -64,9 +64,9 @@ html.dark {
   --canvas: 11 13 18;
   --shell: 20 22 29;
   --bg: 20 22 29;
-  --surface: 26 29 37;
-  --surface-hover: 33 37 47;
-  --border-c: 41 46 58;
+  --surface: 30 33 42;
+  --surface-hover: 38 42 54;
+  --border-c: 47 53 67;
   --text: 232 234 237;
   --text-2: 154 163 176;
   --text-3: 122 130 143;
@@ -312,6 +312,23 @@ body {
 .splash-canvas {
   filter: blur(46px) saturate(1.1);
   transform: scale(1.18); /* 模糊边缘不露底 */
+}
+
+/* 流程管线能量流动：进行中的段渐变位移循环（onetake：用流动表达"进行中"） */
+.flow-line {
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--primary)) 0%,
+    rgb(var(--primary)) 55%,
+    rgb(130 168 255) 75%,
+    rgb(var(--primary)) 100%
+  );
+  background-size: 200% 100%;
+  animation: flow-move 2.4s linear infinite;
+}
+@keyframes flow-move {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 /* 透视网格地平线：向前飞行的网格（复古未来风，低透明度不抢字） */

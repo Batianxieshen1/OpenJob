@@ -1,3 +1,4 @@
+import { humanizeScoreReason } from "@/lib/format"
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Eye, ExternalLink, XCircle, CheckCircle2, History, MessageCircle } from 'lucide-react'
@@ -300,16 +301,17 @@ export function waitingDays(job: Job): number {
 }
 
 /** 待确认岗位卡：选中态用描边+浅蓝勾角标表达，不做整卡高饱和；超 7 天灰显建议重检 */
-export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: JobActionCardProps) {
+export function JobActionCard({ job, selected, onToggle, onDetail, onReject, flipId }: JobActionCardProps & { flipId?: string }) {
   const days = waitingDays(job)
   const overdue = days > 7
   return (
     <div
+      data-flip-id={flipId}
       className={`card-lift relative rounded-card border p-4 transition-soft ${
         overdue && !selected
           ? 'border-card-border bg-surface-hover opacity-75'
           : selected
-            ? 'border-primary bg-accent-soft/40'
+            ? 'glow-selected border-primary bg-accent-soft/40'
             : 'border-card-border bg-card hover:border-primary/30'
       }`}
     >
@@ -340,7 +342,7 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject }: J
           已等待 {days} 天{overdue ? '，超过 7 天：投递价值可能下降，建议重检评分或过期退出' : ''}
         </p>
       )}
-      <p className="mt-3 line-clamp-2 min-h-12 text-[13px] leading-6 text-muted">{job.score_reason || job.greeting || '等待继续推进。'}</p>
+      <p className="mt-3 line-clamp-2 min-h-6 text-[13px] leading-6 text-muted">{humanizeScoreReason(job.score_reason) || job.greeting || '等待继续推进。'}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" onClick={onDetail}><Eye className="mr-2 h-4 w-4" />查看详情</Button>
         <Button variant="secondary" size="sm" disabled={!job.url} onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}><ExternalLink className="mr-2 h-4 w-4" />跳转岗位链接</Button>
