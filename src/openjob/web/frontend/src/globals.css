@@ -302,11 +302,16 @@ body {
   }
 }
 
-/* ── 每日开机画面（SplashScreen）：深色底白字，与主题无关；
+/* ── 每日开机画面（SplashScreen）：流动极光背景（canvas 色团 + 大模糊），
       字符逐个升起 → 整体轻微放大消散（"打开"的方向感） ── */
 .splash-screen {
-  background: linear-gradient(160deg, #0d1017, #17307a 150%);
+  background: #0b0e14;
   color: #fff;
+  overflow: hidden;
+}
+.splash-canvas {
+  filter: blur(46px) saturate(1.25);
+  transform: scale(1.18); /* 模糊边缘不露底 */
 }
 .splash-leave {
   animation: splash-leave 420ms var(--ease-in-quick) both;
