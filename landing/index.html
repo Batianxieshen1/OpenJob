@@ -38,8 +38,9 @@
   }
   .cta-mini:hover { transform: scale(1.04); }
 
-  header {
-    position: relative; padding: 176px 0 150px; text-align: center; overflow: hidden;
+  /* .wrap 的 padding shorthand 会按类优先级覆盖元素选择器，故这里必须用 header.wrap 提升优先级 */
+  header.wrap {
+    position: relative; padding: 176px 24px 150px; text-align: center; overflow: hidden;
     background:
       radial-gradient(1000px 520px at 72% -20%, rgba(30,64,160,.30), transparent 66%),
       radial-gradient(760px 420px at 12% 0%, rgba(70,60,150,.18), transparent 66%);
@@ -236,8 +237,8 @@
 <div class="ribbon-zone" aria-hidden="true">
   <div class="ribbon-track">
     <div class="ribbon r1">
-      <span>搜索流采集</span><i>◆</i><span>推荐页灰度</span><i>◆</i><span>五维评分</span><i>◆</i><span>事实溯源</span><i>◆</i><span>人工确认</span><i>◆</i><span>四层守卫</span><i>◆</i><span>本地优先</span><i>◆</i>
-      <span>搜索流采集</span><i>◆</i><span>推荐页灰度</span><i>◆</i><span>五维评分</span><i>◆</i><span>事实溯源</span><i>◆</i><span>人工确认</span><i>◆</i><span>四层守卫</span><i>◆</i><span>本地优先</span><i>◆</i>
+      <span>搜索流采集</span><i>◆</i><span>推荐页采集</span><i>◆</i><span>五维评分</span><i>◆</i><span>事实溯源</span><i>◆</i><span>人工确认</span><i>◆</i><span>四层守卫</span><i>◆</i><span>本地优先</span><i>◆</i>
+      <span>搜索流采集</span><i>◆</i><span>推荐页采集</span><i>◆</i><span>五维评分</span><i>◆</i><span>事实溯源</span><i>◆</i><span>人工确认</span><i>◆</i><span>四层守卫</span><i>◆</i><span>本地优先</span><i>◆</i>
     </div>
   </div>
   <div class="ribbon-track">
@@ -284,7 +285,7 @@
       <p>主动搜索与平台推荐页一起扫，来源逐条留档。</p>
       <div class="chans">
         <div class="chan"><span>搜索流</span><span class="pill">关键词 × 城市</span></div>
-        <div class="chan"><span>推荐页</span><span class="pill">每日灰度</span></div>
+        <div class="chan"><span>推荐页</span><span class="pill">每日放宽</span></div>
       </div>
     </div>
 
