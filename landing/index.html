@@ -199,6 +199,21 @@
   </div>
 </section>
 
+<div class="ribbon-zone" aria-hidden="true">
+  <div class="ribbon-track">
+    <div class="ribbon r1">
+      <span>搜索流采集</span><i>◆</i><span>推荐页灰度</span><i>◆</i><span>五维评分</span><i>◆</i><span>事实溯源</span><i>◆</i><span>人工确认</span><i>◆</i><span>四层守卫</span><i>◆</i><span>本地优先</span><i>◆</i>
+      <span>搜索流采集</span><i>◆</i><span>推荐页灰度</span><i>◆</i><span>五维评分</span><i>◆</i><span>事实溯源</span><i>◆</i><span>人工确认</span><i>◆</i><span>四层守卫</span><i>◆</i><span>本地优先</span><i>◆</i>
+    </div>
+  </div>
+  <div class="ribbon-track">
+    <div class="ribbon r2">
+      <span>随机休息日</span><i>◆</i><span>时间窗 09:00–16:00</span><i>◆</i><span>JD 定制简历</span><i>◆</i><span>回复监测</span><i>◆</i><span>投后闭环</span><i>◆</i><span>SQLite 本地</span><i>◆</i><span>开源</span><i>◆</i>
+      <span>随机休息日</span><i>◆</i><span>时间窗 09:00–16:00</span><i>◆</i><span>JD 定制简历</span><i>◆</i><span>回复监测</span><i>◆</i><span>投后闭环</span><i>◆</i><span>SQLite 本地</span><i>◆</i><span>开源</span><i>◆</i>
+    </div>
+  </div>
+</div>
+
 <section class="wrap">
   <div class="kicker reveal">Capabilities</div>
   <h2 class="reveal">为「认真找工作的人」设计的每一层</h2>
@@ -332,6 +347,35 @@ safe(function () {
     requestAnimationFrame(render);
   })(0);
 });
+
+/* ── 丝带横飘：两行反向流动的关键词带，hover 暂停（W12） ── */
+.ribbon-zone {
+  padding: 30px 0 10px;
+  display: flex; flex-direction: column; gap: 12px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+.ribbon-track { overflow: hidden; }
+.ribbon {
+  display: flex; align-items: center; gap: 28px; width: max-content;
+  padding: 10px 0;
+}
+.ribbon span {
+  white-space: nowrap; font-size: 15px; font-weight: 600; letter-spacing: .02em;
+  color: #6d7889; transition: color 250ms var(--ease);
+}
+.ribbon i { font-style: normal; color: #2c3342; font-size: 9px; }
+.ribbon.r1 { animation: ribbon-left 38s linear infinite; }
+.ribbon.r2 { animation: ribbon-right 46s linear infinite; }
+.ribbon:hover span { color: var(--text); }
+.ribbon.r1:hover { animation-play-state: paused; }
+.ribbon.r2:hover { animation-play-state: paused; }
+@keyframes ribbon-left { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes ribbon-right { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .ribbon { animation: none !important; }
+}
 
 /* 滚动浮现 */
 safe(function () {
