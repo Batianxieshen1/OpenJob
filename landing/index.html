@@ -13,6 +13,12 @@
   document.documentElement.setAttribute('data-theme', t);
 })();
 </script>
+<meta name="theme-color" id="metaTheme" content="#05070d">
+<meta property="og:type" content="website">
+<meta property="og:title" content="OpenJob — 让岗位，来找工作你">
+<meta property="og:description" content="本地优先的求职自动化工作台：采集 → AI 五维评分 → 人工确认 → 安全发送。AI 只建议，你拍板。">
+<meta property="og:url" content="https://batianxieshen1.github.io/OpenJob/">
+<meta name="twitter:card" content="summary">
 <style>
   /* ── 主题 token：夜=A 深空实验室（默认），昼=B 纸上工程 ── */
   :root {
@@ -31,21 +37,21 @@
     --cell-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.28);
   }
   html[data-theme="light"] {
-    --bg: #f6f4ec; --card: #fffdf7; --card2: #f2efe4; --border: #d9d4c2;
-    --text: #1c1b15; --muted: #6e6a5c; --primary: #2456c4; --primary-soft: rgba(36,86,196,.1);
-    --faint: #8f8b7a; --rb-ink: #85816f; --rb-dot: #cfcaba;
-    --badge-bg: rgba(255,253,247,.85); --nav-bg: rgba(246,244,236,.75); --nav-line: rgba(217,212,194,.75);
-    --sel: rgba(36,86,196,.25); --bar-a: #2456c4; --bar-b: #7c9be8;
-    --grad-a: #2456c4; --grad-b: #6b8fe4;
-    --glow-1: rgba(36,86,196,.09); --glow-2: rgba(120,90,60,.07); --glow-3: rgba(36,86,196,.05);
-    --cta-glow: rgba(28,27,21,.1); --line-strong: #cfcaba; --primary-strong: rgba(36,86,196,.4);
-    --spot: rgba(36,86,196,.07); --grid-line: rgba(36,86,196,.1); --noise-op: .05;
-    --sheen: rgba(47,95,224,.28);
-    --cell-sheen: rgba(255,255,255,.5);
-    --cell-shadow: 0 1px 2px rgba(50,42,20,.05), 0 10px 28px rgba(50,42,20,.07);
+    --bg: #f3f5f9; --card: #ffffff; --card2: #eef1f6; --border: #d8dee8;
+    --text: #141a24; --muted: #5d6878; --primary: #2b5fe3; --primary-soft: rgba(43,95,232,.09);
+    --faint: #9aa4b2; --rb-ink: #7d8798; --rb-dot: #ccd3de;
+    --badge-bg: rgba(255,255,255,.8); --nav-bg: rgba(243,245,249,.75); --nav-line: rgba(216,222,232,.7);
+    --sel: rgba(43,95,232,.22); --bar-a: #2b5fe3; --bar-b: #7c9df0;
+    --grad-a: #2b5fe3; --grad-b: #6f92ee;
+    --glow-1: rgba(43,95,232,.08); --glow-2: rgba(90,110,200,.06); --glow-3: rgba(43,95,232,.05);
+    --cta-glow: rgba(20,26,36,.12); --line-strong: #c4cbd8; --primary-strong: rgba(43,95,232,.38);
+    --spot: rgba(43,95,232,.06); --grid-line: rgba(43,95,232,.085); --noise-op: .045;
+    --cell-sheen: rgba(255,255,255,.6);
+    --cell-shadow: 0 1px 2px rgba(15,23,42,.05), 0 12px 32px rgba(15,23,42,.07);
+    --sheen: rgba(47,95,224,.25);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
   body {
     background: var(--bg); color: var(--text);
     font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -61,7 +67,8 @@
   }
   .nav-in { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .12em; font-size: 14px; }
-  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 12px var(--primary); }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 12px var(--primary); animation: dotPulse 2.8s ease-in-out infinite; }
+  @keyframes dotPulse { 0%, 100% { box-shadow: 0 0 6px var(--primary); } 50% { box-shadow: 0 0 14px var(--primary); } }
   .nav-right { display: flex; align-items: center; gap: 18px; font-size: 13px; }
   .nav-right a { color: var(--muted); text-decoration: none; transition: color 150ms var(--ease); }
   .nav-right a:hover { color: var(--text); }
@@ -163,8 +170,16 @@
   }
   .flow-step .no { transition: color .2s var(--ease), text-shadow .3s var(--ease); }
   .flow-step.lit .no { color: var(--primary); text-shadow: 0 0 12px var(--primary-soft); animation: pop .5s var(--ease); }
+  /* 工序电路节点：电流到达点亮 */
+  .flow-step::before {
+    content: ""; position: absolute; top: 29px; left: 0; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--card2); border: 1px solid var(--border);
+    transform: translate(-50%, -50%);
+    transition: background .25s, border-color .25s, box-shadow .25s;
+  }
+  .flow-step.lit::before { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px var(--primary-soft); }
   @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }
-  @media (max-width: 860px) { .flowline { display: none; } }
+  @media (max-width: 860px) { .flowline, .flow-step::before { display: none; } }
 
   .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 56px; }
   .cell {
@@ -179,6 +194,17 @@
     opacity: 0; transition: opacity 250ms var(--ease);
   }
   .cell:hover::after { opacity: 1; }
+  /* 指针位置渐变描边环（border-glow ring） */
+  .cell::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), var(--primary-strong), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: 0; transition: opacity .25s var(--ease); pointer-events: none;
+  }
+  .cell:hover::before { opacity: 1; }
   .c4 { grid-column: span 4; } .c3 { grid-column: span 3; } .c2 { grid-column: span 2; }
   @media (max-width: 860px) { .c4, .c3, .c2 { grid-column: span 6; } }
   .cell h3 { font-size: 17px; margin-top: 14px; }
@@ -237,7 +263,8 @@
   footer h2 { font-size: clamp(24px, 4vw, 38px); }
   footer .cta-main { display: inline-block; margin-top: 30px; }
   .foot-note { margin-top: 34px; color: var(--faint); font-size: 12.5px; line-height: 2; }
-  .foot-note a { color: var(--muted); }
+  .foot-note a { color: var(--muted); transition: color .15s var(--ease); }
+  .foot-note a:hover { color: var(--primary); }
 
   .reveal { opacity: 0; transform: translateY(24px); filter: blur(8px); transition: opacity 760ms var(--ease), transform 760ms var(--ease), filter 760ms var(--ease); }
   .reveal.on { opacity: 1; transform: none; filter: blur(0); }
@@ -343,6 +370,42 @@ html[data-theme="light"] .ic-moon { display: none; }
   background: radial-gradient(320px circle at var(--sx, 50%) var(--sy, 42%), var(--spot), transparent 70%);
 }
 header:hover .spotlight { opacity: 1; }
+/* hero 浮动产品卡：夜=发光玻璃，昼=白瓷（≥1280px 显示） */
+.hero-cards { position: absolute; inset: 0; z-index: 1; pointer-events: none; display: none; }
+@media (min-width: 1280px) { .hero-cards { display: block; } }
+.hcard {
+  position: absolute; border-radius: 16px; border: 1px solid var(--border);
+  background: var(--card); box-shadow: var(--cell-shadow); overflow: hidden;
+  animation: hfloat 7s ease-in-out infinite;
+}
+.hc-term { top: 23%; right: 5.5%; width: 300px; }
+.hc-stats { bottom: 17%; left: 5.5%; width: 232px; animation-delay: -3.5s; }
+@keyframes hfloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.hc-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+.hc-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.hc-bar span { margin-left: 6px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 10.5px; color: var(--muted); letter-spacing: .08em; }
+.hc-lines { padding: 12px 14px 14px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; line-height: 1.9; min-height: 118px; }
+.tl { white-space: nowrap; color: var(--muted); min-height: 1.9em; }
+.tl.ok { color: var(--primary); }
+.tl.todo { color: var(--text); font-weight: 600; }
+.tl.typing::after { content: "▌"; margin-left: 1px; color: var(--primary); animation: cursor-blink 1s steps(1) infinite; }
+@keyframes cursor-blink { 50% { opacity: 0; } }
+.hc-title { padding: 10px 14px 0; font-size: 11px; letter-spacing: .18em; color: var(--faint); font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.hc-row { display: flex; align-items: baseline; justify-content: space-between; padding: 7px 14px 0; font-size: 12.5px; color: var(--muted); }
+.hc-row b { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 15px; color: var(--text); }
+.hc-row b.hl { color: var(--primary); }
+.hc-note { padding: 10px 14px 12px; font-size: 10.5px; color: var(--faint); letter-spacing: .06em; }
+/* 回到顶部 */
+#toTop {
+  position: fixed; right: 26px; bottom: 26px; z-index: 150;
+  width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--badge-bg); color: var(--muted); font-size: 16px; cursor: pointer;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  opacity: 0; transform: translateY(10px); pointer-events: none;
+  transition: opacity .3s var(--ease), transform .3s var(--ease), color .15s, border-color .15s;
+}
+#toTop.show { opacity: 1; transform: none; pointer-events: auto; }
+#toTop:hover { color: var(--text); border-color: var(--line-strong); }
 /* 主题切换：从按钮位置圆形扩散（View Transition 渐进增强） */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-new(root) {
@@ -374,6 +437,24 @@ header:hover .spotlight { opacity: 1; }
 <header>
   <canvas id="aurora" aria-hidden="true"></canvas>
   <div class="spotlight" aria-hidden="true"></div>
+  <div class="hero-cards" aria-hidden="true">
+    <div class="hcard hc-term">
+      <div class="hc-bar"><i></i><i></i><i></i><span>openjob · terminal</span></div>
+      <div class="hc-lines">
+        <div class="tl" data-text="$ openjob collect --daily">$ openjob collect --daily</div>
+        <div class="tl ok" data-text="✓ 采集 47 · 去重 12">✓ 采集 47 · 去重 12</div>
+        <div class="tl ok" data-text="✓ AI 五维评分完毕">✓ AI 五维评分完毕</div>
+        <div class="tl todo" data-text="→ 待你确认 · 3">→ 待你确认 · 3</div>
+      </div>
+    </div>
+    <div class="hcard hc-stats">
+      <div class="hc-title">今日看板</div>
+      <div class="hc-row"><span>新增岗位</span><b>27</b></div>
+      <div class="hc-row"><span>过线 ≥71</span><b class="hl">2</b></div>
+      <div class="hc-row"><span>待你确认</span><b>3</b></div>
+      <div class="hc-note">AI 只建议 · 你拍板</div>
+    </div>
+  </div>
   <div class="hero-badge"><b>●</b> 本地优先 · 开源 · 每日自动化</div>
   <h1 id="heroTitle" aria-label="让合适的岗位，来找工作你。">
     <span style="display:block"><span class="l" style="animation-delay:120ms">让</span><span class="l" style="animation-delay:175ms">合</span><span class="l" style="animation-delay:230ms">适</span><span class="l" style="animation-delay:285ms">的</span><span class="l" style="animation-delay:340ms">岗</span><span class="l" style="animation-delay:395ms">位</span><span class="l" style="animation-delay:450ms">，</span></span>
@@ -512,6 +593,8 @@ header:hover .spotlight { opacity: 1; }
   </p>
 </footer>
 
+<button id="toTop" aria-label="回到顶部" title="回到顶部">↑</button>
+
 <script>
 function safe(fn) { try { fn(); } catch (e) { console.warn('landing:', e); } }
 
@@ -533,6 +616,8 @@ safe(function () {
     var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     var apply = function () {
       root.setAttribute('data-theme', next);
+      var mt = document.getElementById('metaTheme');
+      if (mt) mt.setAttribute('content', next === 'light' ? '#f3f5f9' : '#05070d');
       try { localStorage.setItem('oj-theme', next); } catch (err) {}
     };
     root.style.setProperty('--vt-x', (e.clientX || window.innerWidth - 60) + 'px');
@@ -635,6 +720,8 @@ safe(function () {
   const flow = document.querySelector('.flow');
   const flowPath = document.querySelector('.flowline path');
   const flowSteps = document.querySelectorAll('.flow-step');
+  const nav = document.querySelector('nav');
+  let lastY = window.scrollY;
   let ticking = false;
   function onScroll() {
     if (ticking) return;
@@ -645,6 +732,11 @@ safe(function () {
       const doc = document.documentElement;
       const max = doc.scrollHeight - window.innerHeight;
       if (pbar) pbar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, y / max) : 0).toFixed(4) + ')';
+      if (nav) {
+        if (y > 140 && y > lastY + 4) nav.classList.add('hidden');
+        else if (y < lastY - 4 || y < 140) nav.classList.remove('hidden');
+      }
+      lastY = y;
       if (aurora) {
         aurora.style.transform = 'translateY(' + Math.round(y * .25) + 'px)';
         const fade = Math.max(0, 1 - y / (window.innerHeight * .9));
@@ -705,6 +797,46 @@ safe(function () {
       cell.style.setProperty('--ry', '0deg');
     });
   });
+});
+
+/* 回到顶部（导航行为，不受 reduced-motion 限制，仅平滑度自适应） */
+safe(function () {
+  const btn = document.getElementById('toTop');
+  if (!btn) return;
+  const show = function () { btn.classList.toggle('show', window.scrollY > window.innerHeight * .9); };
+  window.addEventListener('scroll', show, { passive: true });
+  btn.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
+  show();
+});
+
+/* hero 终端卡打字循环（reduced-motion 直接显示全文） */
+safe(function () {
+  const lines = document.querySelectorAll('.hc-lines .tl');
+  if (!lines.length) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const seq = Array.from(lines).map(function (l) { return [l, l.dataset.text]; });
+  seq.forEach(function (p) { p[0].textContent = ''; });
+  let idx = 0;
+  function typeLine() {
+    if (idx >= seq.length) {
+      setTimeout(function () {
+        seq.forEach(function (p) { p[0].textContent = ''; p[0].classList.remove('typing'); });
+        idx = 0; typeLine();
+      }, 4200);
+      return;
+    }
+    const l = seq[idx][0], text = seq[idx][1];
+    l.classList.add('typing');
+    let c = 0;
+    (function tick() {
+      l.textContent = text.slice(0, ++c);
+      if (c < text.length) setTimeout(tick, 26 + Math.random() * 40);
+      else { l.classList.remove('typing'); idx++; setTimeout(typeLine, 240); }
+    })();
+  }
+  setTimeout(typeLine, 1600);
 });
 </script>
 </body>
