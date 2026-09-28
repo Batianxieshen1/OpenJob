@@ -19,7 +19,7 @@
     -webkit-font-smoothing: antialiased; overflow-x: hidden;
   }
   ::selection { background: rgba(91,140,255,.35); }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 
   nav {
     position: fixed; top: 0; left: 0; right: 0; z-index: 50;
@@ -38,12 +38,13 @@
   }
   .cta-mini:hover { transform: scale(1.04); }
 
-  /* .wrap 的 padding shorthand 会按类优先级覆盖元素选择器，故这里必须用 header.wrap 提升优先级 */
-  header.wrap {
+  /* 首屏通铺全宽：不放 .wrap 里，光晕背景按全屏调校 */
+  header {
     position: relative; padding: 176px 24px 150px; text-align: center; overflow: hidden;
     background:
-      radial-gradient(1000px 520px at 72% -20%, rgba(30,64,160,.30), transparent 66%),
-      radial-gradient(760px 420px at 12% 0%, rgba(70,60,150,.18), transparent 66%);
+      radial-gradient(1600px 720px at 70% -28%, rgba(30,64,160,.34), transparent 68%),
+      radial-gradient(1200px 560px at 10% -16%, rgba(70,60,150,.22), transparent 68%),
+      radial-gradient(1100px 500px at 50% 120%, rgba(30,64,160,.12), transparent 70%);
   }
   /* 底部渐隐：光晕溶入纯黑，与下一段自然衔接 */
   header::after {
@@ -159,16 +160,15 @@
     h1 .l { opacity: 1; transform: none; }
   }
 
-/* ── 丝带横飘：两行反向流动的关键词带，hover 暂停（W12） ── */
+/* ── 丝带横飘：通栏全宽，两行反向流动的关键词带，hover 暂停（W12） ── */
 .ribbon-zone {
-  margin: 0 auto 20px;
-  padding: 22px 0;
-  max-width: 1120px;
+  margin: 0 0 20px;
+  padding: 20px 0;
   display: flex; flex-direction: column; gap: 10px;
   overflow: hidden;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   -webkit-mask-image: none;
   mask-image: none;
 }
@@ -207,7 +207,7 @@
   </div>
 </nav>
 
-<header class="wrap">
+<header>
   <canvas id="aurora" aria-hidden="true"></canvas>
   <div class="hero-badge"><b>●</b> 本地优先 · 开源 · 每日自动化</div>
   <h1 id="heroTitle" aria-label="让合适的岗位，来找工作你。">
@@ -336,7 +336,7 @@
   <p class="who reveal">—— OpenJob 唯一一条不会妥协的铁律</p>
 </div>
 
-<footer id="start" class="wrap">
+<footer id="start">
   <div class="kicker reveal">Start</div>
   <h2 class="reveal">把重复劳动交给机器，<br>把判断留给自己。</h2>
   <a class="cta-main reveal" href="https://github.com/Batianxieshen1/OpenJob" target="_blank" rel="noopener noreferrer">GitHub 上看源码 →</a>
@@ -348,6 +348,15 @@
 
 <script>
 function safe(fn) { try { fn(); } catch (e) { console.warn('landing:', e); } }
+
+/* 丝带通栏后按视口宽度自动倍增内容，保证 -50% 循环在任意屏宽下无缝 */
+safe(function () {
+  var vw = document.documentElement.clientWidth;
+  document.querySelectorAll('.ribbon').forEach(function (r) {
+    var guard = 0;
+    while (r.scrollWidth < vw * 2 && guard++ < 6) { r.innerHTML += r.innerHTML; }
+  });
+});
 
 /* 极光背景：极光失败时 header 的 CSS 渐变兜底仍然可见 */
 safe(function () {
