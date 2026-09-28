@@ -26,6 +26,7 @@
     --glow-1: rgba(30,64,160,.34); --glow-2: rgba(70,60,150,.2); --glow-3: rgba(30,64,160,.12);
     --cta-glow: rgba(91,140,255,.16); --line-strong: #3a4150; --primary-strong: rgba(91,140,255,.45);
     --spot: rgba(91,140,255,.09); --grid-line: rgba(91,140,255,.055); --noise-op: .04;
+    --sheen: rgba(255,255,255,.35);
     --cell-sheen: rgba(255,255,255,.035);
     --cell-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.28);
   }
@@ -39,6 +40,7 @@
     --glow-1: rgba(36,86,196,.09); --glow-2: rgba(120,90,60,.07); --glow-3: rgba(36,86,196,.05);
     --cta-glow: rgba(28,27,21,.1); --line-strong: #cfcaba; --primary-strong: rgba(36,86,196,.4);
     --spot: rgba(36,86,196,.07); --grid-line: rgba(36,86,196,.1); --noise-op: .05;
+    --sheen: rgba(47,95,224,.28);
     --cell-sheen: rgba(255,255,255,.5);
     --cell-shadow: 0 1px 2px rgba(50,42,20,.05), 0 10px 28px rgba(50,42,20,.07);
   }
@@ -91,6 +93,7 @@
     position: relative; display: inline-flex; align-items: center; gap: 8px;
     border: 1px solid var(--border); border-radius: 99px; padding: 6px 16px;
     font-size: 12.5px; color: var(--muted); background: var(--badge-bg);
+    opacity: 0; animation: fade-up 700ms var(--ease) 620ms forwards;
   }
   .hero-badge b { color: var(--primary); font-weight: 600; }
   h1 {
@@ -117,7 +120,26 @@
   .cta-main:hover { transform: translateY(-2px); box-shadow: 0 10px 32px var(--cta-glow); }
   .cta-ghost { border: 1px solid var(--border); color: var(--text); }
   .cta-ghost:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); }
-  @keyframes fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  /* 按钮光泽扫过 + 按压反馈 */
+  .cta-main, .cta-ghost { position: relative; overflow: hidden; }
+  .cta-main::after, .cta-ghost::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+    transform: skewX(-22deg); pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--sheen), transparent);
+    transition: left .55s var(--ease);
+  }
+  .cta-main:hover::after, .cta-ghost:hover::after { left: 135%; }
+  .cta-main:active { transform: scale(.97); }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(16px); filter: blur(8px); } to { opacity: 1; transform: none; filter: blur(0); } }
+  /* 标题落定后 accent 行一次性高光扫过 */
+  h1 > span { position: relative; }
+  h1 > span:nth-child(2)::after {
+    content: ""; position: absolute; inset: -4% 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 32%, var(--sheen) 50%, transparent 68%);
+    transform: translateX(-130%);
+    animation: sheen 1.1s var(--ease) 1.75s 1 forwards;
+  }
+  @keyframes sheen { 0% { transform: translateX(-130%); opacity: 1; } 90% { opacity: 1; } 100% { transform: translateX(130%); opacity: 0; } }
   .hero-meta { position: relative; margin-top: 58px; color: var(--faint); font-size: 12px; letter-spacing: .18em; }
 
   section { padding: 118px 0; }
@@ -131,6 +153,18 @@
   .flow-step .no { font-size: 12px; color: var(--primary); font-weight: 700; letter-spacing: .1em; }
   .flow-step h3 { margin-top: 8px; font-size: 17px; }
   .flow-step p { margin-top: 9px; color: var(--muted); font-size: 13.5px; line-height: 1.85; }
+  /* 四工序通电线：滚动逐段点亮，电流到达时编号 spring pop */
+  .flow { position: relative; }
+  .flowline { position: absolute; left: 0; right: 0; top: 29px; height: 2px; width: 100%; display: block; pointer-events: none; }
+  .flowline path {
+    stroke: var(--primary); stroke-width: 2; fill: none;
+    stroke-dasharray: 100; stroke-dashoffset: 100;
+    filter: drop-shadow(0 0 6px var(--primary-soft));
+  }
+  .flow-step .no { transition: color .2s var(--ease), text-shadow .3s var(--ease); }
+  .flow-step.lit .no { color: var(--primary); text-shadow: 0 0 12px var(--primary-soft); animation: pop .5s var(--ease); }
+  @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }
+  @media (max-width: 860px) { .flowline { display: none; } }
 
   .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 56px; }
   .cell {
@@ -138,7 +172,7 @@
     background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 26px;
     transition: transform 200ms var(--ease), border-color 200ms var(--ease);
   }
-  .cell:hover { transform: translateY(-3px); border-color: var(--primary-strong); }
+  .cell:hover { transform: perspective(900px) translateY(-3px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); border-color: var(--primary-strong); }
   .cell::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     background: radial-gradient(420px 220px at var(--mx, 50%) var(--my, 0%), var(--spot), transparent 65%);
@@ -158,11 +192,28 @@
   .dims .bar { height: 5px; border-radius: 99px; background: var(--card2); overflow: hidden; }
   .dims .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--bar-a), var(--bar-b)); width: 0; transition: width 900ms var(--ease); }
   .on .dims .bar i { width: var(--w); }
+  .dims .bar i { position: relative; }
+  .dims .bar i::after {
+    content: ""; position: absolute; right: 0; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+    transform: translate(2px, -50%); background: var(--bar-b); box-shadow: 0 0 8px var(--bar-a);
+    opacity: 0; transition: opacity .3s .55s;
+  }
+  .on .dims .bar i::after { opacity: 1; }
+  .dims .row > span:last-child { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 700; color: var(--text); }
   .chain { margin-top: 18px; display: flex; flex-direction: column; gap: 0; font-size: 13px; }
   .chain .link { display: flex; align-items: center; gap: 12px; padding: 9px 0; color: var(--muted); }
   .chain .link + .link { border-top: 1px dashed var(--border); }
   .chain .n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: var(--primary); flex-shrink: 0; }
   .chain b { color: var(--text); font-weight: 600; }
+  /* 守卫链阶梯点亮 + hover 高亮 */
+  .chain .link { opacity: .3; transform: translateX(-8px); transition: opacity .45s var(--ease), transform .45s var(--ease); }
+  .reveal.on .chain .link { opacity: 1; transform: none; }
+  .reveal.on .chain .link:nth-child(1) { transition-delay: .05s; }
+  .reveal.on .chain .link:nth-child(2) { transition-delay: .15s; }
+  .reveal.on .chain .link:nth-child(3) { transition-delay: .25s; }
+  .reveal.on .chain .link:nth-child(4) { transition-delay: .35s; }
+  .chain .link:hover { color: var(--text); }
+  .chain .link:hover b { color: var(--primary); }
   .chans { margin-top: 18px; display: grid; gap: 8px; }
   .chan { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 13px; }
   .chan .pill { font-size: 11px; padding: 2px 10px; border-radius: 99px; background: var(--primary-soft); color: var(--primary); font-weight: 600; }
@@ -174,6 +225,13 @@
   .manifesto blockquote { font-size: clamp(30px, 5vw, 52px); font-weight: 800; letter-spacing: -.01em; line-height: 1.3; }
   .manifesto .dim { color: var(--faint); }
   .manifesto .who { margin-top: 20px; color: var(--muted); font-size: 13px; }
+  /* 原则区冲击：dim 渐入，"你拍板"blur+scale 冲击亮起 + 单次光晕脉冲 */
+  .slam-wrap .dim { display: inline-block; opacity: 0; transform: translateY(14px); filter: blur(6px); transition: opacity .7s var(--ease) .1s, transform .7s var(--ease) .1s, filter .7s var(--ease) .1s; }
+  .slam { display: inline-block; opacity: 0; }
+  .slam-wrap.on .dim { opacity: 1; transform: none; filter: blur(0); }
+  .slam-wrap.on .slam { animation: slam-in .68s var(--ease) .42s both, slam-glow 1.5s ease-out .55s 1; }
+  @keyframes slam-in { from { opacity: 0; transform: scale(.94); filter: blur(12px); } to { opacity: 1; transform: none; filter: blur(0); } }
+  @keyframes slam-glow { 0% { text-shadow: none; } 35% { text-shadow: 0 0 30px var(--primary-soft), 0 0 80px var(--primary-soft); } 100% { text-shadow: none; } }
 
   footer { border-top: 1px solid var(--border); padding: 70px 0 60px; text-align: center; }
   footer h2 { font-size: clamp(24px, 4vw, 38px); }
@@ -181,14 +239,20 @@
   .foot-note { margin-top: 34px; color: var(--faint); font-size: 12.5px; line-height: 2; }
   .foot-note a { color: var(--muted); }
 
-  .reveal { opacity: 0; transform: translateY(28px); transition: opacity 700ms var(--ease), transform 700ms var(--ease); }
-  .reveal.on { opacity: 1; transform: none; }
+  .reveal { opacity: 0; transform: translateY(24px); filter: blur(8px); transition: opacity 760ms var(--ease), transform 760ms var(--ease), filter 760ms var(--ease); }
+  .reveal.on { opacity: 1; transform: none; filter: blur(0); }
   .reveal.d1 { transition-delay: 90ms; } .reveal.d2 { transition-delay: 180ms; } .reveal.d3 { transition-delay: 270ms; }
 
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
     .reveal, .hero-sub, .hero-cta { opacity: 1; transform: none; }
     h1 .l { opacity: 1; transform: none; }
+    .reveal { filter: none; }
+    .hero-badge { opacity: 1; }
+    .slam { opacity: 1; }
+    .slam-wrap .dim { opacity: 1; transform: none; filter: none; }
+    h1 > span::after { display: none; }
+    .flowline, #pbar, .spotlight { display: none; }
   }
 
 /* ── 丝带横飘：通栏全宽，两行反向流动的关键词带，hover 暂停（W12） ── */
@@ -232,8 +296,9 @@ header::before {
   content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
                     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(90% 75% at 50% 8%, #000 25%, transparent 78%);
+    background-size: 56px 56px;
+    transform: translateY(var(--psy, 0px));
+    -webkit-mask-image: radial-gradient(90% 75% at 50% 8%, #000 25%, transparent 78%);
   mask-image: radial-gradient(90% 75% at 50% 8%, #000 25%, transparent 78%);
 }
 /* 全页噪点颗粒（SVG feTurbulence，随主题调透明度） */
@@ -266,6 +331,18 @@ html[data-theme="light"] #aurora { display: none; }
 .theme-toggle:hover { color: var(--text); border-color: var(--line-strong); transform: scale(1.06); }
 html[data-theme="dark"] .ic-sun { display: none; }
 html[data-theme="light"] .ic-moon { display: none; }
+/* 阅读进度条 + hero 光标 spotlight */
+#pbar {
+  position: fixed; top: 0; left: 0; width: 100%; height: 2px; z-index: 210;
+  background: linear-gradient(90deg, var(--bar-a), var(--bar-b));
+  transform: scaleX(0); transform-origin: left; pointer-events: none; opacity: .9;
+}
+.spotlight {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  opacity: 0; transition: opacity .4s var(--ease);
+  background: radial-gradient(320px circle at var(--sx, 50%) var(--sy, 42%), var(--spot), transparent 70%);
+}
+header:hover .spotlight { opacity: 1; }
 /* 主题切换：从按钮位置圆形扩散（View Transition 渐进增强） */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-new(root) {
@@ -276,6 +353,8 @@ html[data-theme="light"] .ic-moon { display: none; }
 </style>
 </head>
 <body>
+
+<div id="pbar" aria-hidden="true"></div>
 
 <nav>
   <div class="nav-in">
@@ -294,6 +373,7 @@ html[data-theme="light"] .ic-moon { display: none; }
 
 <header>
   <canvas id="aurora" aria-hidden="true"></canvas>
+  <div class="spotlight" aria-hidden="true"></div>
   <div class="hero-badge"><b>●</b> 本地优先 · 开源 · 每日自动化</div>
   <h1 id="heroTitle" aria-label="让合适的岗位，来找工作你。">
     <span style="display:block"><span class="l" style="animation-delay:120ms">让</span><span class="l" style="animation-delay:175ms">合</span><span class="l" style="animation-delay:230ms">适</span><span class="l" style="animation-delay:285ms">的</span><span class="l" style="animation-delay:340ms">岗</span><span class="l" style="animation-delay:395ms">位</span><span class="l" style="animation-delay:450ms">，</span></span>
@@ -312,6 +392,7 @@ html[data-theme="light"] .ic-moon { display: none; }
   <h2 class="reveal">一条流水线，四道工序</h2>
   <p class="sec-sub reveal">从平台岗位到确认投递，每一步的产物都留在你自己的电脑里。</p>
   <div class="flow">
+    <svg class="flowline" viewBox="0 0 1000 2" preserveAspectRatio="none" aria-hidden="true"><path d="M0,1 H1000" pathLength="100"/></svg>
     <div class="flow-step reveal"><div class="no">01</div><h3>采集</h3><p>搜索流 + 推荐页双通道，关键词与城市按你的求职方向配置，每日定时自动跑。</p></div>
     <div class="flow-step reveal d1"><div class="no">02</div><h3>评分</h3><p>AI 按五个维度打分并说明理由，说不出证据的岗位过不了线。</p></div>
     <div class="flow-step reveal d2"><div class="no">03</div><h3>确认</h3><p>过线岗位排队等你拍板：逐条审、批量审、或按分数预览后放行。</p></div>
@@ -415,8 +496,8 @@ html[data-theme="light"] .ic-moon { display: none; }
 
 <div class="manifesto wrap">
   <div class="kicker reveal">Principle</div>
-  <blockquote class="reveal" style="margin-top: 18px;">
-    <span class="dim">AI 只建议，</span>你拍板。
+  <blockquote class="slam-wrap" style="margin-top: 18px;">
+    <span class="dim">AI 只建议，</span><span class="slam">你拍板。</span>
   </blockquote>
   <p class="who reveal">—— OpenJob 唯一一条不会妥协的铁律</p>
 </div>
@@ -470,11 +551,13 @@ safe(function () {
   }
   const canvas = document.getElementById('aurora');
   const ctx = canvas.getContext('2d');
-  const W = canvas.width = 160, H = canvas.height = 90;
+  const W = canvas.width = 320, H = canvas.height = 180;
   const blobs = [
     { rgb: [20, 44, 110], sx: .8, sy: .4, fx: .8, fy: .6, r: .7 },
     { rgb: [30, 64, 160], sx: .35, sy: .75, fx: 1.2, fy: .5, r: .55 },
     { rgb: [70, 60, 150], sx: .65, sy: .8, fx: .6, fy: 1.0, r: .6 },
+    { rgb: [90, 120, 220], sx: .15, sy: .25, fx: .9, fy: .7, r: .45 },
+    { rgb: [40, 80, 200], sx: .5, sy: .15, fx: .7, fy: 1.1, r: .5 },
   ];
   (function render(now) {
     const t = now / 1000;
@@ -486,8 +569,9 @@ safe(function () {
       const x = (b.sx + .14 * Math.sin(t * b.fx + i * 2)) * W;
       const y = (b.sy + .16 * Math.cos(t * b.fy + i * 1.6)) * H;
       const r = b.r * (0.92 + .1 * Math.sin(t * 1.2 + i)) * W;
+      const a = .42 + .12 * Math.sin(t * .5 + i * 1.3);
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, 'rgba(' + b.rgb.join(',') + ',.5)');
+      g.addColorStop(0, 'rgba(' + b.rgb.join(',') + ',' + a.toFixed(3) + ')');
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
@@ -504,14 +588,28 @@ safe(function () {
       if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }
     });
   }, { threshold: 0.18 });
-  document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  document.querySelectorAll('.reveal, .slam-wrap').forEach(function (el) { io.observe(el); });
 });
 
-/* 五维条进入视口后生长 */
+/* 五维条进入视口后生长 + 数字滚动计数 */
 safe(function () {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
-      if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }
+      if (!e.isIntersecting) return;
+      e.target.classList.add('on'); io.unobserve(e.target);
+      if (reduce) return;
+      e.target.querySelectorAll('.row > span:last-child').forEach(function (sp) {
+        const end = parseInt(sp.textContent, 10) || 0;
+        let t0 = null;
+        function step(ts) {
+          if (!t0) t0 = ts;
+          let k = Math.min(1, (ts - t0) / 900); k = 1 - Math.pow(1 - k, 3);
+          sp.textContent = Math.round(end * k);
+          if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      });
     });
   }, { threshold: 0.4 });
   document.querySelectorAll('[data-dims]').forEach(function (el) { io.observe(el); });
@@ -524,6 +622,87 @@ safe(function () {
       const r = cell.getBoundingClientRect();
       cell.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
       cell.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+    });
+  });
+});
+
+/* ── Phase 2：滚动编排（进度条 / 视差 / 极光衰减 / 通电连线）── */
+safe(function () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const pbar = document.getElementById('pbar');
+  const header = document.querySelector('header');
+  const aurora = document.getElementById('aurora');
+  const flow = document.querySelector('.flow');
+  const flowPath = document.querySelector('.flowline path');
+  const flowSteps = document.querySelectorAll('.flow-step');
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      const y = window.scrollY;
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - window.innerHeight;
+      if (pbar) pbar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, y / max) : 0).toFixed(4) + ')';
+      if (aurora) {
+        aurora.style.transform = 'translateY(' + Math.round(y * .25) + 'px)';
+        const fade = Math.max(0, 1 - y / (window.innerHeight * .9));
+        aurora.style.opacity = (.8 * (.35 + .65 * fade)).toFixed(3);
+      }
+      if (header) header.style.setProperty('--psy', Math.round(y * .3) + 'px');
+      if (flow && flowPath) {
+        const r = flow.getBoundingClientRect();
+        const prog = Math.min(1, Math.max(0, (window.innerHeight * .82 - r.top) / (r.height + window.innerHeight * .25)));
+        flowPath.style.strokeDashoffset = (100 - prog * 100).toFixed(2);
+        const th = prog * 100;
+        flowSteps.forEach(function (s, i) { s.classList.toggle('lit', th > i * 25 - 4); });
+      }
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+});
+
+/* hero 光标 spotlight：网格上的阻尼跟随光 */
+safe(function () {
+  if (!window.matchMedia('(pointer: fine)').matches) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const header = document.querySelector('header');
+  const layer = document.querySelector('.spotlight');
+  if (!header || !layer) return;
+  let tx = .5, ty = .42, cx = .5, cy = .42, raf = null;
+  function loop() {
+    cx += (tx - cx) * .08; cy += (ty - cy) * .08;
+    layer.style.setProperty('--sx', (cx * 100).toFixed(2) + '%');
+    layer.style.setProperty('--sy', (cy * 100).toFixed(2) + '%');
+    if (Math.abs(tx - cx) > .001 || Math.abs(ty - cy) > .001) raf = requestAnimationFrame(loop);
+    else raf = null;
+  }
+  header.addEventListener('pointermove', function (e) {
+    const r = header.getBoundingClientRect();
+    tx = (e.clientX - r.left) / r.width;
+    ty = (e.clientY - r.top) / r.height;
+    if (!raf) raf = requestAnimationFrame(loop);
+  });
+});
+
+/* Bento 3D tilt：阻尼倾转（触屏/reduced-motion 禁用） */
+safe(function () {
+  if (!window.matchMedia('(pointer: fine)').matches) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('.cell').forEach(function (cell) {
+    cell.addEventListener('pointermove', function (e) {
+      const r = cell.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - .5;
+      const py = (e.clientY - r.top) / r.height - .5;
+      cell.style.setProperty('--ry', (px * 8).toFixed(2) + 'deg');
+      cell.style.setProperty('--rx', (-py * 8).toFixed(2) + 'deg');
+    });
+    cell.addEventListener('pointerleave', function () {
+      cell.style.setProperty('--rx', '0deg');
+      cell.style.setProperty('--ry', '0deg');
     });
   });
 });
