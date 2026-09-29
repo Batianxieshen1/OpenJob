@@ -8,47 +8,47 @@
 <script>
 /* 主题防闪烁：先于样式定题。默认夜间，手动选择后记忆 */
 (function () {
-  var t = 'dark';
-  try { if (localStorage.getItem('oj-theme') === 'light') t = 'light'; } catch (e) {}
+  var t = 'light';
+  try { if (localStorage.getItem('oj-theme') === 'dark') t = 'dark'; } catch (e) {}
   document.documentElement.setAttribute('data-theme', t);
 })();
 </script>
-<meta name="theme-color" id="metaTheme" content="#05070d">
+<meta name="theme-color" id="metaTheme" content="#f5f1e8">
 <meta property="og:type" content="website">
 <meta property="og:title" content="OpenJob — 让岗位，来找工作你">
 <meta property="og:description" content="本地优先的求职自动化工作台：采集 → AI 五维评分 → 人工确认 → 安全发送。AI 只建议，你拍板。">
 <meta property="og:url" content="https://batianxieshen1.github.io/OpenJob/">
 <meta name="twitter:card" content="summary">
 <style>
-  /* ── 主题 token：夜=A 深空实验室（默认），昼=B 纸上工程 ── */
+  /* ── 主题 token：昼=晨刊（默认），夜=绛夜·浓 ── */
   :root {
-    --bg: #05070d; --card: #0b0e17; --card2: #10141f; --border: #1d2330;
-    --text: #eef1f6; --muted: #8b94a7; --primary: #5b8cff; --primary-soft: rgba(91,140,255,.14);
+    --bg: #1c0f0d; --card: #251412; --card2: #2b1815; --border: #3c221c;
+    --text: #f0e6de; --muted: #ab948a; --primary: #e04a32; --primary-soft: rgba(224,74,50,.15);
     --ease: cubic-bezier(.22,1,.36,1);
-    --faint: #4d5563; --rb-ink: #6d7889; --rb-dot: #2c3342;
-    --badge-bg: rgba(10,13,20,.72); --nav-bg: rgba(5,7,13,.6); --nav-line: rgba(29,35,48,.6);
-    --sel: rgba(91,140,255,.35); --bar-a: #5b8cff; --bar-b: #9db4ff;
-    --grad-a: #7ea4ff; --grad-b: #c3d2ff;
-    --glow-1: rgba(30,64,160,.34); --glow-2: rgba(70,60,150,.2); --glow-3: rgba(30,64,160,.12);
-    --cta-glow: rgba(91,140,255,.16); --line-strong: #3a4150; --primary-strong: rgba(91,140,255,.45);
-    --spot: rgba(91,140,255,.09); --grid-line: rgba(91,140,255,.055); --noise-op: .04;
-    --sheen: rgba(255,255,255,.35);
-    --cell-sheen: rgba(255,255,255,.035);
-    --cell-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.28);
+    --faint: #82685e; --rb-ink: #a08880; --rb-dot: #46271f;
+    --badge-bg: rgba(37,20,18,.78); --nav-bg: rgba(28,15,13,.7); --nav-line: rgba(60,34,28,.6);
+    --sel: rgba(224,74,50,.3); --bar-a: #e04a32; --bar-b: #f08a6e;
+    --grad-a: #e8654a; --grad-b: #f2b09c;
+    --glow-1: rgba(185,62,40,.24); --glow-2: rgba(205,95,52,.13); --glow-3: rgba(185,62,40,.1);
+    --cta-glow: rgba(224,74,50,.25); --line-strong: #4a2b23; --primary-strong: rgba(224,74,50,.55);
+    --spot: rgba(224,74,50,.09); --grid-line: rgba(240,230,220,.045); --noise-op: .05;
+    --cell-sheen: rgba(255,255,255,.025);
+    --cell-shadow: inset 0 1px 0 rgba(255,235,225,.05), 0 12px 32px rgba(0,0,0,.3);
+    --sheen: rgba(240,230,222,.25);
   }
   html[data-theme="light"] {
-    --bg: #f3f5f9; --card: #ffffff; --card2: #eef1f6; --border: #d8dee8;
-    --text: #141a24; --muted: #5d6878; --primary: #2b5fe3; --primary-soft: rgba(43,95,232,.09);
-    --faint: #9aa4b2; --rb-ink: #7d8798; --rb-dot: #ccd3de;
-    --badge-bg: rgba(255,255,255,.8); --nav-bg: rgba(243,245,249,.75); --nav-line: rgba(216,222,232,.7);
-    --sel: rgba(43,95,232,.22); --bar-a: #2b5fe3; --bar-b: #7c9df0;
-    --grad-a: #2b5fe3; --grad-b: #6f92ee;
-    --glow-1: rgba(43,95,232,.08); --glow-2: rgba(90,110,200,.06); --glow-3: rgba(43,95,232,.05);
-    --cta-glow: rgba(20,26,36,.12); --line-strong: #c4cbd8; --primary-strong: rgba(43,95,232,.38);
-    --spot: rgba(43,95,232,.06); --grid-line: rgba(43,95,232,.085); --noise-op: .045;
-    --cell-sheen: rgba(255,255,255,.6);
-    --cell-shadow: 0 1px 2px rgba(15,23,42,.05), 0 12px 32px rgba(15,23,42,.07);
-    --sheen: rgba(47,95,224,.25);
+    --bg: #f5f1e8; --card: #fbf8f1; --card2: #efe9dc; --border: #d8d2c4;
+    --text: #1c1a16; --muted: #6e685c; --primary: #c23a28; --primary-soft: rgba(194,58,40,.1);
+    --faint: #a39a8b; --rb-ink: #8a8175; --rb-dot: #cfc8b8;
+    --badge-bg: rgba(251,248,241,.85); --nav-bg: rgba(245,241,232,.78); --nav-line: rgba(216,210,196,.7);
+    --sel: rgba(194,58,40,.22); --bar-a: #c23a28; --bar-b: #dd7a66;
+    --grad-a: #c23a28; --grad-b: #e0937e;
+    --glow-1: rgba(194,58,40,.07); --glow-2: rgba(140,100,60,.06); --glow-3: rgba(194,58,40,.04);
+    --cta-glow: rgba(28,26,22,.12); --line-strong: #c4bca8; --primary-strong: rgba(194,58,40,.42);
+    --spot: rgba(194,58,40,.06); --grid-line: rgba(28,26,22,.065); --noise-op: .05;
+    --cell-sheen: rgba(255,255,255,.55);
+    --cell-shadow: 0 1px 2px rgba(40,30,20,.06), 0 12px 32px rgba(40,30,20,.08);
+    --sheen: rgba(194,58,40,.22);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; scroll-padding-top: 84px; }
@@ -638,16 +638,16 @@ safe(function () {
   const ctx = canvas.getContext('2d');
   const W = canvas.width = 320, H = canvas.height = 180;
   const blobs = [
-    { rgb: [20, 44, 110], sx: .8, sy: .4, fx: .8, fy: .6, r: .7 },
-    { rgb: [30, 64, 160], sx: .35, sy: .75, fx: 1.2, fy: .5, r: .55 },
-    { rgb: [70, 60, 150], sx: .65, sy: .8, fx: .6, fy: 1.0, r: .6 },
-    { rgb: [90, 120, 220], sx: .15, sy: .25, fx: .9, fy: .7, r: .45 },
-    { rgb: [40, 80, 200], sx: .5, sy: .15, fx: .7, fy: 1.1, r: .5 },
+    { rgb: [122, 38, 26], sx: .8, sy: .4, fx: .8, fy: .6, r: .7 },
+    { rgb: [168, 54, 34], sx: .35, sy: .75, fx: 1.2, fy: .5, r: .55 },
+    { rgb: [96, 44, 34], sx: .65, sy: .8, fx: .6, fy: 1.0, r: .6 },
+    { rgb: [158, 86, 46], sx: .15, sy: .25, fx: .9, fy: .7, r: .45 },
+    { rgb: [134, 50, 38], sx: .5, sy: .15, fx: .7, fy: 1.1, r: .5 },
   ];
   (function render(now) {
     const t = now / 1000;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = '#05060a';
+    ctx.fillStyle = '#1c0f0d';
     ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
     blobs.forEach(function (b, i) {
