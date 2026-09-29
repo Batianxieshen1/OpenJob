@@ -359,6 +359,9 @@ html[data-theme="light"] #dust { display: none; }
   transition: color 150ms var(--ease), border-color 150ms var(--ease), transform 150ms var(--ease);
 }
 .theme-toggle:hover { color: var(--text); border-color: var(--line-strong); transform: scale(1.06); }
+/* 图标弹簧形变（morphicons 弹簧思路）：主题切换时新图标过冲弹入 */
+.theme-toggle svg { animation: ic-spring .5s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes ic-spring { 0% { opacity: 0; transform: rotate(-120deg) scale(.3); } 100% { opacity: 1; transform: rotate(0) scale(1); } }
 html[data-theme="dark"] .ic-sun { display: none; }
 html[data-theme="light"] .ic-moon { display: none; }
 /* 阅读进度条 + hero 光标 spotlight */
@@ -405,10 +408,10 @@ header:hover .spotlight { opacity: 1; }
   background: var(--badge-bg); color: var(--muted); font-size: 16px; cursor: pointer;
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   opacity: 0; transform: translateY(10px); pointer-events: none;
-  transition: opacity .3s var(--ease), transform .3s var(--ease), color .15s, border-color .15s;
+  transition: opacity .3s var(--ease), transform .38s cubic-bezier(.34, 1.56, .64, 1), color .15s, border-color .15s;
 }
 #toTop.show { opacity: 1; transform: none; pointer-events: auto; }
-#toTop:hover { color: var(--text); border-color: var(--line-strong); }
+#toTop:hover { color: var(--text); border-color: var(--line-strong); transform: translateY(-4px) scale(1.1); }
 /* 主题切换：从按钮位置圆形扩散（View Transition 渐进增强） */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-new(root) {
@@ -841,6 +844,24 @@ safe(function () {
     window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   });
   show();
+});
+
+/* CTA 磁吸（morphicons 弹簧物理 vanilla 版，pointer:fine 门控） */
+safe(function () {
+  if (!window.matchMedia('(pointer: fine)').matches) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('.cta-main, .cta-ghost').forEach(function (btn) {
+    btn.style.transition = 'transform .38s cubic-bezier(.22, 1, .36, 1), box-shadow .3s var(--ease), border-color .3s';
+    btn.addEventListener('pointermove', function (e) {
+      const r = btn.getBoundingClientRect();
+      const dx = (e.clientX - (r.left + r.width / 2)) * .16;
+      const dy = (e.clientY - (r.top + r.height / 2)) * .3;
+      btn.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+    });
+    btn.addEventListener('pointerleave', function () {
+      btn.style.transform = '';
+    });
+  });
 });
 
 /* hero 终端卡打字循环（reduced-motion 直接显示全文） */
