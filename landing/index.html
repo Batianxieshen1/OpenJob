@@ -260,6 +260,17 @@
   .slam-wrap.on .slam { animation: slam-in .68s var(--ease) .42s both, slam-glow 1.5s ease-out .55s 1; }
   @keyframes slam-in { from { opacity: 0; transform: scale(.94); filter: blur(12px); } to { opacity: 1; transform: none; filter: blur(0); } }
   @keyframes slam-glow { 0% { text-shadow: none; } 35% { text-shadow: 0 0 30px var(--primary-soft), 0 0 80px var(--primary-soft); } 100% { text-shadow: none; } }
+  /* 墨点爆点：slam 落定瞬间从句尾迸出朱砂墨点 */
+  .slam-wrap { position: relative; }
+  .ink-dot {
+    position: absolute; width: var(--s, 4px); height: var(--s, 4px); border-radius: 50%;
+    background: var(--primary); opacity: 0; pointer-events: none;
+    animation: ink-burst .65s var(--ease) forwards;
+  }
+  @keyframes ink-burst {
+    0% { opacity: .95; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.35); }
+  }
 
   footer { border-top: 1px solid var(--border); padding: 70px 0 60px; text-align: center; }
   footer h2 { font-size: clamp(24px, 4vw, 38px); }
@@ -862,6 +873,39 @@ safe(function () {
       btn.style.transform = '';
     });
   });
+});
+
+/* 墨点爆点：slam 落定瞬间从句尾迸出朱砂墨点（reduced-motion 跳过） */
+safe(function () {
+  const wrap = document.querySelector('.slam-wrap');
+  if (!wrap) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target);
+      setTimeout(function () {
+        const r = wrap.getBoundingClientRect();
+        const ox = r.width - 8, oy = r.height / 2;
+        for (let i = 0; i < 12; i++) {
+          setTimeout(function () {
+            const d = document.createElement('span');
+            d.className = 'ink-dot';
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 46 + Math.random() * 84;
+            d.style.setProperty('--s', (3 + Math.random() * 4).toFixed(1) + 'px');
+            d.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+            d.style.setProperty('--dy', (Math.sin(ang) * dist * .8).toFixed(1) + 'px');
+            d.style.left = ox + 'px';
+            d.style.top = oy + 'px';
+            wrap.appendChild(d);
+            setTimeout(function () { d.remove(); }, 900);
+          }, i * 9);
+        }
+      }, 1620);
+    });
+  }, { threshold: .4 });
+  io.observe(wrap);
 });
 
 /* hero 终端卡打字循环（reduced-motion 直接显示全文） */
