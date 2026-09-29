@@ -96,6 +96,8 @@
   header::after { z-index: 0; }
   #aurora { z-index: 0; }
   #aurora { position: absolute; inset: -10%; width: 120%; height: 120%; filter: blur(70px) saturate(1.1); opacity: .8; }
+  #dust { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  html[data-theme="light"] #dust { display: none; }
   .hero-badge {
     position: relative; display: inline-flex; align-items: center; gap: 8px;
     border: 1px solid var(--border); border-radius: 99px; padding: 6px 16px;
@@ -335,6 +337,7 @@ body::after {
 }
 /* 极光画布只属夜航；白天交给网格与暖光 */
 html[data-theme="light"] #aurora { display: none; }
+html[data-theme="light"] #dust { display: none; }
 /* 卡片材质：夜=玻璃（顶部内高光+深投影），昼=暖纸（柔和暖影） */
 .cell, .flow-step {
   background-image: linear-gradient(180deg, var(--cell-sheen), transparent 40%);
@@ -436,6 +439,7 @@ header:hover .spotlight { opacity: 1; }
 
 <header>
   <canvas id="aurora" aria-hidden="true"></canvas>
+  <canvas id="dust" aria-hidden="true"></canvas>
   <div class="spotlight" aria-hidden="true"></div>
   <div class="hero-cards" aria-hidden="true">
     <div class="hcard hc-term">
@@ -632,11 +636,28 @@ safe(function () {
 safe(function () {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     document.getElementById('aurora').style.display = 'none';
+    const d0 = document.getElementById('dust');
+    if (d0) d0.style.display = 'none';
     return;
   }
   const canvas = document.getElementById('aurora');
   const ctx = canvas.getContext('2d');
   const W = canvas.width = 320, H = canvas.height = 180;
+  /* C1：朱砂墨尘（清晰层，独立于模糊极光） */
+  const dust = document.getElementById('dust');
+  const dctx = dust.getContext('2d');
+  let DW = 0, DH = 0;
+  function sizeDust() {
+    DW = dust.width = Math.max(320, dust.clientWidth || 1440);
+    DH = dust.height = Math.max(200, dust.clientHeight || 900);
+  }
+  sizeDust();
+  window.addEventListener('resize', function () { sizeDust(); });
+  const motes = Array.from({ length: 56 }, function () {
+    return { x: Math.random(), y: Math.random(), s: 1 + Math.random() * 2.4,
+      sp: .12 + Math.random() * .4, ph: Math.random() * 6.28, sw: .4 + Math.random() * .9,
+      hot: Math.random() < .18 };
+  });
   const blobs = [
     { rgb: [122, 38, 26], sx: .8, sy: .4, fx: .8, fy: .6, r: .7 },
     { rgb: [168, 54, 34], sx: .35, sy: .75, fx: 1.2, fy: .5, r: .55 },
@@ -660,6 +681,17 @@ safe(function () {
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    });
+    /* 朱砂墨尘：上飘 + 正弦摆动 + 闪烁 */
+    dctx.clearRect(0, 0, DW, DH);
+    motes.forEach(function (m) {
+      m.y -= m.sp / 100;
+      m.x += Math.sin(t * m.sw + m.ph) * .0012;
+      if (m.y < -0.02) { m.y = 1.02; m.x = Math.random(); }
+      const tw = .5 + .5 * Math.sin(t * (1.4 + m.sw) + m.ph * 3.1);
+      const a = (m.hot ? .62 : .42) * (.35 + .65 * tw);
+      dctx.fillStyle = m.hot ? 'rgba(240,138,110,' + a.toFixed(3) + ')' : 'rgba(224,74,50,' + a.toFixed(3) + ')';
+      dctx.beginPath(); dctx.arc(m.x * DW, m.y * DH, m.s, 0, Math.PI * 2); dctx.fill();
     });
     requestAnimationFrame(render);
   })(0);
