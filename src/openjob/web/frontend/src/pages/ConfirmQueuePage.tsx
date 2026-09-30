@@ -68,7 +68,12 @@ function BatchConfirmDialog({
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>再看看</Button>
-              <Button size="sm" disabled={submitting} onClick={onConfirm}>
+              <Button
+                size="sm"
+                disabled={submitting}
+                onClick={onConfirm}
+                className="transition-transform duration-200 ease-[cubic-bezier(.34,1.56,.64,1)] active:scale-[.94] active:rotate-[-1.5deg]"
+              >
                 {submitting ? '提交中…' : `确认生成 ${total} 条招呼语`}
               </Button>
             </div>

@@ -133,7 +133,7 @@ export function Header() {
           title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-card-border bg-card text-muted transition-soft hover:-translate-y-px hover:text-foreground active:scale-95"
         >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {theme === 'dark' ? <Sun className="header-theme-icon h-4 w-4" /> : <Moon className="header-theme-icon h-4 w-4" />}
         </button>
       </div>
     </header>
