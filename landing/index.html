@@ -423,13 +423,18 @@ header:hover .spotlight { opacity: 1; }
 }
 #toTop.show { opacity: 1; transform: none; pointer-events: auto; }
 #toTop:hover { color: var(--text); border-color: var(--line-strong); transform: translateY(-4px) scale(1.1); }
-/* 主题切换：从按钮位置圆形扩散（View Transition 渐进增强） */
-::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+/* 主题切换：从按钮位置圆形扩散（View Transition 渐进增强）
+   防闪三重保险：VT 容器垫底色 / 旧快照快速淡出 / 切换期间抑制页面自身过渡 */
+::view-transition { background: var(--bg); }
+::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; }
+::view-transition-old(root) { animation: vt-fade-out .18s var(--ease) both; }
 ::view-transition-new(root) {
-  animation: vt-reveal .45s var(--ease);
+  animation: vt-reveal .45s var(--ease) both;
   clip-path: circle(0 at var(--vt-x, calc(100% - 60px)) var(--vt-y, 24px));
 }
+@keyframes vt-fade-out { to { opacity: 0; } }
 @keyframes vt-reveal { to { clip-path: circle(145% at var(--vt-x, calc(100% - 60px)) var(--vt-y, 24px)); } }
+html.no-trans *, html.no-trans *::before, html.no-trans *::after { transition: none !important; }
 </style>
 </head>
 <body>
@@ -633,16 +638,18 @@ safe(function () {
   btn.addEventListener('click', function (e) {
     var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     var apply = function () {
+      root.classList.add('no-trans');
       root.setAttribute('data-theme', next);
       var mt = document.getElementById('metaTheme');
-      if (mt) mt.setAttribute('content', next === 'light' ? '#f3f5f9' : '#05070d');
+      if (mt) mt.setAttribute('content', next === 'light' ? '#f5f1e8' : '#1c0f0d');
       try { localStorage.setItem('oj-theme', next); } catch (err) {}
     };
     root.style.setProperty('--vt-x', (e.clientX || window.innerWidth - 60) + 'px');
     root.style.setProperty('--vt-y', (e.clientY || 24) + 'px');
     if (document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      document.startViewTransition(apply);
-    } else { apply(); }
+      var vt = document.startViewTransition(apply);
+      vt.finished.finally(function () { root.classList.remove('no-trans'); });
+    } else { apply(); root.classList.remove('no-trans'); }
   });
 });
 
