@@ -106,7 +106,23 @@ body {
 .tabular-nums,
 
 /* P1-4 Typography scale（中文字号层级） */
-.t-h1 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; letter-spacing: -0.01em; }
+/* 页面大标题：晨刊衬线（报纸版式语言，与宣传页同族） */
+.t-h1 {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'STZhongsong', 'SimSun', serif;
+  font-size: 1.5rem; line-height: 2rem; font-weight: 700; letter-spacing: .01em;
+}
+::selection { background: rgb(var(--accent) / .22); }
+:focus-visible { outline: 2px solid rgb(var(--accent) / .55); outline-offset: 2px; border-radius: 4px; }
+/* 纸纹颗粒（晨刊/绛夜共用，固定层不随滚动） */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  opacity: .04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* 栏头双线（报纸版面分隔，任意标题可用） */
+.rule-double { position: relative; padding-top: 14px; }
+.rule-double::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: 3px solid rgb(var(--ink)); }
+.rule-double::after { content: ""; position: absolute; top: 4px; left: 0; right: 0; border-top: 1px solid rgb(var(--ink)); }
 .t-h2 { font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; }
 .t-body { font-size: 0.875rem; line-height: 1.375rem; }
 .t-meta { font-size: 0.75rem; line-height: 1.125rem; color: rgb(var(--text-2)); }
@@ -305,7 +321,7 @@ body {
 /* ── 每日开机画面（SplashScreen）：流动极光背景（canvas 色团 + 大模糊），
       字符逐个升起 → 整体轻微放大消散（"打开"的方向感） ── */
 .splash-screen {
-  background: #0b0e14;
+  background: #171014;
   color: #fff;
   overflow: hidden;
 }
@@ -320,7 +336,7 @@ body {
     90deg,
     rgb(var(--primary)) 0%,
     rgb(var(--primary)) 55%,
-    rgb(130 168 255) 75%,
+    rgb(var(--accent) / .45) 75%,
     rgb(var(--primary)) 100%
   );
   background-size: 200% 100%;
@@ -336,8 +352,8 @@ body {
   bottom: -14%;
   height: 58%;
   background-image:
-    linear-gradient(rgb(96 138 255 / 0.15) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(96 138 255 / 0.15) 1px, transparent 1px);
+    linear-gradient(rgb(var(--accent) / 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--accent) / 0.12) 1px, transparent 1px);
   background-size: 42px 42px;
   transform: perspective(340px) rotateX(58deg);
   transform-origin: center top;
