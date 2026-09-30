@@ -2,32 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-/* OpenJob 设计令牌 v2 —— Light Futuristic / Soft Minimal / Bento Dashboard
-   参考视觉：浅灰画布上的悬浮白色 App Shell + 钴蓝点缀。
+/* OpenJob 设计令牌 v3 —— 朱砂晨刊/绛夜（对齐宣传页身份）
+   参考视觉：米白报纸纸面 + 墨字 + 朱砂点缀（昼）/ 绛红暗底 + 象牙墨 + 余烬朱砂（夜）。
    RGB 三元组便于 Tailwind 以 alpha-value 组合透明度。
    浅色为默认；跟随系统深色，手动主题用 html.light / html.dark 覆盖。 */
 :root {
-  --canvas: 233 234 236;       /* #E9EAEC 画布底（壳外） */
-  --shell: 252 252 253;        /* #FCFCFD 悬浮应用壳 */
-  --bg: 252 252 253;           /* 兼容旧引用：页面底=壳色 */
-  --surface: 245 246 248;      /* #F5F6F8 Soft Card */
-  --surface-hover: 239 241 244; /* #EFF1F4 悬停态 */
-  --border-c: 228 231 236;     /* #E4E7EC 1px 分隔线 */
-  --text: 21 23 28;            /* #15171C 主文本 */
-  --text-2: 111 116 128;       /* #6F7480 次文本 */
-  --text-3: 164 169 178;       /* #A4A9B2 三级文本 */
-  --ink: 17 18 22;             /* #111216 黑胶囊（导航激活/主按钮） */
-  --accent: 49 87 232;         /* #3157E8 品牌钴蓝 */
-  --accent-soft: 233 238 255;  /* #E9EEFF 浅蓝底（整色使用，不用透明度） */
+  --canvas: 239 233 220;       /* #EFE9DC 画布底（壳外·纸） */
+  --shell: 251 248 241;        /* #FBF8F1 悬浮应用壳（晨刊纸面） */
+  --bg: 251 248 241;           /* 兼容旧引用：页面底=壳色 */
+  --surface: 255 255 255;      /* #FFFFFF 卡片（暖白） */
+  --surface-hover: 243 239 228; /* #F3EFE4 悬停态 */
+  --border-c: 216 210 196;     /* #D8D2C4 1px 分隔线（暖） */
+  --text: 28 26 22;            /* #1C1A16 墨字 */
+  --text-2: 110 104 92;        /* #6E685C 次文本 */
+  --text-3: 163 154 139;       /* #A39A8B 三级文本 */
+  --ink: 28 26 22;             /* #1C1A16 墨胶囊（导航激活/主按钮） */
+  --accent: 194 58 40;         /* #C23A28 朱砂 */
+  --accent-soft: 247 226 221;  /* #F7E2DD 朱砂浅底（整色使用，不用透明度） */
   --success: 34 160 107;       /* #22A06B */
   --warning: 233 154 36;       /* #E99A24 */
   --danger: 229 72 77;         /* #E5484D */
 
   /* 品牌渐变令牌：只用于 Logo/空状态/少量视觉强调，不参与交互语义 */
-  --brand-blue: 20 103 248;      /* #1467F8 */
-  --brand-purple: 114 87 232;    /* #7257E8 */
-  --brand-pink: 244 126 156;     /* #F47E9C */
-  --brand-orange: 255 169 104;   /* #FFA968 */
+  --brand-blue: 212 61 42;        /* #D43D2A 朱砂 */
+  --brand-purple: 232 101 74;     /* #E8654A 朱砂亮 */
+  --brand-pink: 217 154 78;       /* #D99A4E 琥珀 */
+  --brand-orange: 232 160 142;    /* #E8A08E 暖玫瑰 */
 
   --radius-control: 10px;
   --radius-card: 18px;
@@ -45,34 +45,34 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --canvas: 11 13 18;        /* #0B0D12 画布底 */
-    --shell: 20 22 29;         /* #14161D 应用壳 */
-    --bg: 20 22 29;
-    --surface: 30 33 42;       /* #1A1D25 Soft Card */
-    --surface-hover: 38 42 54; /* #21252F */
-    --border-c: 47 53 67;      /* #292E3A */
-    --text: 232 234 237;       /* #E8EAED */
-    --text-2: 154 163 176;     /* #9AA3B0 */
-    --text-3: 122 130 143;
-    --ink: 232 234 237;        /* 深色下黑胶囊反转为浅色 */
-    --accent: 96 130 255;      /* #6082FF 深色下提亮一档 */
-    --accent-soft: 36 48 92;   /* #24305C 深色浅蓝底 */
+    --canvas: 21 13 11;        /* #150D0B 画布底（绛黑） */
+    --shell: 28 15 13;         /* #1C0F0D 应用壳（绛夜） */
+    --bg: 28 15 13;
+    --surface: 37 20 18;       /* #251412 Soft Card（绛红暖卡） */
+    --surface-hover: 46 26 22; /* #2E1A16 */
+    --border-c: 60 34 28;      /* #3C221C */
+    --text: 240 230 222;       /* #F0E6DE 象牙墨字 */
+    --text-2: 171 148 138;     /* #AB948A */
+    --text-3: 130 104 94;
+    --ink: 240 230 222;        /* 深色下胶囊反转为象牙 */
+    --accent: 224 74 50;       /* #E04A32 朱砂提亮一档 */
+    --accent-soft: 58 28 22;   /* #3A1C16 绛红浅底 */
   }
 }
 
 html.dark {
-  --canvas: 11 13 18;
-  --shell: 20 22 29;
-  --bg: 20 22 29;
-  --surface: 30 33 42;
-  --surface-hover: 38 42 54;
-  --border-c: 47 53 67;
-  --text: 232 234 237;
-  --text-2: 154 163 176;
-  --text-3: 122 130 143;
-  --ink: 232 234 237;
-  --accent: 96 130 255;
-  --accent-soft: 36 48 92;
+  --canvas: 21 13 11;
+  --shell: 28 15 13;
+  --bg: 28 15 13;
+  --surface: 37 20 18;
+  --surface-hover: 46 26 22;
+  --border-c: 60 34 28;
+  --text: 240 230 222;
+  --text-2: 171 148 138;
+  --text-3: 130 104 94;
+  --ink: 240 230 222;
+  --accent: 224 74 50;
+  --accent-soft: 58 28 22;
 }
 
 * {
