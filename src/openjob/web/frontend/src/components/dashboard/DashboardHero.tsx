@@ -36,7 +36,14 @@ export function DashboardHero({
   const animatedReply = useCountUp(replyCount)
   const animatedReady = useCountUp(readyToSendCount)
   return (
-    <section className="relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
+    <section className="press-head relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
+      {/* 夜间余烬尘：晨刊白天干净，绛夜夜里飘火星 */}
+      <div aria-hidden className="ember" style={{ top: '14%', left: '58%', width: 5, height: 5, animationDelay: '0s' }} />
+      <div aria-hidden className="ember" style={{ top: '68%', left: '74%', width: 4, height: 4, animationDelay: '-2.4s' }} />
+      <div aria-hidden className="ember" style={{ top: '38%', left: '88%', width: 6, height: 6, animationDelay: '-4.2s' }} />
+      <div aria-hidden className="ember" style={{ top: '80%', left: '46%', width: 3.5, height: 3.5, animationDelay: '-5.6s' }} />
+      <div aria-hidden className="ember" style={{ top: '8%', left: '30%', width: 4, height: 4, animationDelay: '-1.3s' }} />
+      <div aria-hidden className="ember" style={{ top: '56%', left: '12%', width: 5, height: 5, animationDelay: '-3.1s' }} />
       {/* 背景装饰：柔和蓝晕 + 细网格，克制不抢内容 */}
       <div
         aria-hidden

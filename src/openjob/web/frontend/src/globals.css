@@ -506,3 +506,28 @@ main,
 /* 工作台主题钮：图标弹簧弹入（morphicons 弹簧思路） */
 .header-theme-icon { animation: icon-spring .45s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes icon-spring { 0% { opacity: 0; transform: rotate(-100deg) scale(.4); } 100% { opacity: 1; transform: rotate(0) scale(1); } }
+
+/* ── W2 头版化：hero 卡报头双规则 + 夜间余烬尘 ── */
+.press-head::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: rgb(var(--ink)); z-index: 1;
+}
+.press-head::after {
+  content: ""; position: absolute; top: 4px; left: 0; right: 0; height: 1px;
+  background: rgb(var(--ink)); opacity: .75; z-index: 1;
+}
+.ember {
+  position: absolute; border-radius: 50%; background: var(--primary);
+  opacity: 0; pointer-events: none;
+  animation: ember-float 8s ease-in-out infinite;
+}
+html.dark .ember { opacity: .55; }
+@keyframes ember-float {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: .3; }
+  50% { transform: translateY(-14px) translateX(4px); opacity: .8; }
+}
+
+/* ── W3：侧栏激活图标弹簧（路由切换重放） ── */
+.nav-icon { animation: nav-pop .38s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes nav-pop { 0% { opacity: .3; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .nav-icon { animation: none; } }
