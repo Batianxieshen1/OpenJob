@@ -55,8 +55,14 @@ export function DashboardHero({
       />
 
       <div className="relative">
-        <div className="text-[11px] font-semibold tracking-[0.22em] text-primary">OPENJOB DAILY</div>
-        <h2 className="mt-2 text-[22px] font-semibold leading-tight tracking-tight xl:text-[24px]">
+        <div className="flex items-baseline justify-between border-b border-card-border pb-2">
+          <div className="text-[11px] font-semibold tracking-[0.22em] text-primary">OPENJOB DAILY</div>
+          <div className="font-mono text-[11px] tracking-[0.1em] text-muted-3">{today}</div>
+        </div>
+        <h2
+          className="mt-3 text-[24px] font-bold leading-tight tracking-tight xl:text-[26px]"
+          style={{ fontFamily: '"Noto Serif SC", "Source Han Serif SC", "SimSun", serif' }}
+        >
           今天，让合适的岗位
           <br />
           更快找到你

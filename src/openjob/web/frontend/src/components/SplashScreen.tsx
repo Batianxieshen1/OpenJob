@@ -30,10 +30,10 @@ function useAuroraCanvas(enabled: boolean) {
     const H = (canvas.height = 68)
     // 低饱和深色团：钴蓝/暗青/暗紫，透明度压低——深邃不艳
     const blobs = [
-      { rgb: [16, 34, 82], sx: 0.9, sy: 0.55, fx: 0.9, fy: 0.7, r: 0.62 },
-      { rgb: [24, 56, 150], sx: 0.5, sy: 0.7, fx: 1.3, fy: 0.5, r: 0.5 },
-      { rgb: [58, 48, 128], sx: 0.72, sy: 0.35, fx: 0.7, fy: 1.1, r: 0.55 },
-      { rgb: [12, 62, 82], sx: 0.35, sy: 0.3, fx: 1.1, fy: 0.9, r: 0.45 },
+      { rgb: [92, 34, 26], sx: 0.9, sy: 0.55, fx: 0.9, fy: 0.7, r: 0.62 },
+      { rgb: [150, 48, 30], sx: 0.5, sy: 0.7, fx: 1.3, fy: 0.5, r: 0.5 },
+      { rgb: [104, 40, 34], sx: 0.72, sy: 0.35, fx: 0.7, fy: 1.1, r: 0.55 },
+      { rgb: [120, 62, 32], sx: 0.35, sy: 0.3, fx: 1.1, fy: 0.9, r: 0.45 },
     ]
     // 微光尘埃：缓慢上浮的小光点
     const dust = Array.from({ length: 26 }, (_, i) => ({
@@ -48,7 +48,7 @@ function useAuroraCanvas(enabled: boolean) {
     const render = (now: number) => {
       const t = (now - t0) / 1000
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = '#06080d'
+      ctx.fillStyle = '#171014'
       ctx.fillRect(0, 0, W, H)
       ctx.globalCompositeOperation = 'lighter'
       for (let i = 0; i < blobs.length; i++) {
@@ -68,7 +68,7 @@ function useAuroraCanvas(enabled: boolean) {
       for (const d of dust) {
         d.y -= d.v * 0.12
         if (d.y < -2) d.y = H + 2
-        ctx.fillStyle = `rgba(165, 195, 255, ${d.a})`
+        ctx.fillStyle = `rgba(238, 178, 150, ${d.a})`
         ctx.fillRect(d.x, d.y, d.s, d.s)
       }
       raf = requestAnimationFrame(render)
