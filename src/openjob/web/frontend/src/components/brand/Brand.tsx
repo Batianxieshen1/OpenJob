@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 
+/* ?v= 资源版本：SVG 走启发式强缓存，改版必须 bump 才能触达已有浏览器 */
+const BRAND_V = '?v=20260930-2'
 export const brandAssets = {
-  icon: '/brand/openjob-icon.svg',
-  logoLight: '/brand/openjob-logo.svg',
-  logoDark: '/brand/openjob-logo-dark.svg',
+  icon: '/brand/openjob-icon.svg' + BRAND_V,
+  logoLight: '/brand/openjob-logo.svg' + BRAND_V,
+  logoDark: '/brand/openjob-logo-dark.svg' + BRAND_V,
 } as const
 
 /** 跟随应用主题（html.dark / html.light 类）而非系统偏好，手动切换即时生效 */
