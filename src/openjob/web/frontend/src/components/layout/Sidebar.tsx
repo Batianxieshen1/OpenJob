@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { BrandMark } from '@/components/brand/Brand'
 import { BarChart3, BriefcaseBusiness, ClipboardCheck, FileText, Inbox, LayoutDashboard, Radar, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -21,6 +21,8 @@ interface SidebarProps {
 
 export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
   const [pendingReplies, setPendingReplies] = useState(pendingRepliesProp ?? 0)
+  const location = useLocation()
+  const activeKey = location.pathname
 
   useEffect(() => {
     if (pendingRepliesProp !== undefined) {
@@ -74,7 +76,7 @@ export function Sidebar({ pendingReplies: pendingRepliesProp }: SidebarProps) {
               }`
             }
           >
-            <item.icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+            <item.icon key={item.to === activeKey ? activeKey : 'idle'} className="nav-icon h-[18px] w-[18px]" strokeWidth={1.8} />
             {/* Tooltip */}
             <span
               role="tooltip"
