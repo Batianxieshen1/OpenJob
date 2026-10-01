@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Building2, GraduationCap, MapPin, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsDarkTheme } from '@/components/brand/Brand'
 
 interface NameCount {
   name: string
@@ -33,13 +34,22 @@ const PLATFORM_LABELS: Record<string, string> = {
   '51job': '前程无忧',
 }
 
-const DONUT_COLORS = [
-  'rgb(49 87 232)',
-  'rgb(49 87 232 / 0.65)',
-  'rgb(49 87 232 / 0.42)',
-  'rgb(49 87 232 / 0.25)',
-  'rgb(49 87 232 / 0.15)',
-  'rgb(49 87 232 / 0.08)',
+// 朱砂色阶：昼=晨刊朱砂 #C23A28，夜=绛夜提亮一档 #E04A32；同色透明度阶梯保证分类间可辨、与纸面/绛底均可区分
+const DONUT_COLORS_DAY = [
+  'rgb(194 58 40)',
+  'rgb(194 58 40 / 0.65)',
+  'rgb(194 58 40 / 0.42)',
+  'rgb(194 58 40 / 0.25)',
+  'rgb(194 58 40 / 0.15)',
+  'rgb(194 58 40 / 0.08)',
+]
+const DONUT_COLORS_NIGHT = [
+  'rgb(224 74 50)',
+  'rgb(224 74 50 / 0.68)',
+  'rgb(224 74 50 / 0.46)',
+  'rgb(224 74 50 / 0.28)',
+  'rgb(224 74 50 / 0.17)',
+  'rgb(224 74 50 / 0.09)',
 ]
 
 function displayName(key: string, labels?: Record<string, string>): string {
@@ -76,6 +86,8 @@ function BarList({ items, labels, accent = false, grandTotal }: { items: NameCou
 }
 
 function DonutChart({ items, labels }: { items: NameCount[]; labels?: Record<string, string> }) {
+  const isDark = useIsDarkTheme()
+  const donutColors = isDark ? DONUT_COLORS_NIGHT : DONUT_COLORS_DAY
   const top = items.slice(0, 5)
   const total = top.reduce((sum, i) => sum + i.count, 0) || 1
   return (
@@ -93,7 +105,7 @@ function DonutChart({ items, labels }: { items: NameCount[]; labels?: Record<str
               strokeWidth={0}
             >
               {top.map((_, i) => (
-                <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                <Cell key={i} fill={donutColors[i % donutColors.length]} />
               ))}
             </Pie>
             <Tooltip
@@ -107,7 +119,7 @@ function DonutChart({ items, labels }: { items: NameCount[]; labels?: Record<str
         {top.map((item, i) => (
           <li key={item.name} className="flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-1.5 text-muted">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: donutColors[i % donutColors.length] }} />
               <span className="truncate">{displayName(item.name, labels)}</span>
             </span>
             <span className="shrink-0 font-semibold tabular-nums text-foreground">{share(item.count, total)}%</span>
