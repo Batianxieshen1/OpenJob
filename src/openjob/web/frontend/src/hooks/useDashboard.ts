@@ -33,6 +33,10 @@ interface Job {
   hr_active: string
   company_size: string
   company_industry: string
+  company_logo_path?: string | null
+  company_logo_url?: string | null
+  company_intro?: string | null
+  company_intro_url?: string | null
   url: string
   created_at: string
   updated_at?: string

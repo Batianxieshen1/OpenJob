@@ -1,8 +1,9 @@
 import { humanizeScoreReason } from "@/lib/format"
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, ExternalLink, XCircle, CheckCircle2, History, MessageCircle } from 'lucide-react'
+import { Eye, ExternalLink, XCircle, CheckCircle2, History, MessageCircle, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { CompanyAvatar } from '@/components/jobs/CompanyAvatar'
 import { parseUtc, formatUtcTime } from "@/lib/datetime"
 import { getActionLabel, getStatusLabel } from '@/lib/status'
 import type { Job } from '@/hooks/useDashboard'
@@ -244,7 +245,10 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold tracking-[0.18em] text-primary">岗位详情</div>
-            <h3 className="mt-1 text-xl font-semibold md:text-2xl">{job.company}｜{job.title}</h3>
+            <h3 className="mt-1 flex items-center gap-2 text-xl font-semibold md:text-2xl">
+              <CompanyAvatar job={job} size={28} />
+              {job.company}｜{job.title}
+            </h3>
             <p className="mt-1 text-sm text-muted">{job.salary || '薪资未填'} · {job.city || '城市未填'} · {getStatusLabel(job.status)}</p>
           </div>
           <Button variant="secondary" size="sm" onClick={onClose}>关闭</Button>
@@ -257,6 +261,22 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
           <InfoBlock label="匹配分" value={String(job.score || '-')} />
           <InfoBlock label="定制简历" value={job.resume_path || '未生成'} />
         </div>
+        {(job.company_intro?.trim() || job.company_intro_url) && (
+          <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center text-sm font-semibold">
+                <Building2 className="mr-1.5 h-4 w-4 text-primary" />
+                公司简介
+              </div>
+              {job.company_intro_url && (
+                <a href={job.company_intro_url} target="_blank" rel="noreferrer" className="flex shrink-0 items-center text-xs text-primary hover:underline">
+                  在 BOSS 查看公司主页 <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
+              )}
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">{job.company_intro?.trim() || '暂无简介'}</p>
+          </div>
+        )}
         <div className="mt-4 rounded-2xl border border-card-border bg-surface-hover p-4">
           <div className="text-sm font-semibold">评分理由</div>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">{job.score_reason || '-'}</p>
@@ -323,6 +343,7 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject, fli
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
+            <CompanyAvatar job={job} size={20} />
             <span className="truncate font-semibold text-foreground">{job.company}</span>
             <span className="shrink-0 text-muted-3">｜</span>
             <span className="truncate font-semibold text-foreground">{job.title}</span>
