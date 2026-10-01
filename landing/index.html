@@ -162,29 +162,168 @@
   .flow-step .no { font-size: 12px; color: var(--primary); font-weight: 700; letter-spacing: .1em; }
   .flow-step h3 { margin-top: 8px; font-size: 17px; }
   .flow-step p { margin-top: 9px; color: var(--muted); font-size: 13.5px; line-height: 1.85; }
-  /* 四工序通电线：滚动逐段点亮，电流到达时编号 spring pop */
-  .flow { position: relative; }
-  .flowline { position: absolute; left: 0; right: 0; top: 29px; height: 2px; width: 100%; display: block; pointer-events: none; }
+  /*
+    四道工序重新布局：
+    1. 连线独立于文字区域，只负责连接四个节点；
+    2. 节点固定在每个工序的水平中心；
+    3. 编号、标题、说明整体下移，彻底避免“编号/图形/线条”重叠；
+    4. 取消原来的纵向 border-left，避免和横向流程线形成视觉打架。
+  */
+  .flow {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    margin-top: 60px;
+    isolation: isolate;
+  }
+
+  .flowline {
+    position: absolute;
+    z-index: 1;
+    left: 12.5%;
+    right: 12.5%;
+    top: 12px;
+    width: 75%;
+    height: 2px;
+    display: block;
+    pointer-events: none;
+    overflow: visible;
+  }
+
   .flowline path {
-    stroke: var(--primary); stroke-width: 2; fill: none;
-    stroke-dasharray: 100; stroke-dashoffset: 100;
-    filter: drop-shadow(0 0 6px var(--primary-soft));
+    stroke: var(--primary);
+    stroke-width: 2;
+    fill: none;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 5px var(--primary-soft));
   }
-  .flow-step .no { transition: color .2s var(--ease), text-shadow .3s var(--ease); }
-  .flow-step.lit .no { color: var(--primary); text-shadow: 0 0 12px var(--primary-soft); animation: pop .5s var(--ease); }
-  /* 工序电路节点：电流到达点亮 */
+
+  .flow-step {
+    position: relative;
+    min-width: 0;
+    padding: 36px 22px 8px;
+    text-align: center;
+    background: var(--bg);
+  }
+
+  .flow-step + .flow-step {
+    padding-left: 22px;
+    border-left: 0;
+  }
+
+  /* 节点独立放在连线上，节点与文字层完全分离 */
   .flow-step::before {
-    content: ""; position: absolute; top: 29px; left: 0; width: 7px; height: 7px; border-radius: 50%;
-    background: var(--card2); border: 1px solid var(--border);
-    transform: translate(-50%, -50%);
-    transition: background .25s, border-color .25s, box-shadow .25s;
+    content: "";
+    position: absolute;
+    z-index: 3;
+    top: 12px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 0 4px var(--bg);
+    transition:
+      background .25s var(--ease),
+      border-color .25s var(--ease),
+      box-shadow .25s var(--ease),
+      transform .25s var(--ease);
   }
-  .flow-step.lit::before { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px var(--primary-soft); }
-  /* 首步无左内边距，节点圆点让位数字：外移到线上起点左侧 */
-  .flow-step:first-child::before { left: -12px; }
-  .flow-step .no { position: relative; z-index: 1; }
-  @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }
-  @media (max-width: 860px) { .flowline, .flow-step::before { display: none; } }
+
+  .flow-step .no {
+    position: relative;
+    z-index: 2;
+    display: inline-block;
+    min-width: 2.5em;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--primary);
+    font-weight: 700;
+    letter-spacing: .1em;
+    transition: color .2s var(--ease), text-shadow .3s var(--ease), transform .3s var(--ease);
+  }
+
+  .flow-step h3 {
+    position: relative;
+    z-index: 2;
+    margin-top: 10px;
+    font-size: 17px;
+    line-height: 1.4;
+  }
+
+  .flow-step p {
+    position: relative;
+    z-index: 2;
+    margin: 9px auto 0;
+    max-width: 235px;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.85;
+  }
+
+  .flow-step.lit::before {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow:
+      0 0 0 4px var(--bg),
+      0 0 14px var(--primary-soft);
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+
+  .flow-step.lit .no {
+    color: var(--primary);
+    text-shadow: 0 0 12px var(--primary-soft);
+    animation: pop .5s var(--ease);
+  }
+
+  @keyframes pop {
+    0% { transform: scale(.88); }
+    60% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+
+  @media (max-width: 860px) {
+    .flow {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 34px 0;
+      margin-top: 46px;
+    }
+
+    .flowline,
+    .flow-step::before {
+      display: none;
+    }
+
+    .flow-step {
+      padding: 0 18px;
+      background: transparent;
+    }
+
+    .flow-step + .flow-step {
+      padding-left: 18px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .flow {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+
+    .flow-step,
+    .flow-step + .flow-step {
+      padding: 0 8px;
+    }
+
+    .flow-step p {
+      max-width: 420px;
+    }
+  }
 
   .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-top: 56px; }
   .cell {
