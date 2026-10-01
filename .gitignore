@@ -62,3 +62,4 @@ src/openjob/web/frontend/ui-acceptance-screenshots/
 # Temp scripts
 _*.py
 .coverage
+landing/pr-preview/
