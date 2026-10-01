@@ -511,7 +511,7 @@ class CollectionOrchestrator:
                 self._persist(states, all_new_ids, platform)
                 try:
                     collector = (
-                        BossCollector(config=self.config, safety_conn=conn)
+                        BossCollector(config=self.config, safety_conn=conn, data_dir=self.db_path.parent)
                         if platform == "boss" and self._uses_default_registry
                         else self.registry.get(platform)
                     )

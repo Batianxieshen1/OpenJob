@@ -87,6 +87,10 @@ class JobCandidate:
     hr_active: str = ""
     company_size: str = ""
     company_industry: str = ""
+    company_logo_path: str = ""
+    company_logo_url: str = ""
+    company_intro: str = ""
+    company_intro_url: str = ""
     url: str = ""
     source_keyword: str = ""
     source_channel: str = "search"
@@ -118,6 +122,10 @@ class JobCandidate:
             "hr_active": self.hr_active,
             "company_size": self.company_size,
             "company_industry": self.company_industry,
+            "company_logo_path": self.company_logo_path,
+            "company_logo_url": self.company_logo_url,
+            "company_intro": self.company_intro,
+            "company_intro_url": self.company_intro_url,
             "url": self.url,
             "source_platform": self.platform,
             "source_job_id": self.source_job_id,

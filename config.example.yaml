@@ -40,6 +40,11 @@ collection:
   risk_pause_min_minutes: 5       # BOSS 风险信号后随机暂停下限
   risk_pause_max_minutes: 10      # BOSS 风险信号后随机暂停上限
   collection_delay_multiplier: 1.5 # BOSS 采集等待时间倍数
+  # 公司画像（Logo/简介）：Logo 从图床转存落盘 data/assets/logos/；简介访问公司主页抓取
+  company_daily_page_limit: 30    # BOSS 单日公司主页访问上限（采集顺路 + company-enrich 共用）
+  company_intro_max_chars: 2000   # 公司简介入库截断上限（字符）
+  enrich_logo: true               # 采集时顺路保存公司 Logo
+  enrich_intro: true              # 采集时顺路抓取公司简介
   delivery_cooldown_min_minutes: 5   # BOSS 采集结束到 BOSS 投递的随机冷却下限
   delivery_cooldown_max_minutes: 15  # BOSS 采集结束到 BOSS 投递的随机冷却上限
 

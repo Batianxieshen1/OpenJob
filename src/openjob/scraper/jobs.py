@@ -18,7 +18,7 @@ from openjob.collection.base import CollectorHooks
 from openjob.collection.models import JobCandidate, PlatformCollectionRequest
 from openjob.collection.platforms.boss import BossBrowser, BossCollector, generate_boss_job_id
 from openjob.config import CITY_CODES
-from openjob.db import get_db, insert_job, job_exists
+from openjob.db import DB_PATH, get_db, insert_job, job_exists
 from openjob.job_filters import matching_blocked_company, matching_deal_breaker
 from openjob.platform_safety import PlatformSafetyStop
 from openjob.throttle import PageThrottle
@@ -155,6 +155,7 @@ def _scrape_jobs_impl(
         sleep=time.sleep,
         config=config,
         safety_conn=db,
+        data_dir=DB_PATH.parent,
     )
     try:
         result = collector.collect(

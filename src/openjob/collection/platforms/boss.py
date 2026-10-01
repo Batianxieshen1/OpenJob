@@ -8,12 +8,21 @@ import random
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote
 
 from openjob.ai.prefilter import quick_score
 from openjob.browser import close_tab, evaluate, navigate, new_tab, scroll, wait_for_load
 from openjob.collection.base import CollectionError, CollectorHooks
+from openjob.collection.company_profile import (
+    JS_EXTRACT_COMPANY_INTRO,
+    absolute_company_url,
+    clean_company_intro,
+    fetch_company_logo,
+    parse_json_payload,
+    save_logo_file,
+)
 from openjob.collection.models import JobCandidate, PlatformCollectionRequest, PlatformCollectionResult
 from openjob.collection.models import classify_recruitment_type
 from openjob.collection.platforms.boss_recommend import (
@@ -90,6 +99,11 @@ JS_EXTRACT_DETAIL = """
         if (text.includes('人')) info.company_size = text;
         else if (!info.company_industry) info.company_industry = text;
     });
+    // 公司画像（S0 勘察）：公司卡 Logo 与 /gongsi/ 公司主页链接
+    const logoImg = document.querySelector('.sider-company .company-info img');
+    info.company_logo = logoImg ? (logoImg.getAttribute('src') || '') : '';
+    const companyAnchor = document.querySelector('.sider-company .company-info a[href*="/gongsi/"]');
+    info.company_page_url = companyAnchor ? (companyAnchor.getAttribute('href') || '') : '';
     const bossSection = document.querySelector('.boss-info-attr') || document.querySelector('.job-boss-info');
     info.hr_name = bossSection?.querySelector('.name')?.textContent?.trim() || '';
     info.hr_title = bossSection?.querySelector('.title')?.textContent?.trim() || '';
@@ -105,7 +119,7 @@ JS_DETECT_COLLECTION_RISK = """
     const url = String(location.href || '');
     const title = String(document.title || '');
     const hasExpectedContent = Boolean(document.querySelector(
-        '.job-card-wrap, .job-sec-text, .job-detail, .job-primary, li.item-boss, .job-name-text'
+        '.job-card-wrap, .job-sec-text, .job-detail, .job-primary, li.item-boss, .job-name-text, .job-sec'
     ));
     const captcha = document.querySelector(
         '.geetest_panel, .captcha, [class*="captcha"], [id*="captcha"], iframe[src*="captcha"], iframe[src*="verify"]'
@@ -147,6 +161,41 @@ def _wait_or_stop(stop_event, seconds: float, sleep: Callable[[float], None] = t
     return False
 
 
+def _inspect_risk_once(browser: "BossBrowser", target_id: str) -> dict[str, str] | None:
+    """单次风险探测（采集器与公司回填共用）；无风险返回 None。"""
+    raw = browser.evaluate(target_id, JS_DETECT_COLLECTION_RISK)
+    try:
+        value = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    except (json.JSONDecodeError, TypeError):
+        value = {}
+    if not isinstance(value, dict) or not value.get("risk"):
+        return None
+    return {
+        "kind": str(value.get("risk")),
+        "evidence": str(value.get("evidence") or "unspecified"),
+    }
+
+
+def _confirm_risk(
+    browser: "BossBrowser",
+    target_id: str,
+    *,
+    stop_event=None,
+    delay_multiplier: float = 1.5,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, str] | None:
+    """风险双检：间隔一次延时后复测，两次同型才判定为真（沿用采集器语义）。"""
+    first = _inspect_risk_once(browser, target_id)
+    if first is None:
+        return None
+    if _wait_or_stop(stop_event, 1.0 * delay_multiplier, sleep):
+        return {"kind": "user_stopped", "evidence": ""}
+    second = _inspect_risk_once(browser, target_id)
+    if second is None or second["kind"] != first["kind"]:
+        return None
+    return second
+
+
 def _positive_int(value: object, default: int) -> int:
     try:
         return max(int(value), 1)
@@ -183,6 +232,7 @@ class BossCollector:
         randint: Callable[[int, int], int] | None = None,
         config: dict[str, Any] | None = None,
         safety_conn: Any | None = None,
+        data_dir: Path | str | None = None,
     ):
         self.browser = browser or BossBrowser()
         self.throttle_factory = throttle_factory
@@ -190,6 +240,8 @@ class BossCollector:
         self.randint = randint or random.SystemRandom().randint
         self.config = config or {}
         self.safety_conn = safety_conn
+        # Logo 落盘目录（data/）：None 时不转存，仅记录图床 URL（测试/降级路径）
+        self.data_dir = Path(data_dir) if data_dir else None
 
     @staticmethod
     def resolve_city_code(city: str, request: PlatformCollectionRequest) -> str | None:
@@ -210,6 +262,10 @@ class BossCollector:
         guard = PlatformAccessGuard(self.safety_conn, self.config, "collection", "boss") if self.safety_conn is not None else None
         search_limit = _positive_int(collection_cfg.get("daily_search_page_limit", 60), 60)
         detail_limit = _positive_int(collection_cfg.get("daily_detail_page_limit", 150), 150)
+        enrich_logo = bool(collection_cfg.get("enrich_logo", True))
+        enrich_intro = bool(collection_cfg.get("enrich_intro", True))
+        company_page_limit = _positive_int(collection_cfg.get("company_daily_page_limit", 30), 30)
+        intro_max_chars = _positive_int(collection_cfg.get("company_intro_max_chars", 2000), 2000)
         failure_limit = _positive_int(collection_cfg.get("max_consecutive_page_failures", 3), 3)
         risk_pause_min = _positive_int(collection_cfg.get("risk_pause_min_minutes", 5), 5)
         risk_pause_max = max(
@@ -251,28 +307,16 @@ class BossCollector:
             )
 
         def inspect_risk(target_id: str) -> dict[str, str] | None:
-            raw = self.browser.evaluate(target_id, JS_DETECT_COLLECTION_RISK)
-            try:
-                value = json.loads(raw) if isinstance(raw, str) else (raw or {})
-            except (json.JSONDecodeError, TypeError):
-                value = {}
-            if not isinstance(value, dict) or not value.get("risk"):
-                return None
-            return {
-                "kind": str(value.get("risk")),
-                "evidence": str(value.get("evidence") or "unspecified"),
-            }
+            return _inspect_risk_once(self.browser, target_id)
 
         def confirm_risk(target_id: str) -> dict[str, str] | None:
-            first = inspect_risk(target_id)
-            if first is None:
-                return None
-            if _wait_or_stop(hooks.stop_event, 1.0 * delay_multiplier, self.sleep):
-                return {"kind": "user_stopped", "evidence": ""}
-            second = inspect_risk(target_id)
-            if second is None or second["kind"] != first["kind"]:
-                return None
-            return second
+            return _confirm_risk(
+                self.browser,
+                target_id,
+                stop_event=hooks.stop_event,
+                delay_multiplier=delay_multiplier,
+                sleep=self.sleep,
+            )
 
         def page_failure_stop() -> PlatformCollectionResult:
             if self.safety_conn is not None:
@@ -287,6 +331,58 @@ class BossCollector:
                 "consecutive_page_failures",
                 "BOSS 连续页面失败，本轮采集已结束；其他平台可继续",
             )
+
+        # 公司画像采集（公司形象增强方案）：每公司至多一次 Logo 转存 + 一次公司主页访问。
+        # 任何失败都不阻塞岗位入库：简介留空，等 company-enrich 回填兜底。
+        company_intro_cache: dict[str, tuple[str, str]] = {}
+        company_logo_cache: dict[str, str] = {}
+
+        def _enrich_company_profile(candidate: JobCandidate) -> str | tuple[str, str] | None:
+            """返回 None=完成；"stopped"=用户停止；(kind, evidence)=公司页风险信号
+            （与详情页风险同待遇：中止本轮并冷却）。"""
+            company = candidate.company
+            if not company:
+                return None
+            if enrich_logo and self.data_dir is not None and str(candidate.company_logo_url or ""):
+                if company not in company_logo_cache:
+                    company_logo_cache[company] = ""
+                    fetched = fetch_company_logo(str(candidate.company_logo_url))
+                    if fetched is not None:
+                        company_logo_cache[company] = save_logo_file(self.data_dir, company, fetched[0], fetched[1])
+                candidate.company_logo_path = company_logo_cache[company]
+            if not enrich_intro:
+                return None
+            if company in company_intro_cache:
+                candidate.company_intro, candidate.company_intro_url = company_intro_cache[company]
+                return None
+            company_intro_cache[company] = ("", "")  # 先占位：本轮内失败不重试
+            company_url = absolute_company_url(candidate.company_intro_url)
+            if not company_url:
+                return None
+            try:
+                if guard is not None:
+                    guard.reserve("company_page", daily_limit=company_page_limit)
+            except PlatformSafetyStop as exc:
+                hooks.on_event(message=f"公司主页访问已达日额度，简介留待回填：{exc.reason}")
+                return None
+            if throttle.wait(hooks.stop_event):
+                return "stopped"
+            if not self.browser.navigate(worker_target, company_url):
+                hooks.on_event(message="公司主页打开失败，简介留待回填")
+                return None
+            if _wait_or_stop(hooks.stop_event, 1.5 * delay_multiplier, self.sleep):
+                return "stopped"
+            self.browser.wait_for_load(worker_target, timeout=10)
+            signal = confirm_risk(worker_target)
+            if signal and signal["kind"] == "user_stopped":
+                return "stopped"
+            if signal:
+                return (signal["kind"], signal["evidence"])
+            payload = parse_json_payload(self.browser.evaluate(worker_target, JS_EXTRACT_COMPANY_INTRO))
+            intro = clean_company_intro(str(payload.get("intro") or ""), intro_max_chars)
+            company_intro_cache[company] = (intro, company_url)
+            candidate.company_intro, candidate.company_intro_url = company_intro_cache[company]
+            return None
 
         combos: list[tuple[str, str, str]] = []
         source_channels = [str(channel) for channel in getattr(request, "source_channels", None) or ["search"]
@@ -382,6 +478,11 @@ class BossCollector:
             if not merged.title or not merged.company or not merged.url or not merged.jd:
                 hooks.on_parse_failed("BOSS 详情缺少职位、公司、链接或 JD")
                 return "failed"
+            profile_signal = _enrich_company_profile(merged)
+            if profile_signal == "stopped":
+                return "stopped"
+            if isinstance(profile_signal, tuple):
+                return f"risk:{profile_signal[0]}:{profile_signal[1]}"
             if not hooks.on_candidate(merged):
                 return "callback_stopped"
             return "saved"
@@ -692,6 +793,8 @@ class BossCollector:
             hr_active=str(detail.get("hr_active") or "").strip(),
             company_size=str(detail.get("company_size") or "").strip(),
             company_industry=str(detail.get("company_industry") or "").strip(),
+            company_logo_url=str(detail.get("company_logo") or "").strip(),
+            company_intro_url=absolute_company_url(str(detail.get("company_page_url") or "")) or "",
             url=detail_url,
             source_keyword=candidate.source_keyword,
             source_channel=candidate.source_channel,
