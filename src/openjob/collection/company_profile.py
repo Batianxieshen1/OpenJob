@@ -24,8 +24,9 @@ _LOGO_FETCH_HEADERS = {
     ),
 }
 
-# 公司主页简介提取：定位"公司简介"标题所在区块，克隆后剥离标题与折叠按钮再取文本，
-# 避免 textContent 里混入"公司简介/展开/收起"等界面词。
+# 公司主页简介提取：定位"公司简介"标题所在区块，直接取整块 textContent。
+# 不做 DOM 克隆删减——简介正文就位于 fold/expand 类容器内，按类名删元素会把正文一并删掉
+# （2026-10-02 真机教训：删减版只取到"展开"二字）；界面词由 clean_company_intro 剥离。
 JS_EXTRACT_COMPANY_INTRO = """
 (() => {
     const out = { intro: '', company_page_url: location.pathname };
@@ -34,9 +35,7 @@ JS_EXTRACT_COMPANY_INTRO = """
     if (!heading) return JSON.stringify(out);
     const section = heading.closest('.job-sec') || heading.parentElement;
     if (!section) return JSON.stringify(out);
-    const clone = section.cloneNode(true);
-    clone.querySelectorAll('h2, h3, button, .btn-fold, [class*="fold"], [class*="expand"]').forEach(el => el.remove());
-    out.intro = clone.textContent.trim();
+    out.intro = section.textContent.trim();
     return JSON.stringify(out);
 })()
 """
@@ -52,8 +51,9 @@ def logo_file_key(company: str) -> str:
 
 
 def clean_company_intro(text: str, max_chars: int = 2000) -> str:
-    """简介清洗：折叠空白、剥掉尾部折叠按钮残留、超长截断。"""
+    """简介清洗：折叠空白、剥掉区块标题词与折叠按钮残留、超长截断。"""
     value = re.sub(r"\s+", " ", str(text or "")).strip()
+    value = re.sub(r"^(?:公司简介|公司介绍|企业介绍)[:：]?", "", value).strip()
     value = re.sub(r"(?:展开|收起)$", "", value).strip()
     if len(value) > max_chars:
         value = value[:max_chars].rstrip() + "…"
