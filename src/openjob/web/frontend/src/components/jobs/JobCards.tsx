@@ -367,7 +367,19 @@ export function PriorityJobRow({
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-foreground">{job.company}｜{job.title}</div>
         <div className="mt-0.5 truncate text-xs text-muted">
-          {job.score ? <span className="font-semibold text-primary tabular-nums">{job.score} 分</span> : null}
+          {job.score ? (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                job.score >= 80
+                  ? 'bg-primary text-shell'
+                  : job.score >= 60
+                    ? 'text-primary ring-1 ring-inset ring-primary/40'
+                    : 'text-muted-3'
+              }`}
+            >
+              {job.score} 分
+            </span>
+          ) : null}
           {job.salary ? ` · ${job.salary}` : ''}
           {job.hr_active ? ` · ${job.hr_active}` : ''}
         </div>
