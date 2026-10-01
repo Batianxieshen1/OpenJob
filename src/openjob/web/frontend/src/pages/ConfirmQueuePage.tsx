@@ -340,7 +340,7 @@ export default function ConfirmQueuePage() {
                   只选额度内（{Math.min(readyToSendJobs.length, workbench.send_quota?.remaining ?? 0)}）
                 </Button>
                 <Button variant="secondary" size="sm" disabled={!sendSelected.length} onClick={() => setSendSelected([])}>清空选择</Button>
-                <Button size="sm" disabled={!sendSelected.length} onClick={() => confirmDeliver(sendSelected, true)}>一键投递已选 {sendSelected.length}（不重新生成）</Button>
+                <Button size="sm" disabled={!sendSelected.length} onClick={() => confirmDeliver(sendSelected, true)} className="font-semibold transition-transform duration-200 ease-[cubic-bezier(.34,1.56,.64,1)] active:scale-[.94] active:rotate-[-1.5deg]">一键投递已选 {sendSelected.length}（不重新生成）</Button>
               </div>
             </div>
           </div>
@@ -462,7 +462,7 @@ export default function ConfirmQueuePage() {
                 </div>
               )}
             </div>
-            <Button size="sm" className="ml-auto" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
+            <Button size="sm" className="ml-auto font-semibold transition-transform duration-200 ease-[cubic-bezier(.34,1.56,.64,1)] active:scale-[.94] active:rotate-[-1.5deg]" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
           </div>
         </div>
       </div>
