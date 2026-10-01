@@ -205,12 +205,12 @@ export function JobsTable({ refreshKey,
                       aria-label={`选择 ${job.company} ${job.title}`}
                       className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                     />
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5">
-                        <CompanyAvatar job={job} size={18} />
+                    <span className="flex min-w-0 items-center gap-2">
+                      <CompanyAvatar job={job} size={32} />
+                      <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-foreground">{job.company}</span>
+                        <span className="block truncate text-[13px] text-foreground">{job.title}</span>
                       </span>
-                      <span className="block truncate text-[13px] text-foreground">{job.title}</span>
                     </span>
                   </label>
                   <ScoreBadge score={job.score || 0} />
@@ -328,18 +328,22 @@ export function JobsTable({ refreshKey,
                         />
                       </td>
                       <td className="max-w-[380px] px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <CompanyAvatar job={job} size={18} />
-                          <span className="truncate font-semibold text-foreground">{job.company}</span>
-                          <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            {job.source_platform === 'zhilian' ? '智联' : job.source_platform === '51job' ? '51job' : 'BOSS'}
-                          </span>
-                        </div>
-                        <div className="mt-0.5 flex min-w-0 items-center gap-2">
-                          <span className="truncate text-[13px] text-foreground">{job.title}</span>
-                          <span className="hidden shrink-0 text-[11px] text-muted-3 md:inline">
-                            {subtitleParts.join(' · ')}
-                          </span>
+                        <div className="flex items-center gap-2.5">
+                          <CompanyAvatar job={job} size={34} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate font-semibold text-foreground">{job.company}</span>
+                              <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                {job.source_platform === 'zhilian' ? '智联' : job.source_platform === '51job' ? '51job' : 'BOSS'}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 flex min-w-0 items-center gap-2">
+                              <span className="truncate text-[13px] text-foreground">{job.title}</span>
+                              <span className="hidden shrink-0 text-[11px] text-muted-3 md:inline">
+                                {subtitleParts.join(' · ')}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="hidden whitespace-nowrap px-4 py-3 align-middle text-muted md:table-cell">{job.city || '未识别'}</td>
