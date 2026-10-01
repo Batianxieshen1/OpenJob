@@ -13,7 +13,7 @@ DB_PATH = Path("./data/openjob.db")
 MAX_JOB_IDS = 1000
 # C4：schema 版本号写入 PRAGMA user_version；版本变化时迁移前先自动备份。
 # 有意新增迁移时上调此数字并同步 _MIGRATIONS。
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 _MIGRATIONS = (
     "_migrate_v1_1", "_migrate_v1_2", "_migrate_v1_3", "_migrate_v1_4",
     "_migrate_platform_access_events", "_init_scoring_runs",
@@ -23,6 +23,7 @@ _MIGRATIONS = (
     "_migrate_v2_8",
     "_migrate_v2_9",
     "_migrate_v2_10",
+    "_migrate_v2_11",
 )
 DELETION_PROTECTED_STATUSES = {"sent", "replied", "resume_sent", "needs_resume", "follow_up_sent"}
 DELETION_PROTECTED_HISTORY_ACTIONS = {
@@ -176,6 +177,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_8(conn)
     _migrate_v2_9(conn)
     _migrate_v2_10(conn)
+    _migrate_v2_11(conn)
     _stamp_schema_version(conn)
 
 
@@ -555,6 +557,21 @@ def _migrate_v2_10(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_v2_11(conn: sqlite3.Connection) -> None:
+    """公司画像字段（公司形象增强方案，幂等）：
+
+    - jobs.company_logo_path / company_logo_url：公司 Logo 本地落盘路径（data/assets/logos/，
+      按公司名 hash 去重）与 BOSS 图床原始 URL 留档；
+    - jobs.company_intro / company_intro_url：BOSS 公司主页的公司简介文本与主页链接。
+    均可空，旧数据不回填（由 company-enrich 命令按需补抓）。
+    """
+    job_cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    for column in ("company_logo_path", "company_logo_url", "company_intro", "company_intro_url"):
+        if column not in job_cols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} TEXT")
+    conn.commit()
+
+
 def record_job_source_observation(
     conn: sqlite3.Connection,
     *,
@@ -665,6 +682,10 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
         "hr_active": job.get("hr_active", ""),
         "company_size": job.get("company_size", ""),
         "company_industry": job.get("company_industry", ""),
+        "company_logo_path": job.get("company_logo_path", ""),
+        "company_logo_url": job.get("company_logo_url", ""),
+        "company_intro": job.get("company_intro", ""),
+        "company_intro_url": job.get("company_intro_url", ""),
         "url": job.get("url", ""),
         "source_platform": str(job.get("source_platform") or "boss"),
         "source_job_id": str(job.get("source_job_id") or "") or None,
@@ -686,11 +707,13 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
         INSERT OR IGNORE INTO jobs (
             id, title, company, salary, city, experience, education, recruitment_type, jd,
             hr_name, hr_title, hr_active, company_size, company_industry, url,
-            source_platform, source_job_id, source_keyword, source_city_code, source_channel
+            source_platform, source_job_id, source_keyword, source_city_code, source_channel,
+            company_logo_path, company_logo_url, company_intro, company_intro_url
         ) VALUES (
             :id, :title, :company, :salary, :city, :experience, :education, :recruitment_type, :jd,
             :hr_name, :hr_title, :hr_active, :company_size, :company_industry, :url,
-            :source_platform, :source_job_id, :source_keyword, :source_city_code, :source_channel
+            :source_platform, :source_job_id, :source_keyword, :source_city_code, :source_channel,
+            :company_logo_path, :company_logo_url, :company_intro, :company_intro_url
         )
         """,
         values,
@@ -705,6 +728,60 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
 def insert_job(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
     """Backward-compatible insert entry point; returns whether it was new."""
     return insert_job_if_new(conn, job)
+
+
+def update_company_profile(
+    conn: sqlite3.Connection,
+    company: str,
+    *,
+    intro: str,
+    intro_url: str,
+    logo_path: str | None = None,
+    logo_url: str | None = None,
+) -> int:
+    """把一家公司的简介/Logo 回填到其名下全部有效岗位（company-enrich 用）。
+
+    简介/主页链接总是覆盖（回填目标就是缺失行）；Logo 用 COALESCE 只补空，
+    不覆盖采集时已落盘的结果。返回受影响行数。
+    """
+    cursor = conn.execute(
+        """
+        UPDATE jobs SET
+            company_intro = ?,
+            company_intro_url = ?,
+            company_logo_path = COALESCE(NULLIF(company_logo_path, ''), ?),
+            company_logo_url = COALESCE(NULLIF(company_logo_url, ''), ?),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE company = ? AND deleted_at IS NULL
+        """,
+        (intro, intro_url, logo_path or "", logo_url or "", company),
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
+def companies_missing_intro(conn: sqlite3.Connection, limit: int | None = None) -> list[dict[str, Any]]:
+    """列出缺简介的 BOSS 公司（含岗位数与一条样本详情页 URL，供回填访问）。"""
+    sql = """
+        SELECT company, COUNT(*) AS job_count,
+               MAX(created_at) AS latest_job_at,
+               (SELECT url FROM jobs j2
+                 WHERE j2.company = j1.company AND j2.deleted_at IS NULL
+                   AND j2.source_platform = 'boss'
+                   AND j2.url LIKE 'https://www.zhipin.com/job_detail/%'
+                 ORDER BY j2.created_at DESC LIMIT 1) AS sample_url
+        FROM jobs j1
+        WHERE j1.deleted_at IS NULL AND j1.source_platform = 'boss'
+          AND (j1.company_intro IS NULL OR j1.company_intro = '')
+        GROUP BY j1.company
+        ORDER BY job_count DESC, latest_job_at DESC
+    """
+    if limit is not None:
+        sql += " LIMIT ?"
+        rows = conn.execute(sql, (limit,)).fetchall()
+    else:
+        rows = conn.execute(sql).fetchall()
+    return [dict(row) for row in rows]
 
 
 def update_job_score(conn: sqlite3.Connection, job_id: str, score: int, reason: str) -> None:

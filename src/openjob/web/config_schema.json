@@ -294,6 +294,35 @@
           "min": 0,
           "max": 240,
           "default": 15
+        },
+        {
+          "key": "company_daily_page_limit",
+          "label": "BOSS 单日公司主页访问上限",
+          "type": "number",
+          "min": 1,
+          "max": 300,
+          "default": 30,
+          "description": "公司画像（简介/Logo）回填与采集期公司主页访问的日额度；采集与回填共用"
+        },
+        {
+          "key": "company_intro_max_chars",
+          "label": "公司简介入库截断上限（字符）",
+          "type": "number",
+          "min": 200,
+          "max": 8000,
+          "default": 2000
+        },
+        {
+          "key": "enrich_logo",
+          "label": "采集时顺路保存公司 Logo",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "key": "enrich_intro",
+          "label": "采集时顺路抓取公司简介",
+          "type": "boolean",
+          "default": true
         }
       ]
     },
