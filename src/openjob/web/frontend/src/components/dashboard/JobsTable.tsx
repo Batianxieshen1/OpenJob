@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'lucide-react'
 import { getStatusLabel } from '@/lib/status'
 import { cn } from '@/lib/utils'
+import { CompanyAvatar } from '@/components/jobs/CompanyAvatar'
 import type { Job } from '@/hooks/useDashboard'
 import type { JobSortKey, JobSortOrder } from '@/hooks/useJobSearch'
 
@@ -205,7 +206,10 @@ export function JobsTable({ refreshKey,
                       className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                     />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-foreground">{job.company}</span>
+                      <span className="flex items-center gap-1.5">
+                        <CompanyAvatar job={job} size={18} />
+                        <span className="block truncate text-sm font-semibold text-foreground">{job.company}</span>
+                      </span>
                       <span className="block truncate text-[13px] text-foreground">{job.title}</span>
                     </span>
                   </label>
@@ -325,6 +329,7 @@ export function JobsTable({ refreshKey,
                       </td>
                       <td className="max-w-[380px] px-4 py-3">
                         <div className="flex items-center gap-2">
+                          <CompanyAvatar job={job} size={18} />
                           <span className="truncate font-semibold text-foreground">{job.company}</span>
                           <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-primary">
                             {job.source_platform === 'zhilian' ? '智联' : job.source_platform === '51job' ? '51job' : 'BOSS'}

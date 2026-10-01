@@ -267,6 +267,44 @@ def export_data(ctx: click.Context, out: str | None, no_resumes: bool) -> None:
     console.print(f"[green]✓[/green] 已导出：{target}（{len(payload) / 1024:.0f} KB，不含 config.yaml 与 API Key）")
 
 
+@cli.command(name="company-enrich")
+@click.option("--apply", is_flag=True, help="正式回填（默认 dry-run：只预览清单与预计访问量，不访问页面不写库）")
+@click.option("--limit", "-l", default=None, type=int, help="本次最多回填的公司数（默认不限制，受日额度约束）")
+@click.option("--daily-limit", default=None, type=int, help="覆盖公司主页日访问额度（默认读 collection.company_daily_page_limit）")
+@click.pass_context
+def company_enrich(ctx: click.Context, apply: bool, limit: int | None, daily_limit: int | None) -> None:
+    """回填存量岗位的公司 Logo 与简介（默认 dry-run 预览）"""
+    from openjob.company_enrich import run_company_enrich
+
+    config = ctx.obj["config"]
+    base_dir = ctx.obj["base_dir"]
+    if not apply:
+        summary = run_company_enrich(
+            config, base_dir / "data" / "openjob.db",
+            apply=False, limit=limit, log=lambda line: console.print(line),
+        )
+        console.print(
+            f"[bold]待回填：{summary['companies']} 家公司（覆盖 {summary['jobs_covered']} 条岗位）[/bold]，"
+            f"其中 {summary['skipped_no_sample_url']} 家缺样本详情页链接"
+        )
+        console.print(f"[dim]预计页面访问 ≈ {summary['estimated_pages']} 次（每公司 1 详情 + 1 主页），受日额度与节流约束[/dim]")
+        console.print("[yellow]以上为 dry-run 预览（未访问页面、未写库）。确认后加 --apply 正式回填。[/yellow]")
+        return
+    console.print("[bold]开始公司画像回填（Ctrl+C 可中断，下次续跑）...[/bold]")
+    summary = run_company_enrich(
+        config, base_dir / "data" / "openjob.db",
+        apply=True, limit=limit, daily_limit_override=daily_limit,
+        log=lambda line: console.print(line),
+    )
+    if summary["status"] == "blocked":
+        console.print(f"[red]{summary.get('message', '检测到平台风险，本轮已停止')}[/red]")
+        raise SystemExit(1)
+    if summary["status"] == "completed":
+        console.print(f"[green]✓[/green] {summary.get('message', '')}")
+    else:
+        console.print(f"[yellow]○ {summary.get('message', '回填未全部完成')}[/yellow]")
+
+
 @cli.command()
 @click.option("--write", "do_write", is_flag=True, help="确认后写入归档目录（默认仅预览，不写任何文件）")
 @click.option("--yes", is_flag=True, help="跳过写入前的交互确认")

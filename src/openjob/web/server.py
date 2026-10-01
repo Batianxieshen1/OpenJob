@@ -10,6 +10,7 @@ import math
 import mimetypes
 import os
 import random
+import re
 import sqlite3
 import tempfile
 import time
@@ -3858,6 +3859,15 @@ def _serve_static(filename: str, root: Path):
 	"""Serve static assets with stable MIME types while retaining range/cache support."""
 	mimetype = _STATIC_MIME_TYPES.get(Path(filename).suffix.lower(), "auto")
 	return static_file(filename, root=str(root), mimetype=mimetype)
+
+
+@app.route("/company-logos/<filename>")
+def serve_company_logo(filename):
+	# 只放行采集端落盘的公司 Logo（sha1 前 16 位 hex + 图片扩展名），
+	# 正则白名单即路径穿越防护（_serve_static 的 static_file 另有校验）
+	if not re.fullmatch(r"[0-9a-f]{16}\.(?:png|jpg|webp|gif)", str(filename)):
+		return _json_response({"error": "Not found"}, 404)
+	return _serve_static(filename, DATA_DIR / "assets" / "logos")
 
 
 @app.route("/assets/<filepath:path>")
