@@ -3,12 +3,18 @@
 [![CI](https://github.com/Batianxieshen1/OpenJob/actions/workflows/ci.yml/badge.svg)](../../actions)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![Release](https://img.shields.io/github/v/release/Batianxieshen1/OpenJob)](../../releases/latest)
+[![Stars](https://img.shields.io/github/stars/Batianxieshen1/OpenJob?style=social)](../../stargazers)
 
 OpenJob 是运行在你自己电脑上的 AI 求职工作台。它把“找岗位、去重、评分、改简历、准备招呼语、跟进回复”串成一条可审阅的工作流；**是否投递、发什么、何时发，始终由你确认。**
 
 它面向的是希望提高求职准备效率、同时保留个人判断与账号控制权的求职者。岗位数据、简历、素材库和 API Key 默认只保存在本机，不是代投服务，也不是无人值守的海投机器人。
 
 ## 界面一览
+
+**一段动图看完主流程**——工作台 → 岗位池 → 投递确认闸门（演示数据）：
+
+![主流程演示](docs/img/demo-flow.gif)
 
 **工作台 · 绛夜主题**——今日待办、投递额度、求职流程进度，打开就能读完：
 
@@ -19,6 +25,12 @@ OpenJob 是运行在你自己电脑上的 AI 求职工作台。它把“找岗�
 | 岗位池（晨刊主题） | 投递确认 · 人工闸门 |
 | --- | --- |
 | ![岗位池](docs/img/job-pool.jpg) | ![投递确认](docs/img/confirm-queue.jpg) |
+
+**市场画像**——每轮采集自动更新城市/薪资/学历分布与市场结论；**简历定制**——三步流程：底稿 → 选岗 → 按 JD 改写导出：
+
+| 市场分析 | 简历工作台 |
+| --- | --- |
+| ![市场分析](docs/img/market-analysis.jpg) | ![简历工作台](docs/img/resume-workbench.jpg) |
 
 > 截图均为内置演示数据（公司名带 mock 标记），非真实岗位。支持明暗双主题；[在线预览宣传页 →](https://batianxieshen1.github.io/OpenJob/)
 
