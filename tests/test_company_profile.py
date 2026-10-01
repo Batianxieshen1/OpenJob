@@ -61,6 +61,8 @@ class CompanyProfileUnitTests(unittest.TestCase):
     def test_clean_company_intro_collapses_and_strips_fold_suffix(self):
         cleaned = clean_company_intro(" 美的是一家\n 科技集团  展开 ")
         self.assertEqual(cleaned, "美的是一家 科技集团")
+        # textContent 直取会混入区块标题词与折叠残留，一并剥离
+        self.assertEqual(clean_company_intro(" 公司简介\n 美的是一家 科技集团 收起 "), "美的是一家 科技集团")
         self.assertEqual(clean_company_intro("很长的简介内容", max_chars=5), "很长的简介…")
 
     def test_absolute_company_url_rules(self):
