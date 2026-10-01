@@ -245,8 +245,8 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold tracking-[0.18em] text-primary">岗位详情</div>
-            <h3 className="mt-1 flex items-center gap-2 text-xl font-semibold md:text-2xl">
-              <CompanyAvatar job={job} size={28} />
+            <h3 className="mt-1 flex items-center gap-2.5 text-xl font-semibold md:text-2xl">
+              <CompanyAvatar job={job} size={34} />
               {job.company}｜{job.title}
             </h3>
             <p className="mt-1 text-sm text-muted">{job.salary || '薪资未填'} · {job.city || '城市未填'} · {getStatusLabel(job.status)}</p>
@@ -341,21 +341,23 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject, fli
         </span>
       )}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <CompanyAvatar job={job} size={20} />
-            <span className="truncate font-semibold text-foreground">{job.company}</span>
-            <span className="shrink-0 text-muted-3">｜</span>
-            <span className="truncate font-semibold text-foreground">{job.title}</span>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <CompanyAvatar job={job} size={38} />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-1.5">
+              <span className="truncate font-semibold text-foreground">{job.company}</span>
+              <span className="shrink-0 text-muted-3">｜</span>
+              <span className="truncate font-semibold text-foreground">{job.title}</span>
+            </div>
+            <div className="mt-1 text-xs text-muted">{jobSubtitle(job)}</div>
           </div>
-          <div className="mt-1 text-xs text-muted">{jobSubtitle(job)}</div>
         </div>
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggle}
           aria-label={`选择岗位：${job.company} ${job.title}`}
-          className="mt-1 h-4 w-4 shrink-0 accent-primary"
+          className="mt-2 h-4 w-4 shrink-0 accent-primary"
         />
       </div>
       {days >= 2 && (

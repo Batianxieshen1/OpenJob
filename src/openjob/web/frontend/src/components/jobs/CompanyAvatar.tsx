@@ -18,7 +18,7 @@ export function CompanyAvatar({ job, size = 20 }: { job: Job; size?: number }) {
         width={size}
         height={size}
         onError={() => setFailed(true)}
-        className="shrink-0 rounded-md border border-card-border bg-card object-cover"
+        className={`shrink-0 border border-card-border bg-card object-cover ${size >= 28 ? 'rounded-lg' : 'rounded-md'}`}
       />
     )
   }
@@ -26,8 +26,8 @@ export function CompanyAvatar({ job, size = 20 }: { job: Job; size?: number }) {
   return (
     <span
       aria-hidden
-      style={{ width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.5)) }}
-      className="flex shrink-0 items-center justify-center rounded-md bg-primary/12 font-semibold text-primary"
+      style={{ width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.45)) }}
+      className={`flex shrink-0 items-center justify-center bg-primary/12 font-semibold text-primary ${size >= 28 ? 'rounded-lg' : 'rounded-md'}`}
     >
       {initial}
     </span>
