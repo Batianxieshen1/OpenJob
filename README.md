@@ -261,3 +261,7 @@ cd src/openjob/web/frontend && npm ci && npm run build  # 前端构建
 ## 📄 License
 
 [MIT](LICENSE) © OpenJob Contributors
+
+---
+
+> 更多作品与札记 → **[蓝纸 · 造物与札记](https://batianxieshen1.github.io/blog/)**
