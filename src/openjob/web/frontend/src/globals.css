@@ -518,16 +518,6 @@ main,
   content: ""; position: absolute; top: 4px; left: 0; right: 0; height: 1px;
   background: rgb(var(--ink)); opacity: .75; z-index: 1;
 }
-.ember {
-  position: absolute; border-radius: 50%; background: var(--primary);
-  opacity: 0; pointer-events: none;
-  animation: ember-float 8s ease-in-out infinite;
-}
-html.dark .ember { opacity: .55; }
-@keyframes ember-float {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: .3; }
-  50% { transform: translateY(-14px) translateX(4px); opacity: .8; }
-}
 
 /* ── W3：侧栏激活图标弹簧（路由切换重放） ── */
 .nav-icon { animation: nav-pop .38s cubic-bezier(.34, 1.56, .64, 1); }

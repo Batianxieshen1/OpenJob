@@ -9,7 +9,7 @@ export const brandAssets = {
 } as const
 
 /** 跟随应用主题（html.dark / html.light 类）而非系统偏好，手动切换即时生效 */
-function useIsDarkTheme(): boolean {
+export function useIsDarkTheme(): boolean {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
 
   useEffect(() => {

@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import { Radar, RefreshCw, Search } from 'lucide-react'
+import { useIsDarkTheme } from '@/components/brand/Brand'
 import { Button } from '@/components/ui/button'
 import { useCountUp } from '@/hooks/useCountUp'
 
@@ -14,6 +16,65 @@ interface DashboardHeroProps {
   replyCount: number
   readyToSendCount: number
   onGoConfirm: () => void
+}
+
+/** 夜间余烬尘：hero 卡内 canvas 粒子场（绛夜限定，reduced-motion 跳过） */
+function EmberCanvas() {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const isDark = useIsDarkTheme()
+
+  useEffect(() => {
+    if (!isDark) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const canvas = ref.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const W = (canvas.width = canvas.clientWidth || 600)
+    const H = (canvas.height = canvas.clientHeight || 220)
+    const motes = Array.from({ length: 22 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      s: 0.8 + Math.random() * 2.2,
+      vy: 0.08 + Math.random() * 0.3,
+      ph: Math.random() * Math.PI * 2,
+      sw: 0.5 + Math.random() * 1.1,
+      hot: Math.random() < 0.2,
+    }))
+    let raf = 0
+    const t0 = performance.now()
+    const render = (now: number) => {
+      const t = (now - t0) / 1000
+      ctx.clearRect(0, 0, W, H)
+      for (const m of motes) {
+        m.y -= m.vy
+        m.x += Math.sin(t * m.sw + m.ph) * 0.18
+        if (m.y < -4) {
+          m.y = H + 4
+          m.x = Math.random() * W
+        }
+        const tw = 0.5 + 0.5 * Math.sin(t * (1.3 + m.sw) + m.ph * 3)
+        const a = (m.hot ? 0.6 : 0.38) * (0.3 + 0.7 * tw)
+        ctx.fillStyle = m.hot
+          ? `rgba(240,138,110,${a.toFixed(3)})`
+          : `rgba(224,74,50,${a.toFixed(3)})`
+        ctx.beginPath()
+        ctx.arc(m.x, m.y, m.s, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      raf = requestAnimationFrame(render)
+    }
+    raf = requestAnimationFrame(render)
+    return () => cancelAnimationFrame(raf)
+  }, [isDark])
+
+  return (
+    <canvas
+      ref={ref}
+      aria-hidden
+      className="pointer-events-none absolute inset-0 h-full w-full"
+    />
+  )
 }
 
 /** L1 焦点层：今日一句话状态 + 唯一主行动；启动类动作降为 ghost 辅助 */
@@ -38,12 +99,7 @@ export function DashboardHero({
   return (
     <section className="press-head relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
       {/* 夜间余烬尘：晨刊白天干净，绛夜夜里飘火星 */}
-      <div aria-hidden className="ember" style={{ top: '14%', left: '58%', width: 5, height: 5, animationDelay: '0s' }} />
-      <div aria-hidden className="ember" style={{ top: '68%', left: '74%', width: 4, height: 4, animationDelay: '-2.4s' }} />
-      <div aria-hidden className="ember" style={{ top: '38%', left: '88%', width: 6, height: 6, animationDelay: '-4.2s' }} />
-      <div aria-hidden className="ember" style={{ top: '80%', left: '46%', width: 3.5, height: 3.5, animationDelay: '-5.6s' }} />
-      <div aria-hidden className="ember" style={{ top: '8%', left: '30%', width: 4, height: 4, animationDelay: '-1.3s' }} />
-      <div aria-hidden className="ember" style={{ top: '56%', left: '12%', width: 5, height: 5, animationDelay: '-3.1s' }} />
+      <EmberCanvas />
       {/* 背景装饰：柔和蓝晕 + 细网格，克制不抢内容 */}
       <div
         aria-hidden
