@@ -70,6 +70,7 @@ function BatchConfirmDialog({
               <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>再看看</Button>
               <Button
                 size="sm"
+                data-deliver-btn
                 disabled={submitting}
                 onClick={onConfirm}
                 className="transition-transform duration-200 ease-[cubic-bezier(.34,1.56,.64,1)] active:scale-[.94] active:rotate-[-1.5deg]"
@@ -91,7 +92,7 @@ function BatchConfirmDialog({
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>再看看</Button>
-              <Button variant="destructive" size="sm" disabled={submitting} onClick={onConfirm}>
+              <Button variant="destructive" size="sm" data-deliver-btn disabled={submitting} onClick={onConfirm}>
                 {submitting ? '提交中…' : `确认发送 ${total} 条招呼语`}
               </Button>
             </div>
@@ -101,6 +102,37 @@ function BatchConfirmDialog({
     </div>,
     document.body,
   )
+}
+
+function spawnDeliverBurst(x: number, y: number) {
+  if (typeof window === 'undefined') return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  for (let i = 0; i < 16; i++) {
+    setTimeout(() => {
+      const d = document.createElement('span')
+      d.className = 'wb-ink-dot'
+      const ang = Math.random() * Math.PI * 2
+      const dist = 42 + Math.random() * 92
+      d.style.setProperty('--s', (3 + Math.random() * 5).toFixed(1) + 'px')
+      d.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px')
+      d.style.setProperty('--dy', (Math.sin(ang) * dist * 0.85).toFixed(1) + 'px')
+      d.style.left = x + 'px'
+      d.style.top = y + 'px'
+      document.body.appendChild(d)
+      setTimeout(() => d.remove(), 950)
+    }, i * 7)
+  }
+  for (let i = 0; i < 2; i++) {
+    setTimeout(() => {
+      const ring = document.createElement('span')
+      ring.className = 'wb-ink-ring'
+      ring.style.left = x + 'px'
+      ring.style.top = y + 'px'
+      ring.style.animationDelay = i * 0.13 + 's'
+      document.body.appendChild(ring)
+      setTimeout(() => ring.remove(), 1200)
+    }, i * 130)
+  }
 }
 
 export default function ConfirmQueuePage() {
@@ -164,6 +196,8 @@ export default function ConfirmQueuePage() {
     const directSend = batchTarget?.directSend || false
     if (!ids.length || batchSubmitting) return
     setBatchSubmitting(true)
+    const btnEl = document.querySelector('[data-deliver-btn]') as HTMLElement | null
+    const btnBox = btnEl ? btnEl.getBoundingClientRect() : null
     try {
       const res = await fetch('/api/workbench/deliver', {
         method: 'POST',
@@ -186,6 +220,9 @@ export default function ConfirmQueuePage() {
           ? `已把 ${ids.length} 个岗位加入发送队列（招呼语不重新生成，按安全队列直接发送）。`
           : `已生成 ${ids.length} 个岗位的招呼语，全部停在「待发送招呼语」等你审阅；确认后才会发送（本步未发送任何内容）。`
       )
+      if (btnBox) {
+        spawnDeliverBurst(btnBox.left + btnBox.width / 2, btnBox.top + btnBox.height / 2)
+      }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '投递失败')
     } finally {

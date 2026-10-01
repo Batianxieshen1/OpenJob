@@ -533,3 +533,25 @@ html.dark .ember { opacity: .55; }
 .nav-icon { animation: nav-pop .38s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes nav-pop { 0% { opacity: .3; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .nav-icon { animation: none; } }
+
+/* ── 确认制"拍板"仪式：投递成功墨点爆点（fixed 视口坐标，双主题走 --accent） ── */
+.wb-ink-dot {
+  position: fixed; width: var(--s, 4px); height: var(--s, 4px); border-radius: 50%;
+  background: rgb(var(--accent)); opacity: 0; pointer-events: none; z-index: 400;
+  animation: wb-ink-burst var(--dur, .8s) var(--ease-product) forwards;
+}
+.wb-ink-ring {
+  position: fixed; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+  border: 3px solid rgb(var(--accent)); border-radius: 50%;
+  opacity: 0; pointer-events: none; z-index: 400; transform: scale(.3);
+  animation: wb-ring-out .7s var(--ease-product) forwards;
+}
+@keyframes wb-ink-burst {
+  0% { opacity: .95; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.35); }
+}
+@keyframes wb-ring-out {
+  0% { opacity: .85; transform: scale(.3); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+
