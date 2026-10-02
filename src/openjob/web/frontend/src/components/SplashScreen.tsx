@@ -6,7 +6,8 @@ function shouldPlay(): boolean {
   if (typeof window === 'undefined') return false
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
   try {
-    const today = new Date().toISOString().slice(0, 10)
+    // 本地日（非 UTC）：与 App.tsx 的门控保持同一口径
+    const today = new Date().toLocaleDateString('sv-SE')
     if (localStorage.getItem(SEEN_KEY) === today) return false
     localStorage.setItem(SEEN_KEY, today)
     return true

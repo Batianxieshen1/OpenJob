@@ -1567,6 +1567,48 @@ def get_daily_activity(conn: sqlite3.Connection, days: int = 7) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def get_weekly_trends(conn: sqlite3.Connection, days: int = 7) -> list[dict]:
+    """近 N 日（本地时区日）采集/评分/投递聚合，供首页趋势图。
+
+    采集 = 当日新增岗位数（jobs.created_at）；评分 = 当日被评分岗位数（jobs.scored_at，
+    含重评）；投递 = 当日发送类动作数（history: sent/manual_sent/resume_sent）。
+    此前趋势图依赖 history 台账，但采集/评分流程从不写 history，两条线恒为零。
+    """
+    from datetime import datetime, timedelta
+
+    window = f"-{max(int(days), 1) - 1} days"
+    counts: dict[str, dict[str, int]] = {}
+    today = datetime.now().astimezone().date()
+    for offset in range(max(int(days), 1) - 1, -1, -1):
+        day = (today - timedelta(days=offset)).isoformat()
+        counts[day] = {"scraped": 0, "scored": 0, "sent": 0}
+
+    queries = {
+        "scraped": (
+            "SELECT date(created_at, 'localtime') AS day, COUNT(*) AS cnt FROM jobs "
+            "WHERE deleted_at IS NULL AND created_at IS NOT NULL "
+            "AND date(created_at, 'localtime') >= date('now', 'localtime', ?) GROUP BY day"
+        ),
+        "scored": (
+            "SELECT date(scored_at, 'localtime') AS day, COUNT(*) AS cnt FROM jobs "
+            "WHERE deleted_at IS NULL AND scored_at IS NOT NULL "
+            "AND date(scored_at, 'localtime') >= date('now', 'localtime', ?) GROUP BY day"
+        ),
+        "sent": (
+            "SELECT date(h.created_at, 'localtime') AS day, COUNT(*) AS cnt "
+            "FROM history h JOIN jobs j ON h.job_id = j.id "
+            "WHERE h.action IN ('sent', 'manual_sent', 'resume_sent') AND j.deleted_at IS NULL "
+            "AND date(h.created_at, 'localtime') >= date('now', 'localtime', ?) GROUP BY day"
+        ),
+    }
+    for key, sql in queries.items():
+        for row in conn.execute(sql, (window,)):
+            bucket = counts.get(str(row["day"]))
+            if bucket is not None:
+                bucket[key] = int(row["cnt"])
+    return [{"day": day, **counts[day]} for day in counts]
+
+
 def get_top_companies(conn: sqlite3.Connection, limit: int = 5) -> list[dict]:
     """Get top companies by average score."""
     rows = conn.execute("""

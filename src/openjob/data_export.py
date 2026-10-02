@@ -17,6 +17,7 @@ _ALLOWED_DATA_ENTRIES = (
     "resume_materials.index.json",
     "usage.jsonl",
     "weekly_reports",
+    "assets",  # 公司 Logo（jobs.company_logo_path 指向 data/assets/logos/，迁移恢复必需）
 )
 
 
@@ -63,7 +64,7 @@ def build_export_archive(base_dir: Path, *, include_resumes: bool = True) -> byt
         archive.writestr(
             "EXPORT-MANIFEST.txt",
             "OpenJob 全量数据导出\n"
-            "内容：openjob.db 快照 + data/ 白名单成员（简历产物/素材库/用量/周报）\n"
+            "内容：openjob.db 快照 + data/ 白名单成员（简历产物/素材库/用量/周报/公司Logo）\n"
             "恢复：解压后把 openjob.db 放回 data/，其余按目录对应放置\n"
             "注意：本包不含 config.yaml（API Key 只存在本地 config.yaml，请自行安全保管）\n"
             f"导出时间：{__import__('datetime').datetime.now().isoformat(timespec='seconds')}\n",

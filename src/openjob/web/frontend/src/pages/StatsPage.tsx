@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Building2, GraduationCap, MapPin, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CompanyAvatar } from '@/components/jobs/CompanyAvatar'
 import { useIsDarkTheme } from '@/components/brand/Brand'
 
 interface NameCount {
   name: string
   count: number
+  logo_path?: string
 }
 
 interface MarketStats {
@@ -158,7 +160,7 @@ function ChipCloud({ items, accent = false }: { items: NameCount[]; accent?: boo
   )
 }
 
-function RankList({ items }: { items: NameCount[] }) {
+function RankList({ items, logoByName }: { items: NameCount[]; logoByName?: Record<string, string> }) {
   const peak = Math.max(...items.map(i => i.count), 1)
   return (
     <ol className="space-y-2">
@@ -172,6 +174,9 @@ function RankList({ items }: { items: NameCount[] }) {
           >
             {i + 1}
           </span>
+          {logoByName?.[item.name] && (
+            <CompanyAvatar company={item.name} logoPath={logoByName[item.name]} size={20} />
+          )}
           <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{item.name}</span>
           <div className="hidden h-1.5 w-20 overflow-hidden rounded-full bg-surface-hover sm:block">
             <div className="h-full rounded-full bg-primary/55" style={{ width: `${Math.round((item.count / peak) * 100)}%` }} />
@@ -362,7 +367,10 @@ export default function StatsPage() {
         {stats.top_companies && stats.top_companies.length > 0 && (
           <div className="xl:col-span-3">
             <ModuleCard title="岗位最多的公司">
-              <RankList items={stats.top_companies.slice(0, 6)} />
+              <RankList
+                items={stats.top_companies.slice(0, 6)}
+                logoByName={Object.fromEntries(stats.top_companies.filter(c => c.logo_path).map(c => [c.name, c.logo_path as string]))}
+              />
             </ModuleCard>
           </div>
         )}

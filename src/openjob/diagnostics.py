@@ -136,6 +136,47 @@ def check_risk_lock(base_dir: Path) -> dict[str, str]:
     return _result("风控状态", PASS, f"曾有记录（{row['reason']}）但已过期")
 
 
+def check_company_profile_coverage(base_dir: Path) -> dict[str, str]:
+    """公司画像覆盖率：两条信号——近期采集岗位是否带画像（采集端失效检测），
+    整体占比（存量回填进度）。Boss 改版导致画像静默失效时在此第一时间暴露。"""
+    db_path = base_dir / "data" / "openjob.db"
+    if not db_path.exists():
+        return _result("公司画像覆盖", PASS, "尚无数据库，跳过")
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            boss_total, with_logo, with_intro = conn.execute(
+                "SELECT COUNT(*), SUM(company_logo_path != ''), SUM(company_intro != '') FROM jobs "
+                "WHERE deleted_at IS NULL AND source_platform = 'boss'"
+            ).fetchone()
+            recent_total, recent_intro = conn.execute(
+                "SELECT COUNT(*), SUM(company_intro != '') FROM ("
+                "SELECT company_intro FROM jobs WHERE deleted_at IS NULL AND source_platform = 'boss' "
+                "ORDER BY created_at DESC LIMIT 30)"
+            ).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return _result("公司画像覆盖", WARN, "无法读取岗位表（旧库缺画像列）", "打开一次工作台完成自动迁移")
+    boss_total = int(boss_total or 0)
+    if boss_total == 0:
+        return _result("公司画像覆盖", PASS, "暂无 BOSS 岗位")
+    recent_total = int(recent_total or 0)
+    recent_intro = int(recent_intro or 0)
+    if recent_total >= 5 and recent_intro == 0:
+        return _result(
+            "公司画像覆盖", WARN,
+            f"最近 {recent_total} 条岗位均无公司简介——画像采集可能已失效（Boss 改版？）",
+            "跑一次采集观察新岗位；用 scripts/debug_company_profile.py 复核选择器",
+        )
+    logo_pct = int(with_logo or 0) * 100 // boss_total
+    intro_pct = int(with_intro or 0) * 100 // boss_total
+    note = f"近期采集画像正常；整体简介覆盖 {intro_pct}%、Logo 覆盖 {logo_pct}%"
+    if logo_pct < 60:
+        note += "（存量回填进行中，openjob company-enrich --apply 可补齐）"
+    return _result("公司画像覆盖", PASS, note)
+
+
 def check_schedule(base_dir: Path) -> dict[str, str]:
     config_path = base_dir / "config.yaml"
     try:
@@ -162,6 +203,7 @@ def run_doctor(base_dir: Path, config: dict, chrome_checker: Callable[[], dict] 
         check_backup(base_dir),
         check_risk_lock(base_dir),
         check_schedule(base_dir),
+        check_company_profile_coverage(base_dir),
     ]
 
 

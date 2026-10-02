@@ -1081,8 +1081,8 @@ def api_market_stats():
 	db = _get_web_db()
 	try:
 		rows = db.execute(
-			f"SELECT company, salary, city, education, experience, recruitment_type, source_platform, jd "
-			f"FROM jobs WHERE {where}"
+			f"SELECT company, salary, city, education, experience, recruitment_type, source_platform, jd, "
+			f"company_logo_path FROM jobs WHERE {where}"
 		).fetchall()
 	finally:
 		db.close()
@@ -1128,6 +1128,22 @@ def api_stats():
 	try:
 		data = get_stats(db)
 		return _json_response(data)
+	finally:
+		db.close()
+
+
+@app.route("/api/trends")
+def api_trends():
+	try:
+		days = int(request.params.get("days", 7))
+	except (TypeError, ValueError):
+		days = 7
+	days = min(max(days, 1), 30)
+	db = _get_web_db()
+	try:
+		from openjob.db import get_weekly_trends
+
+		return _json_response(get_weekly_trends(db, days))
 	finally:
 		db.close()
 

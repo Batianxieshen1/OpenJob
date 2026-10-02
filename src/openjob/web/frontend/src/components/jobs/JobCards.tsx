@@ -246,7 +246,7 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
           <div>
             <div className="text-xs font-semibold tracking-[0.18em] text-primary">岗位详情</div>
             <h3 className="mt-1 flex items-center gap-2.5 text-xl font-semibold md:text-2xl">
-              <CompanyAvatar job={job} size={34} />
+              <CompanyAvatar company={job.company} logoPath={job.company_logo_path} size={34} />
               {job.company}｜{job.title}
             </h3>
             <p className="mt-1 text-sm text-muted">{job.salary || '薪资未填'} · {job.city || '城市未填'} · {getStatusLabel(job.status)}</p>
@@ -342,7 +342,7 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject, fli
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <CompanyAvatar job={job} size={38} />
+          <CompanyAvatar company={job.company} logoPath={job.company_logo_path} size={38} />
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="truncate font-semibold text-foreground">{job.company}</span>
