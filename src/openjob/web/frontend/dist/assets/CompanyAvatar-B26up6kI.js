@@ -1,0 +1,6 @@
+import{f as s,h as c,j as d}from"./index-DV8gH2No.js";/**
+ * @license lucide-react v0.378.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const l=s("Building2",[["path",{d:"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z",key:"1b4qmf"}],["path",{d:"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2",key:"i71pzd"}],["path",{d:"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2",key:"10jefs"}],["path",{d:"M10 6h4",key:"1itunk"}],["path",{d:"M10 10h4",key:"tcdvrf"}],["path",{d:"M10 14h4",key:"kelpxr"}],["path",{d:"M10 18h4",key:"1ulq68"}]]);function u({company:n,logoPath:e,size:t=20}){const[i,o]=c.useState(!1),r=e?e.split("/").pop():"",a=r?`/company-logos/${r}`:"";if(a&&!i)return d.jsx("img",{src:a,alt:"","aria-hidden":!0,width:t,height:t,onError:()=>o(!0),className:`shrink-0 border border-card-border bg-card object-cover ${t>=28?"rounded-lg":"rounded-md"}`});const h=(n||"?").trim().charAt(0).toUpperCase()||"?";return d.jsx("span",{"aria-hidden":!0,style:{width:t,height:t,fontSize:Math.max(10,Math.round(t*.45))},className:`flex shrink-0 items-center justify-center bg-primary/12 font-semibold text-primary ${t>=28?"rounded-lg":"rounded-md"}`,children:h})}export{l as B,u as C};

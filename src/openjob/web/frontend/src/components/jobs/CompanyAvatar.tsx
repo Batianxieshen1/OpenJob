@@ -1,13 +1,21 @@
 import { useState } from 'react'
-import type { Job } from '@/hooks/useDashboard'
 
 /**
  * 公司头像：优先展示采集落盘的 BOSS Logo（/company-logos/ 静态路由），
  * 加载失败或未采集时回退"公司首字 + 主题色圆底"，两主题下均可读。
+ * 独立 props 设计：岗位卡传 job 字段，统计页 top 公司榜也能复用。
  */
-export function CompanyAvatar({ job, size = 20 }: { job: Job; size?: number }) {
+export function CompanyAvatar({
+  company,
+  logoPath,
+  size = 20,
+}: {
+  company: string
+  logoPath?: string | null
+  size?: number
+}) {
   const [failed, setFailed] = useState(false)
-  const filename = job.company_logo_path ? job.company_logo_path.split('/').pop() : ''
+  const filename = logoPath ? logoPath.split('/').pop() : ''
   const src = filename ? `/company-logos/${filename}` : ''
   if (src && !failed) {
     return (
@@ -22,7 +30,7 @@ export function CompanyAvatar({ job, size = 20 }: { job: Job; size?: number }) {
       />
     )
   }
-  const initial = (job.company || '?').trim().charAt(0).toUpperCase() || '?'
+  const initial = (company || '?').trim().charAt(0).toUpperCase() || '?'
   return (
     <span
       aria-hidden

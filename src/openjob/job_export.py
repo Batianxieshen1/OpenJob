@@ -35,6 +35,8 @@ EXPORT_COLUMNS = [
 	("HR 活跃度", "hr_active"),
 	("公司规模", "company_size"),
 	("公司行业", "company_industry"),
+	("公司简介", "company_intro"),
+	("公司主页", "company_intro_url"),
 	("岗位链接", "url"),
 	("预筛分", "quick_score"),
 	("AI 分数", "score"),

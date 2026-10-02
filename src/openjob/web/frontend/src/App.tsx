@@ -55,7 +55,8 @@ export default function App() {
       if (new URLSearchParams(window.location.search).get('splash') === '1') {
         return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
       }
-      const today = new Date().toISOString().slice(0, 10)
+      // 本地日（非 UTC）：UTC 日期会让凌晨 0-8 点被算作"昨天"而跳过进入页
+      const today = new Date().toLocaleDateString('sv-SE')
       if (localStorage.getItem('openjob-splash-seen') === today) return false
       localStorage.setItem('openjob-splash-seen', today)
       return !window.matchMedia('(prefers-reduced-motion: reduce)').matches

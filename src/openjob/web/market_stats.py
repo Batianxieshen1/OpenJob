@@ -99,7 +99,7 @@ def compute_market_stats(rows: list[dict]) -> dict:
     salary_order = [label for label, _ in _SALARY_BUCKETS] + ["未标注"]
     salary_list = [{"name": k, "count": salary[k]} for k in salary_order if salary[k] > 0]
 
-    return {
+    payload = {
         "total": total,
         "platform": top(platform, 5),
         "city": top(city, 10),
@@ -111,3 +111,15 @@ def compute_market_stats(rows: list[dict]) -> dict:
         "skill_freq": top(skill_freq, 15),
         "welfare_freq": top(welfare_freq, 12),
     }
+    # 公司榜附带 Logo 路径：有画像的公司在排行榜显示头像，无则前端回退排名徽章
+    logo_by_company: dict[str, str] = {}
+    for row in rows:
+        path = str(row.get("company_logo_path") or "")
+        name = str(row.get("company") or "")
+        if path and name and name not in logo_by_company:
+            logo_by_company[name] = path
+    for entry in payload["top_companies"]:
+        logo = logo_by_company.get(str(entry["name"]))
+        if logo:
+            entry["logo_path"] = logo
+    return payload

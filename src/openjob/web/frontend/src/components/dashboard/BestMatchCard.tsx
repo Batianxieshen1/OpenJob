@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react'
+import { CompanyAvatar } from '@/components/jobs/CompanyAvatar'
 import type { Job } from '@/hooks/useDashboard'
 
 /** 最佳匹配卡：今日评分最高的 1–3 个岗位，公司首字母圆形标做视觉焦点 */
@@ -16,12 +17,7 @@ export function BestMatchCard({ jobs }: { jobs: Job[] }) {
       {best ? (
         <>
           <div className="mt-3 flex items-center gap-3">
-            <span
-              aria-hidden
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ink text-base font-bold text-shell"
-            >
-              {(best.company || '岗').slice(0, 1)}
-            </span>
+            <CompanyAvatar company={best.company} logoPath={best.company_logo_path} size={44} />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-foreground">{best.company}｜{best.title}</div>
               <div className="mt-0.5 truncate text-xs text-muted">{best.salary || '薪资面议'} · {best.city || '未知城市'}</div>
@@ -33,7 +29,10 @@ export function BestMatchCard({ jobs }: { jobs: Job[] }) {
             <ul className="mt-3 space-y-1.5 border-t border-card-border pt-3">
               {top.slice(1).map(job => (
                 <li key={job.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate text-muted">{job.company}｜{job.title}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <CompanyAvatar company={job.company} logoPath={job.company_logo_path} size={18} />
+                    <span className="truncate text-muted">{job.company}｜{job.title}</span>
+                  </span>
                   <span className="shrink-0 font-semibold text-primary tabular-nums">{job.score || '-'}</span>
                 </li>
               ))}

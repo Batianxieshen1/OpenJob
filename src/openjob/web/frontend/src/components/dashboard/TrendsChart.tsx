@@ -1,4 +1,3 @@
-import { parseUtc } from "@/lib/datetime"
 import { useEffect, useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
@@ -10,36 +9,27 @@ interface TrendsPoint {
   isToday: boolean
 }
 
-const SCRAPE_ACTIONS = new Set(['scrape'])
-const SCORE_ACTIONS = new Set(['scored', 'filtered'])
-const SEND_ACTIONS = new Set(['sent', 'manual_sent', 'resume_sent'])
+interface TrendsRow {
+  day: string
+  scraped: number
+  scored: number
+  sent: number
+}
 
-function buildSeries(records: Array<{ action: string; created_at: string }>): TrendsPoint[] {
+function toPoints(rows: TrendsRow[]): TrendsPoint[] {
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const buckets: TrendsPoint[] = []
-  for (let offset = 6; offset >= 0; offset -= 1) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - offset)
-    buckets.push({
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      scraped: 0,
-      scored: 0,
-      sent: 0,
-      isToday: offset === 0,
-    })
-  }
-  const index = new Map(buckets.map((b, i) => [b.label, i]))
-  for (const record of records) {
-    const created = parseUtc(record.created_at)
-    if (!created) continue
-    const i = index.get(`${created.getMonth() + 1}/${created.getDate()}`)
-    if (i === undefined) continue
-    if (SCRAPE_ACTIONS.has(record.action)) buckets[i].scraped += 1
-    else if (SCORE_ACTIONS.has(record.action)) buckets[i].scored += 1
-    else if (SEND_ACTIONS.has(record.action)) buckets[i].sent += 1
-  }
-  return buckets
+  return (Array.isArray(rows) ? rows : []).map(row => {
+    const parts = String(row.day || '').split('-').map(Number)
+    const [year, month, day] = parts
+    const isToday = year === today.getFullYear() && month === today.getMonth() + 1 && day === today.getDate()
+    return {
+      label: `${month}/${day}`,
+      scraped: Number(row.scraped) || 0,
+      scored: Number(row.scored) || 0,
+      sent: Number(row.sent) || 0,
+      isToday,
+    }
+  })
 }
 
 function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number }>; label?: string }) {
@@ -57,18 +47,17 @@ function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: 
   )
 }
 
-/** 求职趋势：近 7 日采集/评分/投递三条曲线（本地 history 台账聚合） */
+/** 求职趋势：近 7 日采集/评分/投递三条曲线（/api/trends 服务端按本地日聚合） */
 export function TrendsChart() {
-  const [records, setRecords] = useState<Array<{ action: string; created_at: string }>>([])
+  const [rows, setRows] = useState<TrendsRow[]>([])
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       try {
-        const res = await fetch('/api/history?limit=300')
+        const res = await fetch('/api/trends')
         const data = await res.json()
-        const list = Array.isArray(data?.history) ? data.history : Array.isArray(data) ? data : []
-        if (!cancelled) setRecords(list)
+        if (!cancelled) setRows(Array.isArray(data) ? data : [])
       } catch {
         /* 静默 */
       }
@@ -81,7 +70,7 @@ export function TrendsChart() {
     }
   }, [])
 
-  const data = useMemo(() => buildSeries(records), [records])
+  const data = useMemo(() => toPoints(rows), [rows])
 
   const TodayTick = (props: { x?: number; y?: number; payload?: { value: string } }) => {
     const point = data.find(d => d.label === props.payload?.value)
