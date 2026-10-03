@@ -37,6 +37,8 @@ function applyTheme(theme: Theme) {
   root.classList.add('theme-anim')
   root.classList.toggle('dark', theme === 'dark')
   root.classList.toggle('light', theme === 'light')
+  // 浏览器沉浸顶栏/状态栏跟随主题（与 index.html 防闪脚本同一映射）
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#1C0F0D' : '#FBF8F1')
   window.setTimeout(() => root.classList.remove('theme-anim'), 250)
 }
 

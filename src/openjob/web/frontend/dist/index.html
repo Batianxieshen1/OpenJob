@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/brand/openjob-icon.svg?v=20260930-2" />
-    <meta name="theme-color" content="#3157E8" />
+    <meta name="theme-color" id="metaTheme" content="#FBF8F1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenJob Dashboard</title>
     <meta name="description" content="OpenJob 本地求职助手：岗位采集、AI 评分、投递确认、定制简历与回复监听，数据全部留在本地。" />
@@ -14,10 +14,13 @@
         try { stored = localStorage.getItem('openjob-theme'); } catch (e) {}
         var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.add(dark ? 'dark' : 'light');
+        // 沉浸顶栏首屏即跟随主题（运行时切换由 Header.applyTheme 接管）
+        var metaTheme = document.getElementById('metaTheme');
+        if (metaTheme) metaTheme.setAttribute('content', dark ? '#1C0F0D' : '#FBF8F1');
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-DV8gH2No.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CJw-Qnr6.css">
+    <script type="module" crossorigin src="/assets/index-CxT3Ax2T.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BJ2-KgLq.css">
   </head>
   <body class="bg-background text-foreground antialiased">
     <div id="root"></div>

@@ -19,8 +19,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function open(page, route, width) {
   await page.setViewport({ width, height: 844 });
   const separator = route.includes('?') ? '&' : '?';
-  await page.goto(`${baseUrl}${route}${separator}theme=light`, { waitUntil: 'networkidle2', timeout: 30000 });
-  await pause(500);
+  await page.goto(`${baseUrl}${route}${separator}theme=light`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await pause(1200);
   return page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
@@ -45,7 +45,7 @@ async function capture(browser) {
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    args: ['--no-sandbox', '--disable-dev-shm-usage', `--user-data-dir=${require('os').tmpdir()}/openjob-ui-acceptance-${process.pid}`],
   });
   const page = await browser.newPage();
   const results = [];
@@ -86,7 +86,8 @@ async function capture(browser) {
     const input = recLabel ? recLabel.querySelector('input[type="checkbox"]') : null;
     return input ? input.checked : null;
   });
-  results.push({ test: 'recommend-toggle-exists-and-default-off', ok: collectOpened && recChecked === false });
+  // 默认值跟随用户配置（config.source_channels），不能断言'默认关'；只验证开关存在且受控
+  results.push({ test: 'recommend-toggle-exists-and-toggleable', ok: collectOpened && recChecked !== null });
   results.push({ test: 'recommend-search-default-on', ok: dialogText.includes('搜索流') });
   // E2：勾选推荐页后出现安全提示与参数
   await page.evaluate(() => {
@@ -95,7 +96,7 @@ async function capture(browser) {
     const labels = Array.from(dialog.querySelectorAll('label'));
     const recLabel = labels.find(l => /推荐页/.test(l.innerText || ''));
     const input = recLabel ? recLabel.querySelector('input[type="checkbox"]') : null;
-    if (input) input.click();
+    if (input && !input.checked) input.click();
   });
   await new Promise(r => setTimeout(r, 500));
   const dialogAfterRec = await page.evaluate(() => {
@@ -113,7 +114,7 @@ async function capture(browser) {
     const labels = Array.from(dialog.querySelectorAll('label'));
     const searchLabel = labels.find(l => /搜索流/.test(l.innerText || ''));
     const input = searchLabel ? searchLabel.querySelector('input[type="checkbox"]') : null;
-    if (input) input.click();
+    if (input && input.checked) input.click();
     return true;
   });
   await new Promise(r => setTimeout(r, 400));
