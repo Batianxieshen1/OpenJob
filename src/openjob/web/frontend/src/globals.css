@@ -521,6 +521,36 @@ main,
 @media (prefers-reduced-motion: reduce) { .nav-icon { animation: none; } }
 
 /* ── 确认制"拍板"仪式：投递成功墨点爆点（fixed 视口坐标，双主题走 --accent） ── */
+/* 拍板钤印：朱砂"准"印落定（呼应"AI 只建议，你拍板"——印落 + 墨点迸溅同帧） */
+.deliver-seal {
+  position: fixed;
+  z-index: 90;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgb(var(--accent));
+  color: #fbf8f1;
+  font-family: 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0;
+  box-shadow: 0 6px 18px rgb(var(--accent) / 0.45), inset 0 0 0 2px rgb(251 248 241 / 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(1.7) rotate(6deg);
+  animation: deliver-seal-stamp 950ms var(--ease-product) both;
+}
+@keyframes deliver-seal-stamp {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.7) rotate(6deg); }
+  34% { opacity: 1; transform: translate(-50%, -50%) scale(0.94) rotate(-8deg); }
+  52% { transform: translate(-50%, -50%) scale(1.05) rotate(-8deg); }
+  68% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-8deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.98) rotate(-8deg); }
+}
+
 .wb-ink-dot {
   position: fixed; width: var(--s, 4px); height: var(--s, 4px); border-radius: 50%;
   background: rgb(var(--accent)); opacity: 0; pointer-events: none; z-index: 400;

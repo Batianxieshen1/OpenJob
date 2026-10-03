@@ -104,6 +104,19 @@ function BatchConfirmDialog({
   )
 }
 
+/** 拍板钤印：朱砂"准"印落定（reduced-motion 用户跳过） */
+function spawnDeliverSeal(x: number, y: number) {
+  if (typeof window === 'undefined') return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const seal = document.createElement('span')
+  seal.className = 'deliver-seal'
+  seal.textContent = '准'
+  seal.style.left = x + 'px'
+  seal.style.top = y + 'px'
+  document.body.appendChild(seal)
+  window.setTimeout(() => seal.remove(), 1000)
+}
+
 function spawnDeliverBurst(x: number, y: number) {
   if (typeof window === 'undefined') return
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -222,6 +235,7 @@ export default function ConfirmQueuePage() {
       )
       if (btnBox) {
         spawnDeliverBurst(btnBox.left + btnBox.width / 2, btnBox.top + btnBox.height / 2)
+        spawnDeliverSeal(btnBox.left + btnBox.width / 2, btnBox.top + btnBox.height / 2)
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '投递失败')
