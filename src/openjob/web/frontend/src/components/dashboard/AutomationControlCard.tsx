@@ -23,7 +23,7 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
   return (
     <section className={`flex min-h-[212px] flex-col rounded-module p-5 shadow-card transition-soft ${
       dark
-        ? 'bg-ink text-shell shadow-pop dark:bg-[#1B2237] dark:text-white dark:shadow-[0_0_0_1px_rgb(96_130_255/0.25),0_16px_40px_rgb(0_0_0/0.45)]'
+        ? 'bg-ink text-shell shadow-pop dark:bg-accent-soft dark:text-foreground dark:shadow-[0_0_0_1px_rgb(var(--accent)/0.3),0_16px_40px_rgb(0_0_0/0.45)]'
         : 'border border-card-border bg-card text-foreground'
     }`}>
       <div className="flex flex-wrap items-start justify-between gap-2">

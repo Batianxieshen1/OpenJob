@@ -100,7 +100,7 @@ export function DashboardHero({
     <section className="press-head relative flex min-h-[212px] flex-col justify-between overflow-hidden rounded-module border border-card-border bg-card p-6 shadow-card">
       {/* 夜间余烬尘：晨刊白天干净，绛夜夜里飘火星 */}
       <EmberCanvas />
-      {/* 背景装饰：柔和蓝晕 + 细网格，克制不抢内容 */}
+      {/* 背景装饰：柔和朱砂红晕 + 细网格，克制不抢内容 */}
       <div
         aria-hidden
         className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-accent-soft opacity-70 blur-2xl"

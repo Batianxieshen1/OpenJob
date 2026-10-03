@@ -24,10 +24,6 @@
   --danger: 229 72 77;         /* #E5484D */
 
   /* 品牌渐变令牌：只用于 Logo/空状态/少量视觉强调，不参与交互语义 */
-  --brand-blue: 212 61 42;        /* #D43D2A 朱砂 */
-  --brand-purple: 232 101 74;     /* #E8654A 朱砂亮 */
-  --brand-pink: 217 154 78;       /* #D99A4E 琥珀 */
-  --brand-orange: 232 160 142;    /* #E8A08E 暖玫瑰 */
 
   --radius-control: 10px;
   --radius-card: 18px;
@@ -409,7 +405,7 @@ body::after {
 
 /* 环境光：底部蓝晕缓缓升到中部（背景的"呼吸"，非装饰粒子） */
 .splash-glow {
-  background: radial-gradient(560px 300px at 50% 118%, rgb(79 124 255 / 0.42), transparent 70%);
+  background: radial-gradient(560px 300px at 50% 118%, rgb(var(--accent) / 0.35), transparent 70%);
   animation: splash-glow-rise 1.5s var(--ease-product) both;
 }
 @keyframes splash-glow-rise {
@@ -425,7 +421,7 @@ body::after {
   bottom: -10px;
   height: 2px;
   border-radius: 99px;
-  background: linear-gradient(90deg, transparent, rgb(122 162 255 / 0.9), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--accent) / 0.9), transparent);
   transform: scaleX(0);
   animation: splash-rule-in 460ms var(--ease-product) 420ms both;
 }
