@@ -43,9 +43,9 @@ class GreetingSourceRegressionTests(unittest.TestCase):
             db.close()
 
             context = greeter.GreetingContext(
-                resume_summary="陈默｜岭南大学｜大数据管理与应用",
+                resume_summary="陈默｜岭南师范大学｜大数据管理与应用",
                 material_context="素材：用 STAR 写出的真实经历",
-                trusted_text="陈默 岭南大学 大数据管理与应用 用 STAR 写出的真实经历",
+                trusted_text="陈默 岭南师范大学 大数据管理与应用 用 STAR 写出的真实经历",
                 source={"base_resume_id": "base-1"},
             )
             captured = {}
