@@ -253,6 +253,39 @@ class CollectorEnrichTests(unittest.TestCase):
             self.assertEqual(len(harness.company_navs), 1)
             self.assertEqual(fetch_mock.call_count, 1)
 
+    def test_collector_reuses_stocked_company_profile(self):
+        """库里已有同公司画像（旧岗位采过）→ 新岗位零额外访问：不进公司页、不重拉图。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            logo_rel = f"assets/logos/{logo_file_key('美的')}.png"
+            harness = _EnrichBrowserHarness({
+                "job-a.html": self._detail("美的"),
+                "job-b.html": self._detail("美的"),
+            })
+            db_path = Path(tmp) / "openjob.db"
+            (Path(tmp) / logo_rel).parent.mkdir(parents=True, exist_ok=True)
+            (Path(tmp) / logo_rel).write_bytes(PNG_BYTES)  # 库存 Logo 文件真实存在才复用
+            safety_conn = get_db(db_path)
+            try:
+                insert_job_if_new(safety_conn, _job_record(
+                    "stock-1", "美的",
+                    company_intro="库内已有简介", company_intro_url="https://www.zhipin.com/gongsi/stock.html",
+                    company_logo_path=logo_rel,
+                ))
+                result, collected, fetch_mock = self._collect(
+                    harness, tmp, safety_conn=safety_conn,
+                )
+            finally:
+                safety_conn.close()
+            self.assertEqual(result.status, "completed")
+            self.assertEqual(len(collected), 2)
+            for candidate in collected:
+                self.assertEqual(candidate.company_intro, "库内已有简介")
+                self.assertEqual(candidate.company_logo_path, logo_rel)
+            # 零额外访问：不进公司主页、不重拉图床
+            self.assertEqual(len(harness.company_navs), 0)
+            fetch_mock.assert_not_called()
+            # 库存 Logo 文件缺失时应回退重新拉取（_logo_file_exists 把关），正例已由上方覆盖。
+
     def test_collector_skips_company_page_when_intro_disabled(self):
         with tempfile.TemporaryDirectory() as tmp:
             harness = _EnrichBrowserHarness({"job-a.html": self._detail("美的")})

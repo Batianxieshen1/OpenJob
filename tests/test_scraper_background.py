@@ -8,6 +8,18 @@ from openjob.web.server import _execute_collect
 from openjob.web.tasks import WorkbenchTask
 
 
+def _sqlite_db_for_stock_query():
+    """库存复用查询需要真实 sqlite 行为；其余交互（close 等）由测试自行断言。"""
+    import sqlite3
+    import tempfile
+    tmp = tempfile.mkdtemp()
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("CREATE TABLE jobs (id TEXT PRIMARY KEY, company TEXT, deleted_at TIMESTAMP, "
+                 "company_intro TEXT, company_intro_url TEXT, company_logo_path TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    return conn
+
+
 class ScraperBackgroundTests(unittest.TestCase):
     def test_stopped_collection_does_not_open_a_search_page(self):
         db = Mock()
@@ -61,7 +73,7 @@ class ScraperBackgroundTests(unittest.TestCase):
         self.assertEqual(task.snapshot()["metrics"], task.metrics)
 
     def test_scraper_reports_seen_new_and_duplicate_counts(self):
-        db = Mock()
+        db = _sqlite_db_for_stock_query()
         progress = Mock()
         progress.add_task.return_value = "task-1"
         progress_context = Mock()
@@ -109,7 +121,7 @@ class ScraperBackgroundTests(unittest.TestCase):
         })
 
     def test_search_and_detail_pages_reuse_one_background_worker_tab(self):
-        db = Mock()
+        db = _sqlite_db_for_stock_query()
         progress = Mock()
         progress.add_task.return_value = "task-1"
         progress_context = Mock()
