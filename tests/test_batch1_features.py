@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -82,6 +83,7 @@ class NotifyTests(unittest.TestCase):
         self.assertFalse(ok)
         run_mock.assert_not_called()
 
+    @unittest.skipUnless(sys.platform.startswith("win"), "PowerShell 通知仅 Windows 有意义（CI Linux 上跳过）")
     def test_invokes_powershell_with_encoded_command(self):
         from openjob.notify import notify_desktop
 
