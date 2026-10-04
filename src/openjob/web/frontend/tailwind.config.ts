@@ -16,7 +16,7 @@ export default {
         card: 'rgb(var(--surface) / <alpha-value>)',
         'card-border': 'rgb(var(--border-c) / <alpha-value>)',
         'surface-hover': 'rgb(var(--surface-hover) / <alpha-value>)',
-        'accent-soft': 'rgb(var(--accent-soft) / <alpha-value>)', // 整色浅蓝底
+        'accent-soft': 'rgb(var(--accent-soft) / <alpha-value>)', // 整色朱砂浅底
         primary: 'rgb(var(--accent) / <alpha-value>)',
         success: 'rgb(var(--success) / <alpha-value>)',
         warning: 'rgb(var(--warning) / <alpha-value>)',
