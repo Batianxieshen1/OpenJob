@@ -320,7 +320,7 @@ class DocxExportTests(unittest.TestCase):
                 "",
                 "## 教育背景",
                 "",
-                "- 华南师范大学 大数据管理与应用",
+                "- 岭南大学 大数据管理与应用",
                 "",
                 "## 相关经历",
                 "",
@@ -335,7 +335,7 @@ class DocxExportTests(unittest.TestCase):
             self.assertIn("王小明", round_trip)
             self.assertIn("教育背景", round_trip)
             self.assertIn("400+", round_trip)
-            self.assertIn("华南师范大学", round_trip)
+            self.assertIn("岭南大学", round_trip)
 
 
 class RewriteStyleGuardTests(unittest.TestCase):

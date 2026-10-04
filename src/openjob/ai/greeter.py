@@ -55,15 +55,15 @@ class GreetingFactError(ValueError):
 def _ensure_university_tag(greeting: str) -> str:
     """确定性后处理：学校名统一带 211 标记（用户明确要求的自报优势）。
 
-    - 「华南师范大学」→「华南师范大学（211）」（已有 211 标记则不动）；
-    - 简称「华南师大/华师」→「华南师范大学（211）」；
+    - 「岭南大学」→「岭南大学（211）」（已有 211 标记则不动）；
+    - 简称「岭南大/岭大」→「岭南大学（211）」；
     - 括号用全角，与底稿教育行写法一致。
     """
     text = str(greeting or "")
-    if "华南师范大学（211）" in text or "华南师范大学(211)" in text:
+    if "岭南大学（211）" in text or "岭南大学(211)" in text:
         return text
-    text = text.replace("华南师范大学", "华南师范大学（211）")
-    text = text.replace("华南师大", "华南师范大学（211）").replace("华师", "华南师范大学（211）")
+    text = text.replace("岭南大学", "岭南大学（211）")
+    text = text.replace("岭南大", "岭南大学（211）").replace("岭大", "岭南大学（211）")
     return text
 
 
@@ -186,7 +186,7 @@ def _style_only_preference(value: object, trusted_text: str = "") -> str:
     """过滤招呼语偏好中的身份性描述。
 
     安全语义（WP-S1）：偏好里的身份表述只有在**真实底稿/素材可回溯**时才放行
-    （用户明确要求的真实自报，如"华南师范大学（211）的大三学生"——学校/年级均
+    （用户明确要求的真实自报，如"岭南大学（211）的大三学生"——学校/年级均
     在教育经历行中）；无法回溯的身份表述（潜在编造）仍然剥离。
     """
     text = str(value or "").strip()

@@ -165,7 +165,7 @@ _IDENTITY_PATTERNS: tuple[tuple[re.Pattern, str], ...] = (
     (re.compile(r"[\u4e00-\u9fffA-Za-z]{2,30}(?:专业)"), "专业"),
 )
 
-# 身份捕获常带口语前缀（"我是华南师范大学"）；剥前缀后再回溯真实来源
+# 身份捕获常带口语前缀（"我是岭南大学"）；剥前缀后再回溯真实来源
 _IDENTITY_LEAD = re.compile(r"^(?:我是|我是的|来自|毕业于|就读于|作为|一名|一个)+")
 
 
@@ -193,11 +193,11 @@ def _is_generic_phrase(value: str) -> bool:
     return len(core) <= 2 or bool(re.search(r"[把在的了是个这和与就都帮]", core))
 
 
-# 常见学校简称 → 全称（简称不是全称的子串，如"华南师大"省略了"师范"，
+# 常见学校简称 → 全称（简称不是全称的子串，如"岭南大"省略了"师范"，
 # 子串覆盖永远接不住，必须显式映射；仅当全称在可信基线中出现时才展开）
 SCHOOL_ALIAS_EXPANSIONS: tuple[tuple[str, str], ...] = (
-    ("华南师大", "华南师范大学"),
-    ("华师", "华南师范大学"),
+    ("岭南大", "岭南大学"),
+    ("岭大", "岭南大学"),
 )
 
 
@@ -216,7 +216,7 @@ def _identity_in_trusted(value: str, trusted: str) -> bool:
         return False
     if stripped in trusted:
         return True
-    # 简称容忍（"华南师大"之于"华南师范大学"、"大数据管理"之于"大数据管理与应用"）：
+    # 简称容忍（"岭南大"之于"岭南大学"、"大数据管理"之于"大数据管理与应用"）：
     # 剥前缀后必须含一个可回溯的 4-6 字滑窗片段，且其余部分都能被 trusted 片段覆盖。
     if not trusted:
         return False

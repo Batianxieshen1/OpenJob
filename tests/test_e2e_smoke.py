@@ -19,7 +19,7 @@ from openjob.web import server
 BASE_MD = """冒烟测试底稿
 数据分析方向 | 广州
 教育经历
-华南师范大学 | 大数据管理与应用 | 本科
+岭南大学 | 大数据管理与应用 | 本科
 技能特长
 SQL | Python
 """
