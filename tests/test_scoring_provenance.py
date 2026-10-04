@@ -29,9 +29,9 @@ def db_env(tmp_path, monkeypatch):
 class TestResumeProvenance:
     def test_labels_trusted_file_source(self, tmp_path):
         p = tmp_path / "mine.md"
-        p.write_text("林庆涛 真实简历内容", encoding="utf-8")
+        p.write_text("陈默 真实简历内容", encoding="utf-8")
         config = {"profile": {"resume_path": str(p)}}
-        source, digest = scorer.resume_provenance(config, "林庆涛 真实简历内容")
+        source, digest = scorer.resume_provenance(config, "陈默 真实简历内容")
         assert source == f"file:{p}"
         assert len(digest) == 16
 
