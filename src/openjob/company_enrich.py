@@ -74,7 +74,6 @@ def run_company_enrich(
         daily_limit_override or collection_cfg.get("company_daily_page_limit", 30), 30
     )
     intro_max_chars = _positive_int(collection_cfg.get("company_intro_max_chars", 2000), 2000)
-    failure_limit = _positive_int(collection_cfg.get("company_failure_limit", 3), 3)
     data_dir = Path(db_path).parent
 
     failure_limit = _positive_int(collection_cfg.get("max_consecutive_page_failures", 3), 3)
