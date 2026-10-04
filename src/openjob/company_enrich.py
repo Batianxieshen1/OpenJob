@@ -77,6 +77,7 @@ def run_company_enrich(
     failure_limit = _positive_int(collection_cfg.get("company_failure_limit", 3), 3)
     data_dir = Path(db_path).parent
 
+    failure_limit = _positive_int(collection_cfg.get("max_consecutive_page_failures", 3), 3)
     risk_pause_min = _positive_int(collection_cfg.get("risk_pause_min_minutes", 5), 5)
     risk_pause_max = max(risk_pause_min, _positive_int(collection_cfg.get("risk_pause_max_minutes", 10), 10))
     pause_minutes = random.SystemRandom().randint(risk_pause_min, risk_pause_max)

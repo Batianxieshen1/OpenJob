@@ -357,6 +357,33 @@ class CompanyEnrichTests(unittest.TestCase):
                 self.assertTrue((Path(tmp) / row["company_logo_path"]).exists())
             conn.close()
 
+    def test_apply_survives_sample_page_failure(self):
+        """样本详情页打开失败 → 记 failed 继续下一家（回归：failure_limit 曾因重构丢失而 NameError）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._seed(tmp)
+            calls = {"n": 0}
+
+            def navigate(_target, url):
+                calls["n"] += 1
+                return calls["n"] > 1  # 第一家样本页失败，后续恢复
+
+            def evaluate(_target, script):
+                if "公司简介|公司介绍|企业介绍" in script:
+                    return json.dumps({"intro": " 格力是一家制造集团 "})
+                if ".job-sec-text" in script:
+                    return json.dumps({"company_page_url": "/gongsi/gree.html"})
+                return json.dumps({"risk": None})
+
+            with patch("openjob.company_enrich.new_tab", return_value="worker"),                  patch("openjob.company_enrich.close_tab", return_value=True),                  patch("openjob.company_enrich.navigate", navigate),                  patch("openjob.company_enrich.wait_for_load", return_value=True),                  patch("openjob.company_enrich.evaluate", evaluate),                  patch("openjob.company_enrich.PageThrottle", _NoWaitThrottle),                  patch("openjob.company_enrich.time.sleep", lambda _s: None):
+                summary = run_company_enrich({}, Path(tmp) / "openjob.db", apply=True)
+            self.assertEqual(summary["status"], "completed")
+            self.assertEqual(summary["failed"], 1)
+            self.assertEqual(summary["enriched"], 1)
+            conn = get_db(Path(tmp) / "openjob.db")
+            row = dict(conn.execute("SELECT company_intro FROM jobs WHERE company='格力' LIMIT 1").fetchone())
+            self.assertEqual(row["company_intro"], "格力是一家制造集团")
+            conn.close()
+
     def test_apply_blocked_on_captcha(self):
         with tempfile.TemporaryDirectory() as tmp:
             self._seed(tmp)
