@@ -6,6 +6,7 @@ import hashlib
 import json
 import random
 import re
+import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -243,6 +244,36 @@ class BossCollector:
         # Logo 落盘目录（data/）：None 时不转存，仅记录图床 URL（测试/降级路径）
         self.data_dir = Path(data_dir) if data_dir else None
 
+    def _stocked_profile(self, company: str) -> tuple[str, str, str] | None:
+        """跨运行库存：库里已有该公司画像则复用（旧岗位采集过 → 新岗位零额外访问）。"""
+        if self.safety_conn is None:
+            return None
+        try:
+            row = self.safety_conn.execute(
+                "SELECT "
+                "(SELECT company_intro FROM jobs WHERE company = ? AND deleted_at IS NULL "
+                "AND company_intro != '' ORDER BY created_at DESC LIMIT 1) AS intro, "
+                "(SELECT company_intro_url FROM jobs WHERE company = ? AND deleted_at IS NULL "
+                "AND company_intro_url IS NOT NULL AND company_intro_url != '' "
+                "ORDER BY created_at DESC LIMIT 1) AS intro_url, "
+                "(SELECT company_logo_path FROM jobs WHERE company = ? AND deleted_at IS NULL "
+                "AND company_logo_path != '' ORDER BY created_at DESC LIMIT 1) AS logo",
+                (company, company, company),
+            ).fetchone()
+        except sqlite3.Error:
+            return None
+        if not row:
+            return None
+        return str(row[0] or ""), str(row[1] or ""), str(row[2] or "")
+
+    def _logo_file_exists(self, logo_path: str) -> bool:
+        if not logo_path or self.data_dir is None:
+            return False
+        try:
+            return (Path(self.data_dir) / logo_path).is_file()
+        except OSError:
+            return False
+
     @staticmethod
     def resolve_city_code(city: str, request: PlatformCollectionRequest) -> str | None:
         return str(request.city_codes.get(city) or CITY_CODES.get(city) or "") or None
@@ -343,6 +374,14 @@ class BossCollector:
             company = candidate.company
             if not company:
                 return None
+            # 跨运行库存复用：库里已有简介/Logo 文件 → 直接播种缓存，省一次图床 GET 与公司页额度
+            stocked = self._stocked_profile(company)
+            if stocked:
+                stocked_intro, stocked_intro_url, stocked_logo = stocked
+                if stocked_intro and company not in company_intro_cache:
+                    company_intro_cache[company] = (stocked_intro, stocked_intro_url)
+                if stocked_logo and self._logo_file_exists(stocked_logo) and company not in company_logo_cache:
+                    company_logo_cache[company] = stocked_logo
             if enrich_logo and self.data_dir is not None and str(candidate.company_logo_url or ""):
                 if company not in company_logo_cache:
                     company_logo_cache[company] = ""
