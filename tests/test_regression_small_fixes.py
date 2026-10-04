@@ -481,12 +481,14 @@ class DashboardPageTests(unittest.TestCase):
         self.assertIn("采集时间：全部", filter_source)
         self.assertIn("近 3 天", filter_source)
         self.assertIn("近 7 天", filter_source)
-        self.assertIn("筛选结果", filter_source)
-        self.assertIn("重置筛选", filter_source)
-        self.assertIn("2xl:grid-cols-4", filter_source)
+        # 2f24d5c 视觉第二轮把筛选栏重构为 chips（状态选项来自 STATUS_LABELS），
+        # 本断言同步当前已验收 UI：旧断言（筛选结果/重置筛选/2xl:grid-cols-4）已随重构失效。
+        self.assertIn("岗位性质", filter_source)
+        self.assertIn("更多筛选", filter_source)
+        self.assertIn("重置", filter_source)
         self.assertNotIn("xl:grid-cols-8", filter_source)
         self.assertIn("flex-wrap", filter_source)
-        self.assertIn("min-w-0", filter_source)
+        self.assertIn("whitespace-nowrap", filter_source)
 
     def test_jobs_pool_uses_server_search_and_controlled_pagination(self):
         search_hook_source = (
