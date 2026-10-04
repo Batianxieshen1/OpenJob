@@ -27,7 +27,7 @@ from openjob.web import server
 BASE_MD = """李明明
 数据分析方向 | 广州
 教育经历
-岭南大学 | 大数据管理与应用 | 本科
+岭南师范大学 | 大数据管理与应用 | 本科
 项目经历
 • | 用户调研 | 独立设计问卷并回收有效样本 400 份 | 制作推文及海报通过朋友圈与小红书投放
 • | 分析交付 | 基于 Python Pandas 构建 Olist 电商数据集分析引擎 | 完成 9.8 万笔订单端到端分析
@@ -95,14 +95,14 @@ class GeneratedTextValidationTests(unittest.TestCase):
         self.assertTrue(any("包含示例/占位信息" in issue for issue in issues))
 
     def test_example_school_and_major_are_rejected(self):
-        trusted = "岭南大学 大数据管理与应用专业 用户调研 400 份"
+        trusted = "岭南师范大学 大数据管理与应用专业 用户调研 400 份"
         issues = validate_generated_text("我来自杭州某大学计算机专业", trusted)
         self.assertTrue(any("学校" in issue for issue in issues))
         self.assertTrue(any("专业" in issue for issue in issues))
 
     def test_real_school_from_base_passes(self):
-        trusted = "岭南大学大数据管理与应用专业 用户调研 400 份"
-        issues = validate_generated_text("岭南大学大数据管理与应用专业出身，做过用户调研", trusted)
+        trusted = "岭南师范大学大数据管理与应用专业 用户调研 400 份"
+        issues = validate_generated_text("岭南师范大学大数据管理与应用专业出身，做过用户调研", trusted)
         self.assertEqual(issues, [])
 
     def test_unauthorized_numbers_are_rejected(self):
