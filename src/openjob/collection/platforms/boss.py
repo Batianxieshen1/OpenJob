@@ -382,13 +382,15 @@ class BossCollector:
                     company_intro_cache[company] = (stocked_intro, stocked_intro_url)
                 if stocked_logo and self._logo_file_exists(stocked_logo) and company not in company_logo_cache:
                     company_logo_cache[company] = stocked_logo
-            if enrich_logo and self.data_dir is not None and str(candidate.company_logo_url or ""):
-                if company not in company_logo_cache:
-                    company_logo_cache[company] = ""
+            if enrich_logo and self.data_dir is not None:
+                # 库存命中（含旧岗位采过的公司）直接挂取，不依赖本页是否恰好暴露 Logo URL
+                if company in company_logo_cache:
+                    candidate.company_logo_path = company_logo_cache[company]
+                elif str(candidate.company_logo_url or ""):
                     fetched = fetch_company_logo(str(candidate.company_logo_url))
                     if fetched is not None:
                         company_logo_cache[company] = save_logo_file(self.data_dir, company, fetched[0], fetched[1])
-                candidate.company_logo_path = company_logo_cache[company]
+                    candidate.company_logo_path = company_logo_cache[company]
             if not enrich_intro:
                 return None
             if company in company_intro_cache:
