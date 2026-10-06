@@ -113,8 +113,8 @@ export function Header() {
             <span
               aria-hidden
               ref={sliderRef}
-              className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-ink shadow-pop transition-[transform,width] duration-300"
-              style={{ transitionTimingFunction: 'var(--ease-product)', width: sliderW || undefined, transform: `translateX(${sliderX}px)`, opacity: sliderW ? 1 : 0 }}
+              className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-ink shadow-pop transition-[transform,width] duration-150"
+              style={{ transitionTimingFunction: 'var(--ease-out-soft)', width: sliderW || undefined, transform: `translateX(${sliderX}px)`, opacity: sliderW ? 1 : 0 }}
             />
             {pillItems.map(item => (
               <NavLink
