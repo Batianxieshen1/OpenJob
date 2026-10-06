@@ -263,7 +263,8 @@ const markManuallySent = async (job: Job) => {
       `把已选的 ${count} 个岗位批量放行到确认队列吗？\n\n只对「已过滤」状态的岗位生效——你的判断会覆盖 AI 评分；其他状态的岗位会被跳过并提示原因。`
     )) return
     try {
-      const result = await postJobAction('/api/jobs/bulk-approve', { job_ids: selectedIds })
+      const envelope = await postJobAction('/api/jobs/bulk-approve', { job_ids: selectedIds })
+      const result = envelope?.data ?? envelope
       setSelectedIds([])
       setSealSize(72)
       setShowSeal(true)
@@ -350,9 +351,12 @@ const markManuallySent = async (job: Job) => {
     if (!approvePreview || batchApproving) return
     setBatchApproving(true)
     try {
-      const result = await postJobAction('/api/jobs/bulk-approve', { job_ids: approvePreview.ids })
+      const envelope = await postJobAction('/api/jobs/bulk-approve', { job_ids: approvePreview.ids })
+      const result = envelope?.data ?? envelope
       setSelectedIds([])
       setApprovePreview(null)
+      setSealSize(72)
+      setShowSeal(true)
       refreshJobs()
       const skippedCount = Array.isArray(result?.skipped) ? result.skipped.length : 0
       setNotice(`已放行 ${result?.approved_count ?? 0} 个岗位到确认队列${skippedCount ? `，跳过 ${skippedCount} 个` : ''}。`)
