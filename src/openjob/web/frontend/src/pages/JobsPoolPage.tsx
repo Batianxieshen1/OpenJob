@@ -1,7 +1,7 @@
 import { SealStamp } from "@/components/ui/SealStamp"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { Notice } from "@/components/ui/Notice"
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDashboard, type Job } from '@/hooks/useDashboard'
 import { useJobSearch, type JobSortKey, type JobSortOrder } from '@/hooks/useJobSearch'
@@ -14,7 +14,7 @@ import { JobDetailModal } from '@/components/jobs/JobCards'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { hasInvalidSalaryRange, EMPTY_JOB_FILTERS, filterJobs, type JobFilters } from '@/lib/jobFilters'
 import { getStatusLabel } from '@/lib/status'
-import { AlertTriangle, BriefcaseBusiness, Download, ExternalLink, Send, Eye, Trash2 } from 'lucide-react'
+import { AlertTriangle, BriefcaseBusiness, ChevronDown, Download, ExternalLink, Send, Eye, Trash2 } from 'lucide-react'
 
 function ExportMenu({
   onExport,
@@ -26,19 +26,59 @@ function ExportMenu({
   hasFiltered: boolean
 }) {
   const [format, setFormat] = useState<'xlsx' | 'csv'>('xlsx')
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (event: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+  const items: Array<{ scope: 'all' | 'filtered' | 'selected'; label: string; disabled: boolean }> = [
+    { scope: 'filtered', label: '导出筛选结果', disabled: !hasFiltered },
+    { scope: 'selected', label: '导出所选岗位', disabled: !hasSelection },
+    { scope: 'all', label: '导出全部岗位', disabled: false },
+  ]
   return (
-    <div className="ml-auto flex flex-wrap items-center gap-2">
-      <select
-        value={format}
-        onChange={event => setFormat(event.target.value as 'xlsx' | 'csv')}
-        className="rounded-xl border border-card-border bg-card px-2 py-2 text-xs outline-none focus:border-primary"
-      >
-        <option value="xlsx">XLSX</option>
-        <option value="csv">CSV</option>
-      </select>
-      <Button variant="secondary" size="sm" disabled={!hasFiltered} onClick={() => onExport(format, 'filtered')}>导出筛选结果</Button>
-      <Button variant="secondary" size="sm" disabled={!hasSelection} onClick={() => onExport(format, 'selected')}>导出所选岗位</Button>
-      <Button variant="secondary" size="sm" onClick={() => onExport(format, 'all')}>导出全部岗位</Button>
+    <div ref={wrapRef} className="relative ml-auto">
+      <Button variant="secondary" size="sm" aria-expanded={open} onClick={() => setOpen(prev => !prev)}>
+        导出（{format.toUpperCase()}）
+        <ChevronDown className={`ml-1 h-3.5 w-3.5 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} aria-hidden />
+      </Button>
+      {open && (
+        <div className="pop-in pop-origin-top absolute right-0 top-9 z-30 w-56 rounded-2xl border border-card-border bg-card p-2 shadow-pop">
+          <div className="mb-1.5 flex items-center gap-1.5 px-1.5">
+            <span className="text-[11px] font-semibold text-muted">格式</span>
+            <div className="ml-auto flex rounded-lg border border-card-border p-0.5">
+              {(['xlsx', 'csv'] as const).map(fmt => (
+                <button
+                  key={fmt}
+                  type="button"
+                  onClick={() => setFormat(fmt)}
+                  className={`rounded-md px-2.5 py-0.5 text-[11px] font-semibold transition-soft ${
+                    format === fmt ? 'bg-primary/15 text-primary' : 'text-muted hover:text-foreground'
+                  }`}
+                >
+                  {fmt.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          {items.map(item => (
+            <button
+              key={item.scope}
+              type="button"
+              disabled={item.disabled}
+              onClick={() => { onExport(format, item.scope); setOpen(false) }}
+              className="flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs text-foreground transition-soft hover:bg-accent-soft/60 disabled:opacity-40"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -502,7 +542,7 @@ const markManuallySent = async (job: Job) => {
     <div className="rounded-3xl border border-card-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="t-h1">岗位池</h2>
+          <h2 className="t-h1 hidden lg:block">岗位池</h2>
           <p className="mt-1 text-sm text-muted">集中查看已采集岗位、AI 分数、状态和详情入口。</p>
         </div>
         <div className="flex items-center gap-2">
@@ -549,7 +589,7 @@ const markManuallySent = async (job: Job) => {
           <Button variant="ghost" size="sm" onClick={() => void startQuickScoring()} disabled={quickScoring || !total}>
             {quickScoring ? '评分中…' : '一键 AI 评分'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowScoreDialog(true)}>评分选项</Button>
+          <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => setShowScoreDialog(true)}>评分选项</Button>
           <Button variant="ghost" size="sm" onClick={() => { setShowRecycleBin(true); void loadRecycleBin() }}><Trash2 className="mr-1 h-3.5 w-3.5" />回收站 ({recycleJobs.length})</Button>
           <ExportMenu onExport={exportJobs} hasSelection={selectedIds.length > 0} hasFiltered={total > 0} />
         </div>

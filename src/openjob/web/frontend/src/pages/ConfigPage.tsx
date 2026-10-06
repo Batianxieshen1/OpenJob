@@ -302,12 +302,9 @@ export default function ConfigPage() {
         </div>
 
         {/* Profile Section */}
-        <SectionCard title="个人信息" sectionKey="profile" expanded={expandedSections} toggle={toggleSection}>
+        <SectionCard title={<span className="inline-flex items-center gap-6">个人信息<span className="hidden sm:inline"><BrandLogo maxWidth={130} /></span></span>} sectionKey="profile" expanded={expandedSections} toggle={toggleSection}>
           <div className="space-y-4">
-            {/* 品牌识别：横向 Logo 按主题切换，宽度克制不抢配置主体 */}
-            <div className="hidden justify-end border-b border-card-border pb-3 sm:flex">
-              <BrandLogo maxWidth={150} />
-            </div>
+            {/* 品牌识别：与标题同行靠右，不再独占一行留空 */}
             {/* Resume upload */}
             <div>
               <label className="block text-xs text-foreground mb-2">简历文件</label>
@@ -821,7 +818,7 @@ export default function ConfigPage() {
 
 // Helper components
 function SectionCard({ title, sectionKey, expanded, toggle, children }: {
-  title: string; sectionKey: string; expanded: Record<string, boolean>; toggle: (k: string) => void; children: React.ReactNode
+  title: React.ReactNode; sectionKey: string; expanded: Record<string, boolean>; toggle: (k: string) => void; children: React.ReactNode
 }) {
   const isExpanded = expanded[sectionKey] ?? false
   return (

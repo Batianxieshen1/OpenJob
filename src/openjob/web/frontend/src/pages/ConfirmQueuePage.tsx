@@ -337,7 +337,7 @@ export default function ConfirmQueuePage() {
     <div className="mx-auto max-w-[1440px] space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="t-h1">投递确认</h1>
+          <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block t-h1">投递确认</h1>
           <p className="text-xs text-muted">
             这里是投递前的人工闸门：AI 只建议，你拍板。勾选岗位 → 一键投递 → 招呼语生成后按安全队列发送。
           </p>
