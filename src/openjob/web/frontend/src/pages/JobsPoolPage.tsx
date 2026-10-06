@@ -1,3 +1,4 @@
+import { SealStamp } from "@/components/ui/SealStamp"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { Notice } from "@/components/ui/Notice"
 import { useEffect, useMemo, useState } from 'react'
@@ -49,6 +50,8 @@ export default function JobsPoolPage() {
   const [filters, setFilters] = useState<JobFilters>({ ...EMPTY_JOB_FILTERS })
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchApproving, setBatchApproving] = useState(false)
+  const [showSeal, setShowSeal] = useState(false)
+  const [sealSize, setSealSize] = useState(72)
   const [approvePreview, setApprovePreview] = useState<{
     filteredCount: number
     skippedCount: number
@@ -222,6 +225,8 @@ const markManuallySent = async (job: Job) => {
     try {
       const result = await postJobAction('/api/jobs/bulk-approve', { job_ids: selectedIds })
       setSelectedIds([])
+      setSealSize(72)
+      setShowSeal(true)
       refreshJobs()
       const skippedCount = Array.isArray(result?.skipped) ? result.skipped.length : 0
       setNotice(
@@ -426,10 +431,11 @@ const markManuallySent = async (job: Job) => {
     }
   }
 
+  {showSeal && <SealStamp size={sealSize} onDone={() => setShowSeal(false)} />}
   // 放行预览弹窗：portal 提为变量，主视图与回收站两个分支都可渲染
   //（此前渲染在回收站分支早返回内，主视图点「放行筛选结果」看不到弹窗）
   const approvePreviewDialog = approvePreview && createPortal(
-    <div className="overlay-in fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
+    <div className="overlay-in veil fixed inset-0 z-[90] flex items-center justify-center p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !batchApproving) setApprovePreview(null) }}>
       <div role="dialog" aria-modal="true" aria-label="放行筛选结果确认" className="pop-in w-full max-w-lg rounded-3xl border border-card-border bg-card p-6 shadow-2xl">
         <h3 className="t-h2">批量放行筛选结果</h3>
         <ul className="mt-4 space-y-2 text-sm">
@@ -480,7 +486,7 @@ const markManuallySent = async (job: Job) => {
         />
         {approvePreviewDialog}
         {permanentDeleteIds.length > 0 && (
-          <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
+          <div className="overlay-in veil fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div className="pop-in w-full max-w-lg rounded-3xl border border-danger/30 bg-card p-6 shadow-2xl">
               <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-danger" /><div><h3 className="t-h2">确认永久删除</h3><p className="mt-2 text-sm leading-6 text-muted">将永久删除 {permanentDeleteIds.length} 条岗位及其历史，无法恢复。存在发送或回复证据的岗位会被后端拒绝删除。</p></div></div>
               <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-3 text-sm font-bold"><input type="checkbox" checked={permanentDeleteAcknowledged} onChange={event => setPermanentDeleteAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 accent-danger" /><span>我确认永久删除，并了解此操作无法撤销。</span></label>
