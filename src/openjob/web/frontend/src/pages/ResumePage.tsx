@@ -289,7 +289,7 @@ export default function ResumePage() {
     <div className="rise-in mx-auto max-w-[1440px] space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold">简历工作台</h1>
+          <h1 className="hidden text-lg font-bold lg:block">简历工作台</h1>
           <p className="text-xs text-muted">
             按 JD 定制简历：逐块审阅修改，确认后导出 PDF；发送永远由你手动完成。
             {baseName && <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-primary">底稿：{baseName}</span>}

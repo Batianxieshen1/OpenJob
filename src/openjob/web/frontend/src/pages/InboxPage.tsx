@@ -39,6 +39,13 @@ function formatTime(value: string) {
 }
 
 /** A3 回复工作台：聚合待处理会话，草稿只复制到剪贴板，绝不自动发送 */
+
+/** 疑似面试邀约判定：正文命中关键词即加权置顶（纯关键词零误伤成本，宁滥勿漏） */
+const INTERVIEW_RE = /面试|约面|线下见|方便视频|到店详聊|方便到访/
+function isInterviewish(conv: Conversation): boolean {
+  return conv.match_status !== 'matched' && INTERVIEW_RE.test(conv.last_message_snippet || '')
+}
+
 export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [unresolvedReplies, setUnresolvedReplies] = useState(0)
@@ -183,7 +190,7 @@ export default function InboxPage() {
   return (
     <div className="mx-auto max-w-[1440px] space-y-4">
       <header>
-        <h1 className="text-lg font-semibold">回复工作台</h1>
+        <h1 className="hidden text-lg font-semibold lg:block">回复工作台</h1>
         <p className="text-xs text-muted">
           HR 回复聚合在这里：监测自动回流 + 未匹配会话人工关联。草稿只生成文本供你复制到平台发送——OpenJob 永远不替你自动回复。
           另有 <span className="font-semibold text-primary tabular-nums">{unresolvedReplies}</span> 条历史待确认回复在「监测执行」页。
@@ -202,7 +209,8 @@ export default function InboxPage() {
         </div>
       ) : (
         <section className="space-y-3">
-          {conversations.map(conv => {
+          {/* 疑似面试邀约置顶（U-2），其余保持原序 */}
+          {[...conversations].sort((a, b) => Number(isInterviewish(b)) - Number(isInterviewish(a))).map(conv => {
             const badge = matchBadge(conv.match_status)
             const draft = drafts[conv.id]
             return (
@@ -212,7 +220,13 @@ export default function InboxPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-foreground">{conv.company || '未知公司'}</span>
                       {conv.hr_name && <span className="text-sm text-muted">{conv.hr_name}</span>}
-                      <Badge variant={badge.variant as any}>{badge.label}</Badge>
+                      {isInterviewish(conv) ? (
+                        <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+                          疑似面试邀约
+                        </span>
+                      ) : (
+                        <Badge variant={badge.variant as any}>{badge.label}</Badge>
+                      )}
                       {conv.job_id && <span className="text-xs text-muted">岗位：{conv.job_title || conv.job_id}</span>}
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">“{conv.last_message_snippet || '（无消息摘要）'}”</p>

@@ -157,9 +157,14 @@ export function ResumeMaterials({ config, updateConfig }: {
   return (
     <div className="space-y-4">
       <div className="space-y-1 text-xs leading-5 text-muted">
-        <p>启用后，生成定制简历时会根据 JD 匹配本地素材并记录引用来源。</p>
-        <p>素材库未上传时，系统会继续使用底稿原文，不会阻断生成。</p>
-        <p>关闭后，生成流程只使用简历底稿。素材只保存在本机，不会自动发送。</p>
+        <details className="mt-1">
+          <summary className="cursor-pointer select-none font-semibold">ℹ️ 素材库说明</summary>
+          <div className="mt-1.5 space-y-1 leading-5">
+            <p>启用后，生成定制简历时会根据 JD 匹配本地素材并记录引用来源。</p>
+            <p>素材库未上传时，系统会继续使用底稿短文，不会阻断生成。</p>
+            <p>关闭后，生成流程只使用简历底稿，素材只保存在本机，不会自动发送。</p>
+          </div>
+        </details>
       </div>
 
       {/* 状态行 */}
