@@ -1,3 +1,4 @@
+import { formatUtcTime } from "@/lib/datetime"
 import { useEffect, useMemo, useState } from 'react'
 import { useDashboard, type HistoryItem } from '@/hooks/useDashboard'
 import { Button } from '@/components/ui/button'
@@ -179,7 +180,7 @@ function MonitorExecutionView({ history, refresh }: { history: HistoryItem[]; re
           return (
             <div key={`${item.created_at}-${index}`} className="grid gap-3 rounded-2xl border border-card-border bg-surface-hover p-4 lg:grid-cols-[130px_1fr_160px]">
               <div className="text-xs text-muted">
-                <div>{item.created_at}</div>
+                <div>{formatUtcTime(item.created_at)}</div>
                 <div className="mt-2 rounded-full bg-card px-2 py-1 text-center font-bold text-primary">{getActionLabel(item.action)}</div>
               </div>
               <div>
