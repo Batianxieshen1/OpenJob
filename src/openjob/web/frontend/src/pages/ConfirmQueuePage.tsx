@@ -161,6 +161,8 @@ export default function ConfirmQueuePage() {
 
   const [tab, setTab] = useState<'confirm' | 'ready_to_send'>('confirm')
   const [sendSelected, setSendSelected] = useState<string[]>([])
+  const [sendPage, setSendPage] = useState(0)
+  const SEND_PAGE_SIZE = 15
   const [editingGreeting, setEditingGreeting] = useState<{ jobId: string; text: string } | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const debouncedQuery = useDebouncedValue(filters.query, 250)
@@ -400,8 +402,9 @@ export default function ConfirmQueuePage() {
               暂无待发送岗位。在「待确认生成」里确认的岗位生成招呼语后会出现在这里。
             </div>
           ) : (
-            <ul className="space-y-3">
-              {readyToSendJobs.map(job => (
+            <>
+            <ul className="stagger space-y-3">
+              {readyToSendJobs.slice(sendPage * SEND_PAGE_SIZE, (sendPage + 1) * SEND_PAGE_SIZE).map(job => (
                 <li key={job.id} className={cn(
                   'rounded-card border p-4 transition-soft',
                   sendSelected.includes(job.id) ? 'border-primary bg-accent-soft/40' : 'border-card-border bg-surface-hover'
@@ -450,6 +453,14 @@ export default function ConfirmQueuePage() {
                 </li>
               ))}
             </ul>
+            {readyToSendJobs.length > SEND_PAGE_SIZE && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted">
+                <Button variant="secondary" size="sm" disabled={sendPage === 0} onClick={() => setSendPage(p => Math.max(0, p - 1))}>上一页</Button>
+                <span className="tabular-nums">第 {sendPage + 1} / {Math.ceil(readyToSendJobs.length / SEND_PAGE_SIZE)} 页 · 共 {readyToSendJobs.length} 条</span>
+                <Button variant="secondary" size="sm" disabled={sendPage >= Math.ceil(readyToSendJobs.length / SEND_PAGE_SIZE) - 1} onClick={() => setSendPage(p => p + 1)}>下一页</Button>
+              </div>
+            )}
+            </>
           )}
         </section>
       ) : (

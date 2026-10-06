@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { BrandLogo } from '@/components/brand/Brand'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -123,10 +123,15 @@ export default function ResumePage() {
     }
   }, [])
 
+  const versionsSeqRef = useRef(0)
+  const detailSeqRef = useRef(0)
+
   const loadVersions = useCallback(async (jobId: string) => {
     if (!jobId) return
+    const seq = ++versionsSeqRef.current
     const res = await fetch(`/api/resume/${jobId}/versions`)
     const data = await res.json()
+    if (seq !== versionsSeqRef.current) return undefined
     setVersions(data.versions || [])
     if ((data.versions || []).length > 0) {
       return data.versions[0].id as string
@@ -138,13 +143,17 @@ export default function ResumePage() {
   }, [])
 
   const loadDetail = useCallback(async (resumeId: string) => {
+    const seq = ++detailSeqRef.current
     const res = await fetch(`/api/resume/version/${resumeId}`)
     if (!res.ok) {
-      setDetail(null)
-      setDiff([])
+      if (seq === detailSeqRef.current) {
+        setDetail(null)
+        setDiff([])
+      }
       return
     }
     const data: VersionDetail = await res.json()
+    if (seq !== detailSeqRef.current) return
     setDetail(data)
     if (data.base_resume_id) {
       try {

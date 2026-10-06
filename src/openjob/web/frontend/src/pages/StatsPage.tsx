@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Building2, GraduationCap, MapPin, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -210,17 +210,28 @@ const SCOPE_LABELS: Record<Scope, string> = {
 
 export default function StatsPage() {
   const [scope, setScope] = useState<Scope>('all')
+  const fetchSeqRef = useRef(0)
   const [stats, setStats] = useState<MarketStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    const seq = ++fetchSeqRef.current
     setLoading(true)
     fetch(`/api/market/stats?scope=${scope}`)
       .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(() => setError('市场数据加载失败，请稍后重试'))
-      .finally(() => setLoading(false))
+      .then(data => {
+        if (seq !== fetchSeqRef.current) return
+        setStats(data)
+        setError('')
+      })
+      .catch(() => {
+        if (seq !== fetchSeqRef.current) return
+        setError('市场数据加载失败，请稍后重试')
+      })
+      .finally(() => {
+        if (seq === fetchSeqRef.current) setLoading(false)
+      })
   }, [scope])
 
   const conclusions = useMemo(() => {
