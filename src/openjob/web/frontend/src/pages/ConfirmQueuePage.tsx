@@ -51,7 +51,7 @@ function BatchConfirmDialog({
   const total = jobs.length
 
   return createPortal(
-    <div className="overlay-in fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
+    <div className="overlay-in veil fixed inset-0 z-[90] flex items-center justify-center p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
       <div role="dialog" aria-modal="true" aria-label="批量确认" className="pop-in w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
         <h3 className="t-h2">{generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
         {generateOnly ? (

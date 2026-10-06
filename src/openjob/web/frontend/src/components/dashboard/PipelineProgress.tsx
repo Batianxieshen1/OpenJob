@@ -63,7 +63,7 @@ export function PipelineProgress({ funnelToday, pendingCount }: PipelineProgress
                     !done && !current && 'border-card-border bg-shell text-muted-3'
                   )}
                 >
-                  {done ? <Check className="h-3 w-3" /> : i + 1}
+                  {done ? <Check className="stamp-pop h-3 w-3" /> : i + 1}
                 </span>
                 <span className={cn('text-[11px] leading-none', done || current ? 'font-semibold text-foreground' : 'text-muted-3')}>
                   {stage.label}

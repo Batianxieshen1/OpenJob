@@ -231,7 +231,7 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
 
   return createPortal(
     <div
-      className="overlay-in fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm sm:p-6"
+      className="overlay-in veil fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
     >
       <div
@@ -327,7 +327,12 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject, fli
   return (
     <div
       data-flip-id={flipId}
-      className={`card-lift relative rounded-card border p-4 transition-soft ${
+      onPointerMove={event => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        event.currentTarget.style.setProperty('--mx', `${((event.clientX - rect.left) / rect.width) * 100}%`)
+        event.currentTarget.style.setProperty('--my', `${((event.clientY - rect.top) / rect.height) * 100}%`)
+      }}
+      className={`card-lift pointer-glow relative rounded-card border p-4 transition-soft ${
         overdue && !selected
           ? 'border-card-border bg-surface-hover opacity-75'
           : selected

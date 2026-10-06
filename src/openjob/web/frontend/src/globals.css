@@ -33,6 +33,7 @@
   --ease-product: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-quick: cubic-bezier(0.55, 0, 0.85, 0.4);   /* 离场快于入场 */
+  --ease-stamp: cubic-bezier(0.34, 1.56, 0.64, 1);     /* 印章敲定：微过冲回弹 */
   /* 节奏三档（2026-09-26 审计：全站单一时长 → 分层） */
   --dur-fast: 120ms;
   --dur-base: 200ms;
@@ -197,6 +198,61 @@ body::after {
   animation: breathe 2.4s var(--ease-product) infinite;
 }
 
+
+/* ── 金石质感（Gemini 方案一期）：钤印 / 拂光 / 节点 pop ── */
+
+/* 钤印：朱砂方印「准」敲定（stamp 曲线落地，微墨点散开） */
+@keyframes seal-stamp {
+  0% { opacity: 0; transform: scale(1.7) rotate(-8deg); }
+  55% { opacity: 1; transform: scale(0.92) rotate(2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes seal-fade {
+  to { opacity: 0; transform: scale(1.04) translateY(-8px); }
+}
+.seal-stamp {
+  animation: seal-stamp 380ms var(--ease-stamp) both;
+}
+.seal-stamp.seal-leaving {
+  animation: seal-fade 320ms var(--ease-in-quick) both;
+}
+
+/* 主按钮拂光：hover 时一道温润高光掠过（抛光漆面质感） */
+.btn-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.btn-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.22) 50%, transparent 70%);
+  transform: translateX(-160%) skewX(-14deg);
+  transition: transform 520ms var(--ease);
+  pointer-events: none;
+}
+.btn-sheen:hover::after {
+  transform: translateX(160%) skewX(-14deg);
+}
+
+/* 节点 pop：流程阶段达标时圆环被朱砂"注入灌满" */
+@keyframes stamp-pop {
+  0% { transform: scale(0.4); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.stamp-pop {
+  animation: stamp-pop 380ms var(--ease-stamp);
+}
+
+
+/* 宣纸揭帘：弹窗遮罩改绛夜暖底（替代冷黑） */
+.veil {
+  background: rgba(21, 13, 11, 0.55) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 /* ── 动效二期（M1 基建）：弹窗/下拉/离场/抬升/脉冲/勾选 ── */
 
 /* 弹窗与下拉内容弹入：从触发点"长出来"（onetake popIn） */
@@ -253,6 +309,33 @@ body::after {
 }
 .tick-pop {
   animation: tick-pop 280ms var(--ease-product) both;
+}
+
+
+/* 卡片边缘跟随微光：光标掠过时边缘划过一缕朱砂细光（平时是安静的纸面） */
+.pointer-glow { position: relative; }
+.pointer-glow::after {
+  content: "";
+  position: absolute; inset: -1px; border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(220px 140px at var(--mx, 50%) var(--my, 50%), rgba(179, 56, 44, 0.35), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0; transition: opacity 250ms var(--ease);
+  pointer-events: none;
+}
+.pointer-glow:hover::after { opacity: 1; }
+
+/* 勾选光晕：选中卡片保留一圈淡主色光环，进入时脉冲一次 */
+.glow-selected {
+  box-shadow: 0 0 0 3px rgb(var(--primary) / 0.1);
+  animation: glow-pulse 450ms var(--ease-stamp);
+}
+@keyframes glow-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--primary) / 0.32); }
+  100% { box-shadow: 0 0 0 8px rgb(var(--primary) / 0); }
 }
 
 /* 勾选角标弹出（onetake tick：到达即弹） */

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -55,11 +56,33 @@ function withinSendWindow(now: Date): boolean {
 }
 
 export function Header() {
+
   const location = useLocation()
   const inPills = pillItems.some(item => item.to === location.pathname)
   const fallbackTitle = pageTitles[location.pathname]
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme)
   const [now, setNow] = useState(() => new Date())
+
+  const activeNavRef = useRef<HTMLAnchorElement>(null)
+  const sliderRef = useRef<HTMLSpanElement>(null)
+  const [sliderX, setSliderX] = useState(0)
+  const [sliderW, setSliderW] = useState(0)
+
+  // 水银磁吸滑块：测量激活项位置，底衬平滑吸附过去（Gemini 方案一期二）
+  useLayoutEffect(() => {
+    const el = activeNavRef.current
+    const nav = el?.parentElement
+    if (!el || !nav) { setSliderW(0); return }
+    const measure = () => {
+      setSliderX(el.offsetLeft)
+      setSliderW(el.offsetWidth)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(nav)
+    return () => ro.disconnect()
+  }, [location.pathname])
+
 
   useEffect(() => {
     applyTheme(theme)
@@ -85,17 +108,24 @@ export function Header() {
           </h1>
           <nav
             aria-label="主导航"
-            className="hidden -mx-1 items-center gap-1.5 rounded-full border border-card-border bg-card p-1 lg:flex"
+            className="relative hidden -mx-1 items-center gap-1.5 rounded-full border border-card-border bg-card p-1 lg:flex"
           >
+            <span
+              aria-hidden
+              ref={sliderRef}
+              className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-ink shadow-pop transition-[transform,width] duration-300"
+              style={{ transitionTimingFunction: 'var(--ease-product)', width: sliderW || undefined, transform: `translateX(${sliderX}px)`, opacity: sliderW ? 1 : 0 }}
+            />
             {pillItems.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
+                ref={item.to === location.pathname ? activeNavRef : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-semibold transition-soft',
+                    'relative z-[1] shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-semibold transition-soft',
                     isActive
-                      ? 'bg-ink text-shell shadow-pop'
+                      ? 'text-shell'
                       : 'text-muted hover:-translate-y-px hover:text-foreground'
                   )
                 }
