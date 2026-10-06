@@ -100,6 +100,11 @@ def fetch_company_logo(url: str, timeout: float = 15.0) -> tuple[bytes, str] | N
         value = f"https:{value}"
     if not value.startswith("http"):
         return None
+    # 黑名单：BOSS 默认公司图标（公司未上传 Logo 时的占位图）与横幅 banner
+    # （部分详情页 .sider-company 内混入的工作环境横幅）。转存它们只会把
+    # "灰色占位图/宽横幅"当成 Logo 存进库（2026-10-06 用户反馈 + 存量清洗）。
+    if "/beijin/mcs/banner/" in value or "894ce6fa7e58d64d57e7f22d2f3a9d18afa7fcceaa24b8ea28f56f1bb14732c0" in value:
+        return None
     try:
         response = httpx.get(
             value,
