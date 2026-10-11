@@ -52,6 +52,7 @@ $ChromeProfile = Join-Path $env:LOCALAPPDATA "OpenJobChrome"
 $ChromeArguments = @(
 	"--remote-debugging-port=9222",
 	"--user-data-dir=$ChromeProfile",
+	"--no-proxy-server",
 	"https://www.zhipin.com"
 )
 
@@ -98,6 +99,7 @@ if (-not $SkipChrome) {
 	Start-Process -FilePath $Chrome -ArgumentList @(
 		"--remote-debugging-port=9222",
 		"--user-data-dir=$ChromeProfile",
+		"--no-proxy-server",
 		"http://127.0.0.1:8686"
 	)
 }
