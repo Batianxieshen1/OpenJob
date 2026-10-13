@@ -519,7 +519,10 @@ class CollectionOrchestrator:
                 except CollectionError as exc:
                     result = PlatformCollectionResult(platform, "blocked", exc.code, exc.message, error=str(exc))
                 except Exception as exc:
-                    result = PlatformCollectionResult(platform, "failed", "network_error", f"{platform} 采集失败", error=str(exc)[:500])
+                    import traceback
+
+                    traceback.print_exc()  # 落入任务日志（task-*.log），network_error 不再只有代号
+                    result = PlatformCollectionResult(platform, "failed", "network_error", f"{platform} 采集失败", error=f"{type(exc).__name__}: {exc}"[:500])
                 # 按来源标记各自真实状态（收尾 Batch A）：
                 # 优先读 result.source_results 中该来源的阶段结果，
                 # 避免 search 的完成状态被 recommendation 的 reason code 覆盖。
