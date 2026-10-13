@@ -390,7 +390,11 @@ class BossCollector:
                     fetched = fetch_company_logo(str(candidate.company_logo_url))
                     if fetched is not None:
                         company_logo_cache[company] = save_logo_file(self.data_dir, company, fetched[0], fetched[1])
-                    candidate.company_logo_path = company_logo_cache[company]
+                    else:
+                        # 黑名单（默认图/横幅）或下载失败：缓存空串占位，
+                        # 否则下行无条件取缓存会 KeyError 并炸掉整轮采集（2026-10-13 凡岛）
+                        company_logo_cache[company] = ""
+                    candidate.company_logo_path = company_logo_cache[company] or None
             if not enrich_intro:
                 return None
             if company in company_intro_cache:
