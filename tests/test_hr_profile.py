@@ -182,6 +182,30 @@ class HrCollectorTests(unittest.TestCase):
             )
             self.assertTrue((Path(tmp) / collected[0].hr_avatar_path).exists())
 
+    def test_as_job_record_carries_hr_avatar_path(self):
+        """回归：as_job_record 漏带 hr_avatar_path 导致落库恒空（头像文件存在但岗位行全空）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            harness = _Harness({"job-a.html": _detail("美的")})
+            result, collected, _fetch = _collect(harness, tmp)
+            self.assertEqual(result.status, "completed")
+            record = collected[0].as_job_record()
+            self.assertEqual(
+                record["hr_avatar_path"],
+                f"assets/hr_avatars/{hr_avatar_file_key('美的', '王女士')}.png",
+            )
+            # 全链路：record 直接入库可读回
+            conn = get_db(Path(tmp) / "openjob.db")
+            try:
+                self.assertTrue(insert_job_if_new(conn, record))
+                row = dict(conn.execute(
+                    "SELECT hr_avatar_path, hr_name FROM jobs WHERE id=?",
+                    (record["id"],),
+                ).fetchone())
+                self.assertEqual(row["hr_avatar_path"], record["hr_avatar_path"])
+                self.assertEqual(row["hr_name"], "王女士")
+            finally:
+                conn.close()
+
     def test_stock_hr_avatar_reused_without_fresh_url(self):
         """库存（公司+姓名）命中 → 零图床请求；本页未暴露头像 URL 也不丢头像。"""
         with tempfile.TemporaryDirectory() as tmp:
