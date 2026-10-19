@@ -102,7 +102,16 @@ JS_EXTRACT_DETAIL = """
     });
     // 公司画像（S0 勘察）：公司卡 Logo 与 /gongsi/ 公司主页链接
     const logoImg = document.querySelector('.sider-company .company-info img');
-    info.company_logo = logoImg ? (logoImg.getAttribute('src') || '') : '';
+    let logoSrc = logoImg ? (logoImg.getAttribute('src') || '') : '';
+    // 大厂版式：侧栏公司卡的 src 可能是 banner 封面/默认灰图，真头像在主体区
+    // （chatphoto / upload/avatar 路径）。回退一次全页扫描，横幅与静态图不作 Logo。
+    if (/[/]mcs[/]banner[/]|beijin[/]icon[/]|[/]static[/]/.test(logoSrc)) {
+        const alt = Array.from(document.querySelectorAll('img'))
+            .map(i => (i.getAttribute('src') || ''))
+            .find(src => src.includes('chatphoto') || src.includes('/upload/avatar/'));
+        if (alt) { logoSrc = alt; }
+    }
+    info.company_logo = logoSrc;
     const companyAnchor = document.querySelector('.sider-company .company-info a[href*="/gongsi/"]');
     info.company_page_url = companyAnchor ? (companyAnchor.getAttribute('href') || '') : '';
     const bossSection = document.querySelector('.boss-info-attr') || document.querySelector('.job-boss-info');
