@@ -95,7 +95,7 @@ class CompanyProfileDbTests(unittest.TestCase):
             conn = get_db(db_path)
             columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
             self.assertTrue({"company_logo_path", "company_logo_url", "company_intro", "company_intro_url"} <= columns)
-            self.assertEqual(int(conn.execute("PRAGMA user_version").fetchone()[0]), 11)
+            self.assertEqual(int(conn.execute("PRAGMA user_version").fetchone()[0]), 12)
             conn.close()
             conn = get_db(db_path)  # 二次打开幂等
             columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}

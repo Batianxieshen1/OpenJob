@@ -13,7 +13,7 @@ DB_PATH = Path("./data/openjob.db")
 MAX_JOB_IDS = 1000
 # C4：schema 版本号写入 PRAGMA user_version；版本变化时迁移前先自动备份。
 # 有意新增迁移时上调此数字并同步 _MIGRATIONS。
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 _MIGRATIONS = (
     "_migrate_v1_1", "_migrate_v1_2", "_migrate_v1_3", "_migrate_v1_4",
     "_migrate_platform_access_events", "_init_scoring_runs",
@@ -24,6 +24,7 @@ _MIGRATIONS = (
     "_migrate_v2_9",
     "_migrate_v2_10",
     "_migrate_v2_11",
+    "_migrate_v2_12",
 )
 DELETION_PROTECTED_STATUSES = {"sent", "replied", "resume_sent", "needs_resume", "follow_up_sent"}
 DELETION_PROTECTED_HISTORY_ACTIONS = {
@@ -178,6 +179,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     _migrate_v2_9(conn)
     _migrate_v2_10(conn)
     _migrate_v2_11(conn)
+    _migrate_v2_12(conn)
     _stamp_schema_version(conn)
 
 
@@ -572,6 +574,20 @@ def _migrate_v2_11(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_v2_12(conn: sqlite3.Connection) -> None:
+    """HR 画像字段（招聘者形象方案，幂等）：
+
+    - jobs.hr_avatar_path / hr_avatar_url：HR 头像本地落盘路径与 BOSS 图床 URL 留档。
+    hr_name/hr_title/hr_active 列 v1 起已存在，无需迁移。旧数据不回填
+    （company-enrich 样本页顺路补少量，新采集自动带）。
+    """
+    job_cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    for column in ("hr_avatar_path", "hr_avatar_url"):
+        if column not in job_cols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} TEXT")
+    conn.commit()
+
+
 def record_job_source_observation(
     conn: sqlite3.Connection,
     *,
@@ -680,6 +696,8 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
         "hr_name": job.get("hr_name", ""),
         "hr_title": job.get("hr_title", ""),
         "hr_active": job.get("hr_active", ""),
+        "hr_avatar_path": job.get("hr_avatar_path", ""),
+        "hr_avatar_url": job.get("hr_avatar_url", ""),
         "company_size": job.get("company_size", ""),
         "company_industry": job.get("company_industry", ""),
         "company_logo_path": job.get("company_logo_path", ""),
@@ -708,12 +726,14 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
             id, title, company, salary, city, experience, education, recruitment_type, jd,
             hr_name, hr_title, hr_active, company_size, company_industry, url,
             source_platform, source_job_id, source_keyword, source_city_code, source_channel,
-            company_logo_path, company_logo_url, company_intro, company_intro_url
+            company_logo_path, company_logo_url, company_intro, company_intro_url,
+            hr_avatar_path, hr_avatar_url
         ) VALUES (
             :id, :title, :company, :salary, :city, :experience, :education, :recruitment_type, :jd,
             :hr_name, :hr_title, :hr_active, :company_size, :company_industry, :url,
             :source_platform, :source_job_id, :source_keyword, :source_city_code, :source_channel,
-            :company_logo_path, :company_logo_url, :company_intro, :company_intro_url
+            :company_logo_path, :company_logo_url, :company_intro, :company_intro_url,
+            :hr_avatar_path, :hr_avatar_url
         )
         """,
         values,
@@ -728,6 +748,37 @@ def insert_job_if_new(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
 def insert_job(conn: sqlite3.Connection, job: dict[str, Any]) -> bool:
     """Backward-compatible insert entry point; returns whether it was new."""
     return insert_job_if_new(conn, job)
+
+
+def update_job_hr_snapshot(
+    conn: sqlite3.Connection,
+    job_id: str,
+    *,
+    hr_name: str,
+    hr_title: str,
+    hr_active: str,
+    hr_avatar_path: str = "",
+    hr_avatar_url: str = "",
+) -> bool:
+    """把样本详情页顺路提取的 HR 信息写回该岗位行（company-enrich 用）。
+
+    只补空不覆盖：已有 hr_name 的岗位说明近期采集过，不回退。
+    """
+    cursor = conn.execute(
+        """
+        UPDATE jobs SET
+            hr_name = COALESCE(NULLIF(hr_name, ''), ?),
+            hr_title = COALESCE(NULLIF(hr_title, ''), ?),
+            hr_active = COALESCE(NULLIF(hr_active, ''), ?),
+            hr_avatar_path = COALESCE(NULLIF(hr_avatar_path, ''), ?),
+            hr_avatar_url = COALESCE(NULLIF(hr_avatar_url, ''), ?),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND deleted_at IS NULL
+        """,
+        (hr_name, hr_title, hr_active, hr_avatar_path, hr_avatar_url, job_id),
+    )
+    conn.commit()
+    return cursor.rowcount == 1
 
 
 def update_company_profile(

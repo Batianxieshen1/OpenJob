@@ -22,6 +22,7 @@ from openjob.collection.company_profile import (
     clean_company_intro,
     fetch_company_logo,
     parse_json_payload,
+    save_hr_avatar_file,
     save_logo_file,
 )
 from openjob.collection.platforms.boss import (
@@ -31,7 +32,8 @@ from openjob.collection.platforms.boss import (
     _positive_int,
     JS_EXTRACT_DETAIL,
 )
-from openjob.db import companies_missing_intro, update_company_profile
+from openjob.collection.platforms.boss import generate_boss_job_id
+from openjob.db import companies_missing_intro, update_company_profile, update_job_hr_snapshot
 from openjob.platform_safety import PlatformAccessGuard, PlatformSafetyStop
 from openjob.throttle import PageThrottle
 
@@ -221,6 +223,27 @@ def run_company_enrich(
                 fetched = fetch_company_logo(logo_url)
                 if fetched is not None:
                     logo_path = save_logo_file(data_dir, company, fetched[0], fetched[1])
+
+            # HR 快照顺路写回（阶段1/2）：样本详情页本来就开了，card 里的 HR 姓名/职位/
+            # 活跃/头像直接补到该岗位行——旧岗位的 HR 字段白捡，零额外访问。
+            hr_name_card = str(card.get("hr_name") or "").strip()
+            if hr_name_card:
+                hr_avatar_rel = ""
+                hr_avatar_url_card = str(card.get("hr_avatar") or "").strip()
+                if hr_avatar_url_card:
+                    fetched_avatar = fetch_company_logo(hr_avatar_url_card)
+                    if fetched_avatar is not None:
+                        hr_avatar_rel = save_hr_avatar_file(data_dir, company, hr_name_card, fetched_avatar[0], fetched_avatar[1])
+                update_job_hr_snapshot(
+                    conn,
+                    generate_boss_job_id(sample_url),
+                    hr_name=hr_name_card,
+                    hr_title=str(card.get("hr_title") or "").strip(),
+                    hr_active=str(card.get("hr_active") or "").strip(),
+                    hr_avatar_path=hr_avatar_rel,
+                    hr_avatar_url=hr_avatar_url_card,
+                )
+
             rows = update_company_profile(
                 conn,
                 company,

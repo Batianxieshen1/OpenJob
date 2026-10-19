@@ -85,6 +85,7 @@ class JobCandidate:
     hr_name: str = ""
     hr_title: str = ""
     hr_active: str = ""
+    hr_avatar_url: str = ""
     company_size: str = ""
     company_industry: str = ""
     company_logo_path: str = ""
@@ -120,6 +121,7 @@ class JobCandidate:
             "hr_name": self.hr_name,
             "hr_title": self.hr_title,
             "hr_active": self.hr_active,
+            "hr_avatar_url": self.hr_avatar_url,
             "company_size": self.company_size,
             "company_industry": self.company_industry,
             "company_logo_path": self.company_logo_path,
