@@ -1132,6 +1132,39 @@ def api_stats():
 		db.close()
 
 
+@app.route("/api/hr-stats")
+def api_hr_stats():
+	"""按 公司+HR 聚合本地会话台账（conversations）：近期沟通次数与最近时间。
+
+	零采集——数据来自 monitor 的回流记录；Boss 聊天页无"沟通 N 次"计数面板
+	（2026-10-05 S0），本地台账即 B 方案指标的权威来源。
+	"""
+	# 中文参数经 Bottle 的 latin-1 解码会乱码（WSGI QUERY_STRING 复现），
+	# 直接按 UTF-8 手动解析原始查询串
+	from urllib.parse import parse_qs
+
+	query_values = parse_qs(request.query_string or "", encoding="utf-8")
+	company = str(query_values.get("company", [""])[0]).strip()
+	hr_name = str(query_values.get("hr_name", [""])[0]).strip()
+	if not company or not hr_name:
+		return _json_response({"error": "company 与 hr_name 必填"}, 400)
+	db = _get_web_db()
+	try:
+		row = db.execute(
+			"SELECT COUNT(*) AS messages, MAX(updated_at) AS last_at FROM conversations "
+			"WHERE company = ? AND hr_name = ?",
+			(company, hr_name),
+		).fetchone()
+		return _json_response({
+			"company": company,
+			"hr_name": hr_name,
+			"messages": int(row["messages"] or 0),
+			"last_at": row["last_at"],
+		})
+	finally:
+		db.close()
+
+
 @app.route("/api/trends")
 def api_trends():
 	try:
@@ -3875,6 +3908,14 @@ def _serve_static(filename: str, root: Path):
 	"""Serve static assets with stable MIME types while retaining range/cache support."""
 	mimetype = _STATIC_MIME_TYPES.get(Path(filename).suffix.lower(), "auto")
 	return static_file(filename, root=str(root), mimetype=mimetype)
+
+
+@app.route("/hr-avatars/<filename>")
+def serve_hr_avatar(filename):
+	# HR 头像（个人照片）：文件名白名单防穿越，规则与公司 Logo 路由一致
+	if not re.fullmatch(r"[0-9a-f]{16}\.(?:png|jpg|webp|gif)", str(filename)):
+		return _json_response({"error": "Not found"}, 404)
+	return _serve_static(filename, DATA_DIR / "assets" / "hr_avatars")
 
 
 @app.route("/company-logos/<filename>")

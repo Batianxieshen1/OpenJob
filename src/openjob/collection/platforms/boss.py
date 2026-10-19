@@ -22,6 +22,7 @@ from openjob.collection.company_profile import (
     clean_company_intro,
     fetch_company_logo,
     parse_json_payload,
+    save_hr_avatar_file,
     save_logo_file,
 )
 from openjob.collection.models import JobCandidate, PlatformCollectionRequest, PlatformCollectionResult
@@ -114,10 +115,29 @@ JS_EXTRACT_DETAIL = """
     info.company_logo = logoSrc;
     const companyAnchor = document.querySelector('.sider-company .company-info a[href*="/gongsi/"]');
     info.company_page_url = companyAnchor ? (companyAnchor.getAttribute('href') || '') : '';
-    const bossSection = document.querySelector('.boss-info-attr') || document.querySelector('.job-boss-info');
-    info.hr_name = bossSection?.querySelector('.name')?.textContent?.trim() || '';
-    info.hr_title = bossSection?.querySelector('.title')?.textContent?.trim() || '';
-    info.hr_active = document.querySelector('.boss-active-time')?.textContent?.trim() || '';
+    // HR 区块（2026-10-05 S0 勘察重写）：旧代码在 .boss-info-attr（公司·职位行）里找
+    // .name/.title 子元素——找错容器，hr_name/hr_title 静默全空。正确结构：
+    // .job-boss-info > .detail-figure img（头像）+ h2.name（姓名，混有 vip 图标与活跃时间）
+    const bossBox = document.querySelector('.job-boss-info');
+    info.hr_name = ''; info.hr_title = ''; info.hr_active = ''; info.hr_avatar = '';
+    if (bossBox) {
+        const nameEl = bossBox.querySelector('h2.name');
+        if (nameEl) {
+            const nameClone = nameEl.cloneNode(true);
+            nameClone.querySelectorAll('.boss-active-time, i, span').forEach(el => el.remove());
+            info.hr_name = nameClone.textContent.trim();
+        }
+        const activeEl = bossBox.querySelector('.boss-active-time');
+        info.hr_active = activeEl ? activeEl.textContent.trim() : '';
+        const avatarImg = bossBox.querySelector('.detail-figure img');
+        info.hr_avatar = avatarImg ? (avatarImg.getAttribute('src') || '') : '';
+    }
+    const attrEl = document.querySelector('.boss-info-attr');
+    if (attrEl) {
+        // "公司·职位"结构：取末段为职位（无分隔符时留空，宁缺毋脏）
+        const attrParts = attrEl.textContent.trim().split('·');
+        info.hr_title = attrParts.length >= 2 ? attrParts[attrParts.length - 1].trim() : '';
+    }
     info.url = window.location.pathname;
     return JSON.stringify(info);
 })()
@@ -283,6 +303,29 @@ class BossCollector:
         except OSError:
             return False
 
+    def _stocked_hr_avatar(self, company: str, hr_name: str) -> str:
+        """跨运行库存：同公司同名 HR 的头像路径（旧岗位采过 → 新岗位零额外访问）。"""
+        if self.safety_conn is None or not hr_name:
+            return ""
+        try:
+            row = self.safety_conn.execute(
+                "SELECT hr_avatar_path FROM jobs WHERE company = ? AND hr_name = ? "
+                "AND deleted_at IS NULL AND hr_avatar_path != '' "
+                "ORDER BY created_at DESC LIMIT 1",
+                (company, hr_name),
+            ).fetchone()
+        except sqlite3.Error:
+            return ""
+        return str(row[0] or "") if row else ""
+
+    def _hr_avatar_file_exists(self, avatar_path: str) -> bool:
+        if not avatar_path or self.data_dir is None:
+            return False
+        try:
+            return (Path(self.data_dir) / avatar_path).is_file()
+        except OSError:
+            return False
+
     @staticmethod
     def resolve_city_code(city: str, request: PlatformCollectionRequest) -> str | None:
         return str(request.city_codes.get(city) or CITY_CODES.get(city) or "") or None
@@ -376,6 +419,7 @@ class BossCollector:
         # 任何失败都不阻塞岗位入库：简介留空，等 company-enrich 回填兜底。
         company_intro_cache: dict[str, tuple[str, str]] = {}
         company_logo_cache: dict[str, str] = {}
+        hr_avatar_cache: dict[str, str] = {}
 
         def _enrich_company_profile(candidate: JobCandidate) -> str | tuple[str, str] | None:
             """返回 None=完成；"stopped"=用户停止；(kind, evidence)=公司页风险信号
@@ -404,6 +448,25 @@ class BossCollector:
                         # 否则下行无条件取缓存会 KeyError 并炸掉整轮采集（2026-10-13 凡岛）
                         company_logo_cache[company] = ""
                     candidate.company_logo_path = company_logo_cache[company] or None
+            # HR 头像（阶段2）：库存（公司+姓名）→ 本页 URL 顺路转存，与公司 Logo 同机制、
+            # 同样零额外页面访问；下载失败仅留空，不阻塞岗位入库。
+            if enrich_logo and self.data_dir is not None and candidate.hr_name:
+                hr_key = f"{company}|{candidate.hr_name}"
+                if hr_key in hr_avatar_cache:
+                    candidate.hr_avatar_path = hr_avatar_cache[hr_key]
+                else:
+                    stocked_avatar = self._stocked_hr_avatar(company, candidate.hr_name)
+                    if stocked_avatar and self._hr_avatar_file_exists(stocked_avatar):
+                        hr_avatar_cache[hr_key] = stocked_avatar
+                    elif str(candidate.hr_avatar_url or ""):
+                        fetched_avatar = fetch_company_logo(str(candidate.hr_avatar_url))
+                        hr_avatar_cache[hr_key] = (
+                            save_hr_avatar_file(self.data_dir, company, candidate.hr_name, fetched_avatar[0], fetched_avatar[1])
+                            if fetched_avatar is not None else ""
+                        )
+                    else:
+                        hr_avatar_cache[hr_key] = ""
+                    candidate.hr_avatar_path = hr_avatar_cache[hr_key]
             if not enrich_intro:
                 return None
             if company in company_intro_cache:
@@ -845,6 +908,7 @@ class BossCollector:
             hr_name=str(detail.get("hr_name") or "").strip(),
             hr_title=str(detail.get("hr_title") or "").strip(),
             hr_active=str(detail.get("hr_active") or "").strip(),
+            hr_avatar_url=str(detail.get("hr_avatar") or "").strip(),
             company_size=str(detail.get("company_size") or "").strip(),
             company_industry=str(detail.get("company_industry") or "").strip(),
             company_logo_url=str(detail.get("company_logo") or "").strip(),

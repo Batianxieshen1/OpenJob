@@ -5,6 +5,7 @@ import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'luci
 import { getStatusLabel } from '@/lib/status'
 import { cn } from '@/lib/utils'
 import { CompanyAvatar } from '@/components/jobs/CompanyAvatar'
+import { HrAvatar } from '@/components/jobs/HrAvatar'
 import type { Job } from '@/hooks/useDashboard'
 import type { JobSortKey, JobSortOrder } from '@/hooks/useJobSearch'
 
@@ -210,6 +211,15 @@ export function JobsTable({ refreshKey,
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-foreground">{job.company}</span>
                         <span className="block truncate text-[13px] text-foreground">{job.title}</span>
+                        {(job.hr_name || job.hr_active) && (
+                          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted">
+                            <HrAvatar company={job.company} hrName={job.hr_name} avatarPath={job.hr_avatar_path} size={14} />
+                            <span className="truncate">
+                              {job.hr_name || '招聘者'}
+                              {job.hr_active ? ` · ${job.hr_active}` : ''}
+                            </span>
+                          </span>
+                        )}
                       </span>
                     </span>
                   </label>
@@ -342,6 +352,15 @@ export function JobsTable({ refreshKey,
                               <span className="hidden shrink-0 text-[11px] text-muted-3 md:inline">
                                 {subtitleParts.join(' · ')}
                               </span>
+                              {(job.hr_name || job.hr_active) && (
+                                <span className="hidden min-w-0 items-center gap-1 md:flex">
+                                  <HrAvatar company={job.company} hrName={job.hr_name} avatarPath={job.hr_avatar_path} size={14} />
+                                  <span className="truncate text-[11px] text-muted">
+                                    {job.hr_name || '招聘者'}
+                                    {job.hr_active ? `（${job.hr_active}）` : ''}
+                                  </span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

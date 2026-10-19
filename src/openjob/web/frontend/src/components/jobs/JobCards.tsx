@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { Eye, ExternalLink, XCircle, CheckCircle2, History, MessageCircle, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CompanyAvatar } from '@/components/jobs/CompanyAvatar'
+import { HrAvatar } from '@/components/jobs/HrAvatar'
 import { parseUtc, formatUtcTime } from "@/lib/datetime"
 import { getActionLabel, getStatusLabel } from '@/lib/status'
 import type { Job } from '@/hooks/useDashboard'
@@ -23,6 +24,42 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-card-border bg-surface-hover p-4">
       <div className="text-xs text-muted">{label}</div>
       <div className="mt-1 font-semibold text-foreground">{value}</div>
+    </div>
+  )
+}
+
+/** HR 画像块：头像+姓名/职位/活跃 + 本地沟通台账（conversations 聚合，零采集） */
+function HrInfoBlock({ job }: { job: Job }) {
+  const [stats, setStats] = useState<{ messages: number; last_at: string | null } | null>(null)
+  useEffect(() => {
+    if (!job.hr_name || !job.company) return
+    let cancelled = false
+    fetch(`/api/hr-stats?company=${encodeURIComponent(job.company)}&hr_name=${encodeURIComponent(job.hr_name)}`, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled && data && typeof data.messages === 'number') setStats(data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [job.company, job.hr_name])
+
+  return (
+    <div className="rounded-2xl border border-card-border bg-surface-hover p-4">
+      <div className="flex items-center gap-3">
+        <HrAvatar company={job.company} hrName={job.hr_name} avatarPath={job.hr_avatar_path} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-foreground">
+            {job.hr_name || '招聘者未识别'}
+            {job.hr_title && <span className="ml-1.5 text-xs font-normal text-muted">{job.hr_title}</span>}
+          </div>
+          <div className="mt-0.5 text-xs text-muted">
+            {job.hr_active ? `采集时状态：${job.hr_active}` : '活跃度未知'}
+            {stats && stats.messages > 0 && (
+              <span className="ml-2 font-semibold text-success">
+                已沟通 {stats.messages} 条 · 最近 {stats.last_at ? stats.last_at.slice(5, 10).replace('-', '/') : ''}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -253,9 +290,8 @@ export function JobDetailModal({ job, onClose }: JobDetailModalProps) {
           </div>
           <Button variant="secondary" size="sm" onClick={onClose}>关闭</Button>
         </div>
-        <div className="grid gap-3 text-sm lg:grid-cols-2">
-          <InfoBlock label="HR" value={[job.hr_name, job.hr_title].filter(Boolean).join(' · ') || '-'} />
-          <InfoBlock label="招聘者活跃" value={job.hr_active || '活跃度未知'} />
+        <HrInfoBlock job={job} />
+        <div className="mt-3 grid gap-3 text-sm lg:grid-cols-2">
           <InfoBlock label="公司" value={[job.company_size, job.company_industry].filter(Boolean).join(' · ') || '-'} />
           <InfoBlock label="来源平台" value={[job.source_platform === 'zhilian' ? '智联招聘｜当前只开放采集' : job.source_platform === '51job' ? '前程无忧｜当前只开放采集' : 'BOSS 直聘', ...(Array.isArray(job.source_labels) && job.source_labels.length ? [`来源：${job.source_labels.join(' + ')}`] : job.source_channel === 'recommendation' ? ['来源：推荐页'] : [])].filter(Boolean).join(' · ')} />
           <InfoBlock label="匹配分" value={String(job.score || '-')} />
@@ -355,6 +391,16 @@ export function JobActionCard({ job, selected, onToggle, onDetail, onReject, fli
               <span className="truncate font-semibold text-foreground">{job.title}</span>
             </div>
             <div className="mt-1 text-xs text-muted">{jobSubtitle(job)}</div>
+            {(job.hr_name || job.hr_active) && (
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+                <HrAvatar company={job.company} hrName={job.hr_name} avatarPath={job.hr_avatar_path} size={16} />
+                <span className="truncate">
+                  {job.hr_name || '招聘者'}
+                  {job.hr_title ? ` · ${job.hr_title}` : ''}
+                  {job.hr_active ? ` · ${job.hr_active}` : ''}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <input

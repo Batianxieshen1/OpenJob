@@ -50,6 +50,12 @@ def logo_file_key(company: str) -> str:
     return hashlib.sha1(normalize_company_name(company).encode("utf-8")).hexdigest()[:16]
 
 
+def hr_avatar_file_key(company: str, hr_name: str) -> str:
+    """HR 头像去重键：公司+姓名归一后哈希（S0 确认详情页无 boss_id，取稳定近似键）。"""
+    raw = f"{normalize_company_name(company)}|{normalize_company_name(hr_name)}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
 def clean_company_intro(text: str, max_chars: int = 2000) -> str:
     """简介清洗：折叠空白、剥掉区块标题词与折叠按钮残留、超长截断。"""
     value = re.sub(r"\s+", " ", str(text or "")).strip()
@@ -138,6 +144,26 @@ def save_logo_file(data_dir: Path | str, company: str, content: bytes, ext: str)
         if not target.exists():
             target.write_bytes(content)
         return f"assets/logos/{filename}"
+    except OSError:
+        return ""
+
+
+def save_hr_avatar_file(data_dir: Path | str, company: str, hr_name: str, content: bytes, ext: str) -> str:
+    """HR 头像落盘（每 公司+姓名 一份，幂等）：返回相对 data/ 的路径，失败返回空串。
+
+    同 save_logo_file 的魔数复验；目录独立于公司 Logo（个人照片与企业标识分开管理，
+    导出白名单默认不含 hr_avatars——个人照片不进导出包）。
+    """
+    if not content or not ext or _sniff_image_ext(content) != ext:
+        return ""
+    try:
+        avatar_dir = Path(data_dir) / "assets" / "hr_avatars"
+        avatar_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{hr_avatar_file_key(company, hr_name)}.{ext}"
+        target = avatar_dir / filename
+        if not target.exists():
+            target.write_bytes(content)
+        return f"assets/hr_avatars/{filename}"
     except OSError:
         return ""
 
