@@ -1107,8 +1107,21 @@ def get_jobs_pending_confirmation(conn: sqlite3.Connection) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def get_jobs_ready_to_send(conn: sqlite3.Connection) -> list[dict]:
-    """Get jobs that have generated greetings and are ready to send."""
+def get_jobs_ready_to_send(conn: sqlite3.Connection, *, boss_default: bool = False) -> list[dict]:
+    """Get jobs that have generated greetings and are ready to send.
+
+    boss_default=True：招聘者用 Boss 账号自带默认招呼语直接发送（不经过 OpenJob
+    生成链路，无文本可校验）——放宽问候语与事实门，仍限 ready/approved/error
+    且未删除；发送纪律（额度/时间窗/间隔）不变。
+    """
+    if boss_default:
+        rows = conn.execute("""
+            SELECT * FROM jobs
+            WHERE status IN ('ready', 'approved', 'error')
+              AND deleted_at IS NULL
+            ORDER BY score DESC
+        """).fetchall()
+        return [dict(row) for row in rows]
     rows = conn.execute("""
         SELECT * FROM jobs
         WHERE status IN ('ready', 'approved')

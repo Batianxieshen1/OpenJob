@@ -33,6 +33,8 @@ interface Job {
   hr_active: string
   hr_avatar_path?: string | null
   hr_avatar_url?: string | null
+  hr_messages?: number
+  hr_last_at?: string | null
   company_size: string
   company_industry: string
   company_logo_path?: string | null

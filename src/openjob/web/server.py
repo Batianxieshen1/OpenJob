@@ -641,6 +641,7 @@ def _queue_monitor_delivery(
 	job_ids: list[str],
 	*,
 	direct_send: bool = False,
+	boss_default: bool = False,
 ) -> dict:
 	"""Queue confirmed jobs on a task that is already in its monitor loop."""
 	queue_lock = task.context.get("monitor_queue_lock")
@@ -656,7 +657,10 @@ def _queue_monitor_delivery(
 		}
 		new_ids = [job_id for job_id in job_ids if job_id not in queued_ids]
 		if new_ids:
-			pending.append({"job_ids": new_ids, "direct_send": direct_send})
+			if boss_default:
+				pending.append({"job_ids": new_ids, "direct_send": direct_send, "boss_default": True})
+			else:
+				pending.append({"job_ids": new_ids, "direct_send": direct_send})
 			_log(task, f"监测期间新增 {len(new_ids)} 个确认投递岗位，已加入发送队列")
 	wakeup_event = task.context.get("monitor_wakeup_event")
 	if isinstance(wakeup_event, Event):
@@ -816,6 +820,7 @@ def _queue_active_delivery(
 	job_ids: list[str],
 	*,
 	direct_send: bool,
+	boss_default: bool = False,
 ) -> tuple[dict, list[str]]:
 	"""Append jobs to the currently running single delivery worker."""
 	queue_lock = task.context.setdefault("delivery_queue_lock", Lock())
@@ -826,10 +831,10 @@ def _queue_active_delivery(
 		new_ids = [job_id for job_id in job_ids if job_id not in scheduled_ids]
 		already_queued_count = len(job_ids) - len(new_ids)
 		if new_ids:
-			task.context.setdefault("pending_deliveries", []).append({
-				"job_ids": new_ids,
-				"direct_send": direct_send,
-			})
+			batch = {"job_ids": new_ids, "direct_send": direct_send}
+			if boss_default:
+				batch["boss_default"] = True  # 仅 boss_default 时带键，保持既有队列字典形状
+			task.context.setdefault("pending_deliveries", []).append(batch)
 			scheduled_ids.update(new_ids)
 			_log(task, f"新增 {len(new_ids)} 个岗位，已加入当前发送队列")
 		elif already_queued_count:
@@ -879,6 +884,11 @@ def _execute_deliver(task: WorkbenchTask, config: dict) -> None:
 				current_config["_workbench_skip_greeting"] = True
 			else:
 				current_config.pop("_workbench_skip_greeting", None)
+			if batch.get("boss_default"):
+				current_config["_workbench_skip_greeting"] = True
+				current_config["_workbench_boss_default"] = True
+			else:
+				current_config.pop("_workbench_boss_default", None)
 			_log(task, f"继续处理队列中的 {len(current_config['_workbench_job_ids'])} 个岗位")
 	finally:
 		with queue_lock:
@@ -1215,6 +1225,30 @@ def api_jobs():
 			job["source_channels"] = summary.get("source_channels") or [str(job.get("source_channel") or "search")]
 			job["source_labels"] = summary.get("source_labels") or []
 			job["source_observations"] = summary.get("source_observations") or []
+		# HR 沟通台账（阶段3）：按 公司+HR 聚合 conversations，卡片直接可见"已沟通N条"
+		hr_pairs = sorted({
+			(str(job.get("company") or "").strip(), str(job.get("hr_name") or "").strip())
+			for job in jobs
+			if str(job.get("hr_name") or "").strip()
+		})
+		if hr_pairs:
+			pair_sql = " OR ".join(["(company = ? AND hr_name = ?)"] * len(hr_pairs))
+			pair_params = [value for pair in hr_pairs for value in pair]
+			agg_rows = db.execute(
+				f"SELECT company, hr_name, COUNT(*) AS messages, MAX(updated_at) AS last_at "
+				f"FROM conversations WHERE {pair_sql} GROUP BY company, hr_name",
+				pair_params,
+			).fetchall()
+			hr_stats = {
+				(str(r["company"]).strip(), str(r["hr_name"]).strip()):
+					(int(r["messages"] or 0), r["last_at"])
+				for r in agg_rows
+			}
+			for job in jobs:
+				key = (str(job.get("company") or "").strip(), str(job.get("hr_name") or "").strip())
+				messages, last_at = hr_stats.get(key, (0, None))
+				job["hr_messages"] = messages
+				job["hr_last_at"] = last_at
 		response.headers["X-Total-Count"] = str(total)
 		return _json_response(jobs)
 	finally:
@@ -1966,6 +2000,7 @@ def api_workbench_deliver():
 		if not job_ids:
 			return _json_response({"error": "请选择要投递的岗位"}, 400)
 		direct_send = bool(body.get("direct_send"))
+		boss_default = bool(body.get("boss_default"))
 		generate_only = bool(body.get("generate_only"))
 		validation_db = _get_web_db()
 		try:
@@ -1999,12 +2034,13 @@ def api_workbench_deliver():
 				"unsupported_platform": "unknown",
 				"invalid_ids": unsupported,
 			}, 403)
-		allowed_statuses = {"ready", "approved", "error"} if direct_send else {"ready", "approved"}
+		# boss_default：直接确认 Boss 账号自带默认招呼语（无 OpenJob 文本，事实门不适用）
+		allowed_statuses = {"ready", "approved", "error"} if (direct_send or boss_default) else {"ready", "approved"}
 		invalid_status_ids = [
 			str(row["id"])
 			for row in platform_rows
 			if str(row["status"] or "") not in allowed_statuses
-			or (direct_send and not str(row["greeting"] or "").strip())
+			or (direct_send and not boss_default and not str(row["greeting"] or "").strip())
 		]
 		if invalid_status_ids:
 			return _json_response({
@@ -2015,7 +2051,7 @@ def api_workbench_deliver():
 		# Defense in depth: direct send is allowed only for a greeting generated from
 		# verified resume sources. This blocks historical/platform-default text and
 		# prevents callers from bypassing the DB ready-to-send query.
-		if direct_send:
+		if direct_send and not boss_default:
 			fact_unverified_ids = [
 				str(row["id"])
 				for row in platform_rows
@@ -2069,6 +2105,7 @@ def api_workbench_deliver():
 				delivery_task,
 				job_ids,
 				direct_send=direct_send,
+				boss_default=boss_default,
 			)
 
 		db = _get_web_db()
@@ -2097,12 +2134,15 @@ def api_workbench_deliver():
 					monitoring_task,
 					job_ids,
 					direct_send=direct_send,
+					boss_default=boss_default,
 				)
 			)
 
 		deliver_options = {"_workbench_job_ids": job_ids}
-		if direct_send:
+		if direct_send or boss_default:
 			deliver_options["_workbench_skip_greeting"] = True
+		if boss_default:
+			deliver_options["_workbench_boss_default"] = True
 		if generate_only:
 			deliver_options["_workbench_generate_only"] = True
 		task = task_runner.start("deliver", _task_config(deliver_options))
