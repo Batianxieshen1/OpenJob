@@ -430,18 +430,45 @@ export function JobsTable({ refreshKey,
                       <td colSpan={columnCount} className="p-0">
                         <div className="expand-wrap" data-open={isExpanded}>
                           <div className="overflow-hidden">
-                            <div className={isExpanded ? 'grid grid-cols-1 gap-4 p-4 text-sm lg:grid-cols-3' : 'p-0 text-sm'}>
-                              <div className="rounded-2xl border border-card-border bg-card p-4">
-                                <p className="mb-2 text-xs font-semibold text-primary">JD摘要</p>
-                                <p className="line-clamp-6 leading-6 text-muted">{job.jd || '无'}</p>
-                              </div>
-                              <div className="rounded-2xl border border-card-border bg-card p-4">
-                                <p className="mb-2 text-xs font-semibold text-primary">招呼语</p>
-                                <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.greeting || '未生成'}</p>
-                              </div>
-                              <div className="rounded-2xl border border-card-border bg-card p-4">
-                                <p className="mb-2 text-xs font-semibold text-primary">评分理由</p>
-                                <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.score_reason || '无'}</p>
+                            <div className={isExpanded ? 'space-y-4 p-4 text-sm' : 'p-0 text-sm'}>
+                              {/* HR 画像行：头像+姓名/职位/活跃+本地沟通台账（与详情弹窗同源字段） */}
+                              {(job.hr_name || job.hr_active || job.company_intro) && (
+                                <div className="rounded-2xl border border-card-border bg-card p-4">
+                                  <div className="flex items-center gap-3">
+                                    <HrAvatar company={job.company} hrName={job.hr_name} avatarPath={job.hr_avatar_path} size={36} />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-sm font-semibold text-foreground">
+                                        {job.hr_name || '招聘者未识别'}
+                                        {job.hr_title && <span className="ml-1.5 text-xs font-normal text-muted">{job.hr_title}</span>}
+                                      </div>
+                                      <div className="mt-0.5 text-xs text-muted">
+                                        {job.hr_active ? `采集时状态：${job.hr_active}` : '活跃度未知'}
+                                        {!!job.hr_messages && job.hr_messages > 0 && (
+                                          <span className="ml-2 font-semibold text-success">
+                                            已沟通 {job.hr_messages} 条{job.hr_last_at ? ` · 最近 ${String(job.hr_last_at).slice(5, 10).replace('-', '/')}` : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {job.company_intro?.trim() && (
+                                    <p className="mt-3 border-t border-card-border pt-3 text-xs leading-6 text-muted">{job.company_intro}</p>
+                                  )}
+                                </div>
+                              )}
+                              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                                <div className="rounded-2xl border border-card-border bg-card p-4">
+                                  <p className="mb-2 text-xs font-semibold text-primary">JD摘要</p>
+                                  <p className="line-clamp-6 leading-6 text-muted">{job.jd || '无'}</p>
+                                </div>
+                                <div className="rounded-2xl border border-card-border bg-card p-4">
+                                  <p className="mb-2 text-xs font-semibold text-primary">招呼语</p>
+                                  <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.greeting || '未生成'}</p>
+                                </div>
+                                <div className="rounded-2xl border border-card-border bg-card p-4">
+                                  <p className="mb-2 text-xs font-semibold text-primary">评分理由</p>
+                                  <p className="line-clamp-6 whitespace-pre-wrap leading-6 text-muted">{job.score_reason || '无'}</p>
+                                </div>
                               </div>
                             </div>
                           </div>
