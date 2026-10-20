@@ -1225,11 +1225,43 @@ def api_jobs():
 			job["source_channels"] = summary.get("source_channels") or [str(job.get("source_channel") or "search")]
 			job["source_labels"] = summary.get("source_labels") or []
 			job["source_observations"] = summary.get("source_observations") or []
-		# HR 沟通台账（阶段3）：按 公司+HR 聚合 conversations，卡片直接可见"已沟通N条"
+		# HR 沟通台账（阶段3，2026-10-20 修正）：conversations.job_id 是 monitor
+		# 记录时已建立的精确关联（老岗位 hr_name 为空、按公司+HR 配对连不上）——
+		# 以 job_id 聚合为主；会话里记录的 HR 姓名/公司回填为该岗位的展示字段；
+		# 仅当 job_id 未命中时用 公司+HR 配对兜底（跨岗位同 HR 的会话）。
+		job_id_keys = [str(job.get("id") or "") for job in jobs]
+		hr_stats_by_job: dict[str, tuple[int, str | None, str, str]] = {}
+		if job_id_keys:
+			placeholders = ",".join("?" for _ in job_id_keys)
+			for row in db.execute(
+				f"SELECT job_id, COUNT(*) AS messages, MAX(updated_at) AS last_at, "
+				f"MAX(hr_name) AS hr_name, MAX(company) AS company "
+				f"FROM conversations WHERE job_id IN ({placeholders}) GROUP BY job_id",
+				job_id_keys,
+			).fetchall():
+				hr_stats_by_job[str(row["job_id"])] = (
+					int(row["messages"] or 0), row["last_at"],
+					str(row["hr_name"] or ""), str(row["company"] or ""),
+				)
+		for job in jobs:
+			job_id = str(job.get("id") or "")
+			if job_id in hr_stats_by_job:
+				messages, last_at, chat_hr_name, _chat_company = hr_stats_by_job[job_id]
+				job["hr_messages"] = messages
+				job["hr_last_at"] = last_at
+				# 岗位行 hr_name 为空（旧采集）时用会话记录的姓名作展示值
+				# （仅响应层：不写回数据库列；头像走首字占位）
+				if messages > 0 and not str(job.get("hr_name") or "").strip() and chat_hr_name:
+					job["hr_name"] = chat_hr_name
+				continue
+			pair = (str(job.get("company") or "").strip(), str(job.get("hr_name") or "").strip())
+			job["hr_messages"] = 0
+			job["hr_last_at"] = None
+		# 公司+HR 配对兜底（针对本轮未按 job_id 命中、但有 HR 姓名的岗位）
 		hr_pairs = sorted({
 			(str(job.get("company") or "").strip(), str(job.get("hr_name") or "").strip())
 			for job in jobs
-			if str(job.get("hr_name") or "").strip()
+			if str(job.get("hr_name") or "").strip() and str(job.get("id") or "") not in hr_stats_by_job
 		})
 		if hr_pairs:
 			pair_sql = " OR ".join(["(company = ? AND hr_name = ?)"] * len(hr_pairs))
@@ -1245,10 +1277,14 @@ def api_jobs():
 				for r in agg_rows
 			}
 			for job in jobs:
-				key = (str(job.get("company") or "").strip(), str(job.get("hr_name") or "").strip())
-				messages, last_at = hr_stats.get(key, (0, None))
-				job["hr_messages"] = messages
-				job["hr_last_at"] = last_at
+				job_id = str(job.get("id") or "")
+				if job_id in hr_stats_by_job and int(job.get("hr_messages") or 0) > 0:
+					continue  # job_id 命中优先生效，避免双计
+				if str(job.get("id") or "") not in hr_stats_by_job:
+					key = (str(job.get("company") or "").strip(), str(job.get("hr_name") or "").strip())
+					messages, last_at = hr_stats.get(key, (0, None))
+					job["hr_messages"] = messages
+					job["hr_last_at"] = last_at
 		response.headers["X-Total-Count"] = str(total)
 		return _json_response(jobs)
 	finally:
