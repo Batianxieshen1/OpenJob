@@ -772,6 +772,31 @@ def _submit_chat_message_background(target_id: str, greeting: str) -> dict:
     return result
 
 
+def _submit_chat_prefilled_background(target_id: str) -> dict:
+    """boss_default 模式的聊天页发送：输入框已由 BOSS 预填账号默认招呼语——
+    不读取内容、不清空、不打字，校验非空后直接点击发送。
+
+    空输入框 → no_prefilled_greeting（该岗位多半已非首次沟通，用不了默认招呼语），
+    带 skip_backoff 让岗位保留待人工处理，绝不静默重试。
+    """
+    result = _parse_js_result(evaluate(target_id, """
+    (() => {
+        const input = document.querySelector('#chat-input');
+        if (!input) return JSON.stringify({success: false, error: 'no_chat_input'});
+        const value = String(input.value || '').trim();
+        if (!value) return JSON.stringify({success: false, error: 'no_prefilled_greeting'});
+        const send = document.querySelector('.btn-send:not(.disabled), .send-message:not(.disabled)');
+        if (!send) return JSON.stringify({success: false, error: 'send_button_missing'});
+        send.click();
+        return JSON.stringify({success: true});
+    })()
+    """))
+    if result.get("error") == "no_prefilled_greeting":
+        result["history_detail"] = "聊天输入框没有预填招呼语（可能已非首次沟通），无法用 Boss 默认招呼语直接发送"
+        result["skip_backoff"] = True
+    return result
+
+
 def _fill_chat_input(target_id: str, greeting: str) -> dict:
     greeting_escaped = json.dumps(greeting, ensure_ascii=False)
     input_state = _parse_js_result(evaluate(target_id, """
@@ -886,7 +911,7 @@ def _has_outgoing_messages(target_id: str) -> bool:
     return False
 
 
-def _send_greeting_once(job: dict, greeting: str, throttle_config: dict) -> tuple[dict, str | None]:
+def _send_greeting_once(job: dict, greeting: str, throttle_config: dict, boss_default: bool = False) -> tuple[dict, str | None]:
     stop_event = throttle_config.get("_workbench_stop_event")
     existing_target_ids = {
         str(target.get("targetId") or "")
@@ -1110,25 +1135,31 @@ def _send_greeting_once(job: dict, greeting: str, throttle_config: dict) -> tupl
             "history_detail": "会话中已存在我方发送的消息（可能此前已手动打过招呼），系统未重复发送，按已完成记录",
         }, None
 
-    submit_result = _submit_chat_message_background(target_id, greeting)
-    if not submit_result.get("success"):
-        input_result = _fill_chat_input(target_id, greeting)
-        if not input_result.get("success"):
-            return input_result, target_id
-        if input_result.get("disabled"):
-            return {
-                "success": False,
-                "error": "send_button_unavailable",
-                "history_detail": "招呼语已填入，但发送按钮不可用，未标记成功",
-                "skip_backoff": True,
-            }, target_id
-        if not click_at(target_id, ".btn-send:not(.disabled)"):
-            return {
-                "success": False,
-                "error": "send_button_click_failed",
-                "history_detail": "招呼语已填入，但发送按钮点击失败，未标记成功",
-                "skip_backoff": True,
-            }, target_id
+    if boss_default:
+        # boss_default：只点发送，不打字（输入框内容是 BOSS 预填的账号默认招呼语）
+        submit_result = _submit_chat_prefilled_background(target_id)
+        if not submit_result.get("success"):
+            return submit_result, target_id
+    else:
+        submit_result = _submit_chat_message_background(target_id, greeting)
+        if not submit_result.get("success"):
+            input_result = _fill_chat_input(target_id, greeting)
+            if not input_result.get("success"):
+                return input_result, target_id
+            if input_result.get("disabled"):
+                return {
+                    "success": False,
+                    "error": "send_button_unavailable",
+                    "history_detail": "招呼语已填入，但发送按钮不可用，未标记成功",
+                    "skip_backoff": True,
+                }, target_id
+            if not click_at(target_id, ".btn-send:not(.disabled)"):
+                return {
+                    "success": False,
+                    "error": "send_button_click_failed",
+                    "history_detail": "招呼语已填入，但发送按钮点击失败，未标记成功",
+                    "skip_backoff": True,
+                }, target_id
 
     for _ in range(max(1, verification_attempts)):
         if _sleep_or_stop(0.5, stop_event):
@@ -1248,7 +1279,8 @@ def send_greetings(config: dict, force: bool = False, skip_day_off: bool = False
         db.close()
         return 0
 
-    jobs = get_jobs_ready_to_send(db)
+    boss_default = bool(config.get("_workbench_boss_default"))
+    jobs = get_jobs_ready_to_send(db, boss_default=boss_default)
     if workbench_job_ids:
         jobs = [job for job in jobs if str(job["id"]) in workbench_job_ids]
     unsupported_jobs = [
@@ -1316,7 +1348,9 @@ def send_greetings(config: dict, force: bool = False, skip_day_off: bool = False
             # keep the invariant at the actual send boundary as well. This
             # prevents future query/queue changes from sending platform-default,
             # manually edited, stale, or otherwise unaudited text.
-            if (
+            # boss_default 例外：无 OpenJob 文本可校验（发的是用户自己在 Boss 配置的
+            # 默认招呼语）；URL 守卫、额度、时间窗、间隔纪律全部保留。
+            if not boss_default and (
                 str(job.get("greeting_fact_status") or "").strip().lower() != "verified"
                 or not str(job.get("greeting_source_json") or "").strip()
             ):
@@ -1359,7 +1393,7 @@ def send_greetings(config: dict, force: bool = False, skip_day_off: bool = False
                 break
 
             greeting = job.get("greeting", "")
-            if not greeting:
+            if not greeting and not boss_default:
                 transition_job_status(db, job["id"], "error")
                 send_report["attempted_count"] += 1
                 send_report["failed_count"] += 1
@@ -1376,14 +1410,14 @@ def send_greetings(config: dict, force: bool = False, skip_day_off: bool = False
 
             progress.update(task, description=f"发送: {job['company'][:10]} - {job['title'][:15]}")
 
-            result_data, failed_target_id = _send_greeting_once(job, greeting, throttle_config)
+            result_data, failed_target_id = _send_greeting_once(job, greeting, throttle_config, boss_default=boss_default)
             if result_data.get("error") == "stopped":
                 send_report["stop_reason"] = "stopped"
                 break
             if result_data.get("error") == "no_chat_input" and failed_target_id:
                 console.print("[yellow]    ! 未进入具体聊天会话，重新打开岗位页再试一次[/yellow]")
                 close_tab(failed_target_id)
-                result_data, failed_target_id = _send_greeting_once(job, greeting, throttle_config)
+                result_data, failed_target_id = _send_greeting_once(job, greeting, throttle_config, boss_default=boss_default)
                 if result_data.get("error") == "stopped":
                     send_report["stop_reason"] = "stopped"
                     break

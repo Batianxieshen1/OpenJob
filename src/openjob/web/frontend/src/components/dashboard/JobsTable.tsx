@@ -217,6 +217,9 @@ export function JobsTable({ refreshKey,
                             <span className="truncate">
                               {job.hr_name || '招聘者'}
                               {job.hr_active ? ` · ${job.hr_active}` : ''}
+                              {!!job.hr_messages && job.hr_messages > 0 && (
+                                <span className="ml-1 font-semibold text-success">· 已沟通{job.hr_messages}条</span>
+                              )}
                             </span>
                           </span>
                         )}
@@ -358,6 +361,9 @@ export function JobsTable({ refreshKey,
                                   <span className="truncate text-[11px] text-muted">
                                     {job.hr_name || '招聘者'}
                                     {job.hr_active ? `（${job.hr_active}）` : ''}
+                                    {!!job.hr_messages && job.hr_messages > 0 && (
+                                      <span className="ml-1 font-semibold text-success">已沟通{job.hr_messages}条</span>
+                                    )}
                                   </span>
                                 </span>
                               )}

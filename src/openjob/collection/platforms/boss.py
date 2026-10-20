@@ -107,9 +107,12 @@ JS_EXTRACT_DETAIL = """
     // 大厂版式：侧栏公司卡的 src 可能是 banner 封面/默认灰图，真头像在主体区
     // （chatphoto / upload/avatar 路径）。回退一次全页扫描，横幅与静态图不作 Logo。
     if (/[/]mcs[/]banner[/]|beijin[/]icon[/]|[/]static[/]/.test(logoSrc)) {
+        // 只认 chatphoto（Boss 公司聊天头像的专用路径）。/upload/avatar/ 是个人头像
+        // （登录用户自己 + HR），绝不能当公司 Logo（2026-10-20 用户实测：13 家公司
+        // 挂上了自己的卡通头像）。
         const alt = Array.from(document.querySelectorAll('img'))
             .map(i => (i.getAttribute('src') || ''))
-            .find(src => src.includes('chatphoto') || src.includes('/upload/avatar/'));
+            .find(src => src.includes('chatphoto'));
         if (alt) { logoSrc = alt; }
     }
     info.company_logo = logoSrc;
@@ -436,6 +439,9 @@ class BossCollector:
                 if stocked_logo and self._logo_file_exists(stocked_logo) and company not in company_logo_cache:
                     company_logo_cache[company] = stocked_logo
             if enrich_logo and self.data_dir is not None:
+                # 双保险：个人头像路径（登录用户/HR）绝不能进公司 Logo 槽位
+                if "/upload/avatar/" in str(candidate.company_logo_url or ""):
+                    candidate.company_logo_url = ""
                 # 库存命中（含旧岗位采过的公司）直接挂取，不依赖本页是否恰好暴露 Logo URL
                 if company in company_logo_cache:
                     candidate.company_logo_path = company_logo_cache[company]

@@ -27,12 +27,13 @@ function isActiveToday(job: Job) {
 
 /** B9 六要素批量确认对话框：发送数/平台分布/事实校验/需检查/额度 + 不可撤回警示 */
 function BatchConfirmDialog({
-  jobs, quotaRemaining, submitting, generateOnly, onConfirm, onClose,
+  jobs, quotaRemaining, submitting, generateOnly, bossDefault, onConfirm, onClose,
 }: {
   jobs: Job[]
   quotaRemaining: number
   submitting: boolean
   generateOnly?: boolean
+  bossDefault?: boolean
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -53,8 +54,26 @@ function BatchConfirmDialog({
   return createPortal(
     <div className="overlay-in veil fixed inset-0 z-[90] flex items-center justify-center p-4 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && !submitting) onClose() }}>
       <div role="dialog" aria-modal="true" aria-label="批量确认" className="pop-in w-full max-w-lg rounded-overlay border border-card-border bg-card p-6 shadow-pop">
-        <h3 className="t-h2">{generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
-        {generateOnly ? (
+        <h3 className="t-h2">{bossDefault ? '用 Boss 默认招呼语直接发送' : generateOnly ? '批量生成招呼语' : '批量确认发送'}</h3>
+        {bossDefault ? (
+          <>
+            <ul className="mt-4 space-y-2 text-sm">
+              <li>本次将为 <span className="font-semibold text-primary tabular-nums">{total}</span> 个岗位直接发送——<span className="font-semibold">不生成任何定制文案</span></li>
+              <li>发送内容：你在 <span className="font-semibold">Boss 直聘账号里设置的默认招呼语</span>（OpenJob 只负责点发送，不读取、不修改这条文案）</li>
+              <li>安全纪律不变：时间窗 / 每日额度 / 发送间隔 / 页面额度照常生效</li>
+              <li>今日剩余发送额度：<span className="tabular-nums">{quotaRemaining}</span> 条{total > quotaRemaining && <span className="ml-1 text-warning">（超出部分明日时间窗自动续发）</span>}</li>
+            </ul>
+            <p className="mt-4 rounded-xl border border-primary/30 bg-accent-soft px-3 py-2 text-xs text-primary">
+              提示：Boss 默认招呼语对首次沟通的岗位有效；若某岗位输入框没有预填文案（多半已沟通过），该条会标记失败并保留，可改用定制招呼语。
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>再看看</Button>
+              <Button variant="destructive" size="sm" data-deliver-btn disabled={submitting} onClick={onConfirm}>
+                {submitting ? '提交中…' : `确认直接发送 ${total} 条`}
+              </Button>
+            </div>
+          </>
+        ) : generateOnly ? (
           <>
             <ul className="mt-4 space-y-2 text-sm">
               <li>本次将为 <span className="font-semibold text-primary tabular-nums">{total}</span> 个岗位生成招呼语（<span className="font-semibold">只生成，不发送</span>）</li>
@@ -156,7 +175,7 @@ export default function ConfirmQueuePage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [page, setPage] = useState(0)
-  const [batchTarget, setBatchTarget] = useState<{ ids: string[]; directSend: boolean } | null>(null)
+  const [batchTarget, setBatchTarget] = useState<{ ids: string[]; directSend: boolean; bossDefault?: boolean } | null>(null)
   const [batchSubmitting, setBatchSubmitting] = useState(false)
 
   const [tab, setTab] = useState<'confirm' | 'ready_to_send'>('confirm')
@@ -201,27 +220,29 @@ export default function ConfirmQueuePage() {
     setPage(0)
   }, [quickFilter, filters])
 
-  const confirmDeliver = async (ids: string[], directSend = false) => {
+  const confirmDeliver = async (ids: string[], directSend = false, bossDefault = false) => {
     if (!ids.length) return
-    setBatchTarget({ ids, directSend })
+    setBatchTarget({ ids, directSend, bossDefault })
   }
 
   const runBatchDeliver = async () => {
     const ids = batchTarget?.ids || []
     const directSend = batchTarget?.directSend || false
+    const bossDefault = batchTarget?.bossDefault || false
     if (!ids.length || batchSubmitting) return
     setBatchSubmitting(true)
     const btnEl = document.querySelector('[data-deliver-btn]') as HTMLElement | null
     const btnBox = btnEl ? btnEl.getBoundingClientRect() : null
     try {
+      const payload = bossDefault
+        ? { job_ids: ids, boss_default: true }
+        : directSend
+          ? { job_ids: ids, direct_send: true }
+          : { job_ids: ids, generate_only: true }
       const res = await fetch('/api/workbench/deliver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          directSend
-            ? { job_ids: ids, direct_send: true }
-            : { job_ids: ids, generate_only: true },
-        ),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -231,7 +252,9 @@ export default function ConfirmQueuePage() {
       setSendSelected([])
       await refresh()
       setNotice(
-        directSend
+        bossDefault
+          ? `已把 ${ids.length} 个岗位加入发送队列（不生成任何定制文案，发送时直接确认你在 Boss 账号里设置的默认招呼语；时间窗/额度/间隔纪律不变）。`
+          : directSend
           ? `已把 ${ids.length} 个岗位加入发送队列（招呼语不重新生成，按安全队列直接发送）。`
           : `已生成 ${ids.length} 个岗位的招呼语，全部停在「待发送招呼语」等你审阅；确认后才会发送（本步未发送任何内容）。`
       )
@@ -525,6 +548,7 @@ export default function ConfirmQueuePage() {
               )}
             </div>
             <Button size="sm" className="ml-auto font-semibold transition-transform duration-200 ease-[cubic-bezier(.34,1.56,.64,1)] active:scale-[.94] active:rotate-[-1.5deg]" onClick={() => confirmDeliver(actionable)}>一键投递已选 {actionable.length}</Button>
+            <Button size="sm" variant="secondary" disabled={!actionable.length} onClick={() => confirmDeliver(actionable, false, true)}>用Boss默认招呼语直接发送 {actionable.length}</Button>
           </div>
         </div>
       </div>
@@ -578,10 +602,11 @@ export default function ConfirmQueuePage() {
       {selectedJob && <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
       {batchTarget && batchTarget.ids.length > 0 && (
         <BatchConfirmDialog
-          jobs={(batchTarget.directSend ? readyToSendJobs : jobs).filter(job => batchTarget.ids.includes(job.id))}
+          jobs={jobs.filter(job => batchTarget.ids.includes(job.id))}
           quotaRemaining={workbench.send_quota?.remaining ?? 0}
           submitting={batchSubmitting}
-          generateOnly={!batchTarget.directSend}
+          generateOnly={!batchTarget.directSend && !batchTarget.bossDefault}
+          bossDefault={batchTarget.bossDefault}
           onConfirm={runBatchDeliver}
           onClose={() => { if (!batchSubmitting) setBatchTarget(null) }}
         />
