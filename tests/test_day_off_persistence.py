@@ -62,13 +62,13 @@ class TestDayOffPersistence:
 
 class TestDailyQuotaLocalBoundary:
     def test_today_sent_counted_by_local_day(self, db_env):
-        """本地时区今天 08:00 前的 sent 历史（UTC 昨天）也应计入今日额度。
+        """本地时区今天刚过零点的 sent 历史也应计入今日额度。
 
-        恒定夹具：插入"本地今天 00:30"对应的 UTC 值（本地零点+30min 转回 UTC）。
-        任何时刻运行都命中边界场景——UTC 日期比本地日期少一天且属本地今天，
-        不再依赖运行时刻（-1h 版本在本地 00:00-01:00 会跨日假失败，Gemini 验收发现）。"""
+        夹具：插入"本地今天 00:30"对应的 UTC 值。用 SQLite 的 'utc' 修饰符把
+        本地时间转回 UTC，而不是写死 -8 hours——后者把 UTC+8 编码进测试，
+        在 UTC 的 CI runner 上算出来是昨天 16:30，count 恒为 0。"""
         db_env.execute(
-            "INSERT INTO history (job_id, action, created_at) VALUES ('j1', 'sent', datetime('now','localtime','start of day','+30 minutes','-8 hours'))"
+            "INSERT INTO history (job_id, action, created_at) VALUES ('j1', 'sent', datetime('now','localtime','start of day','+30 minutes','utc'))"
         )
         db_env.commit()
         row = db_env.execute(
