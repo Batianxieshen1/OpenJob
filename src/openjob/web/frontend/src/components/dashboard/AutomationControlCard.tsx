@@ -28,14 +28,14 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
     }`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className={`text-[11px] font-medium tracking-[0.18em] ${dark ? 'text-shell/50 dark:text-white/50' : 'text-muted'}`}>今日自动化</div>
+          <div className={`text-[11px] font-medium tracking-[0.18em] ${dark ? 'text-shell/65 dark:text-white/65' : 'text-muted'}`}>今日自动化</div>
           <div className="mt-1 max-w-full text-[13px] font-semibold sm:text-sm">{today}</div>
         </div>
         <button
           type="button"
           onClick={() => { window.location.href = '/config?section=throttle' }}
           className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-soft ${
-            dark ? 'border-shell/15 dark:border-white/20 text-shell/80 dark:text-white/90 hover:border-shell/40 hover:text-shell'
+            dark ? 'border-shell/15 dark:border-white/20 text-shell/90 dark:text-white/95 hover:border-shell/40 hover:text-shell'
                  : 'border-card-border text-muted hover:border-primary/40 hover:text-foreground'
           }`}
         >
@@ -46,17 +46,17 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <div className={`rounded-2xl px-3 py-2.5 ${dark ? 'bg-shell/8 dark:bg-white/5' : 'bg-surface-hover'}`}>
-          <div className={`text-[11px] ${dark ? 'text-shell/50 dark:text-white/50' : 'text-muted'}`}>今日已投递</div>
+          <div className={`text-[11px] ${dark ? 'text-shell/65 dark:text-white/65' : 'text-muted'}`}>今日已投递</div>
           <div className="mt-0.5 text-xl font-semibold tabular-nums">
             {quota.sent}
-            <span className="text-xs font-normal text-shell/50 dark:text-white/50"> / {quota.daily_limit}</span>
+            <span className="text-xs font-normal text-shell/65 dark:text-white/65"> / {quota.daily_limit}</span>
           </div>
         </div>
         <div className={`rounded-2xl px-3 py-2.5 ${dark ? 'bg-shell/8 dark:bg-white/5' : 'bg-surface-hover'}`}>
-          <div className={`text-[11px] ${dark ? 'text-shell/50 dark:text-white/50' : 'text-muted'}`}>剩余额度</div>
+          <div className={`text-[11px] ${dark ? 'text-shell/65 dark:text-white/65' : 'text-muted'}`}>剩余额度</div>
           <div className="mt-0.5 flex items-baseline gap-2">
             <span className="text-xl font-semibold tabular-nums">{quota.remaining}</span>
-            <span className={`text-[11px] ${dark ? 'text-shell/50 dark:text-white/50' : 'text-muted'}`}>已用 {usagePct}%</span>
+            <span className={`text-[11px] ${dark ? 'text-shell/65 dark:text-white/65' : 'text-muted'}`}>已用 {usagePct}%</span>
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
         return (
           <div className="mt-3 space-y-1">
             {Object.entries(bossSources).map(([channel, info]) => (
-              <div key={channel} className="rounded-xl bg-shell/8 dark:bg-white/5 px-3 py-1.5 text-[11px] leading-5 text-shell/80 dark:text-white/80">
+              <div key={channel} className="rounded-xl bg-shell/8 dark:bg-white/5 px-3 py-1.5 text-[11px] leading-5 text-shell/90 dark:text-white/90">
                 {info.label || channel}：扫描 {info.seen || 0} · 新增 {info.new || 0} · 重复 {info.duplicate || 0}
                 {info.reason_code && <span className="ml-1 text-warning">（{info.reason_code}）</span>}
               </div>
@@ -98,7 +98,7 @@ export function AutomationControlCard({ activeTask, quota, modePending, onRunFul
           </button>
         ) : (
           <div className={`flex h-8 w-full items-center justify-center rounded-full border border-dashed text-[11px] ${
-            dark ? 'border-shell/30 text-shell/60 dark:text-white/60' : 'border-card-border text-muted-3'
+            dark ? 'border-shell/30 text-shell/70 dark:text-white/70' : 'border-card-border text-muted-3'
           }`}>
             启动入口在上方主按钮
           </div>

@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // 主题由 html.light / html.dark 类驱动（index.html 首屏脚本 + Header.applyTheme）。
+  // 默认的 'media' 会让 dark: 跟随系统偏好，与令牌层打架——系统深色 + 应用浅色时
+  // dark: 变体仍生效，导致半透明白字落在淡粉底上（对比度 1.05:1，2026-10-22 实测）。
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
