@@ -42,6 +42,14 @@ from openjob.throttle import PageThrottle
 
 SEARCH_URL = "https://www.zhipin.com/web/geek/job?query={keyword}&city={city_code}"
 
+JS_CHECK_LOGIN = """
+(() => {
+    const loginBtn = Array.from(document.querySelectorAll('a,button'))
+        .find(e => ['登录', '登录/注册'].includes((e.textContent || '').trim()));
+    return JSON.stringify({ logged_in: !loginBtn });
+})()
+"""
+
 JS_EXTRACT_LIST = """
 (() => {
     const wraps = document.querySelectorAll('.job-card-wrap');
@@ -361,6 +369,31 @@ class BossCollector:
         worker_target: str | None = None
         page_failures = 0
 
+        def precheck_logged_in() -> bool:
+            """采集启动前登录态预检（2026-10-25）：未登录时 12 关键词×2 城全被重定向，
+            空转一整轮还反复撞验证码。查一次首页，未登录立即返回 False 秒停整轮。
+            预检失败（页面打不开/解析异常）一律视为已登录——只做快路径，不误杀。"""
+            probe: str | None = None
+            try:
+                opened = self.browser.new_tab("https://www.zhipin.com/", background=True)
+                if not opened:
+                    return True
+                probe = str(opened)
+                if _wait_or_stop(hooks.stop_event, 3 * delay_multiplier, self.sleep):
+                    return True
+                self.browser.wait_for_load(probe, timeout=10)
+                result = self.browser.evaluate(probe, JS_CHECK_LOGIN)
+                state = json.loads(result) if result else {}
+                return bool(state.get("logged_in", True))
+            except Exception:
+                return True
+            finally:
+                if probe:
+                    try:
+                        self.browser.close_tab(probe)
+                    except Exception:
+                        pass
+
         def limited(reason: str) -> PlatformCollectionResult:
             return PlatformCollectionResult(
                 self.platform, "completed_with_shortage", reason,
@@ -529,6 +562,11 @@ class BossCollector:
                 guard.ensure_unlocked()
             except PlatformSafetyStop as exc:
                 return limited(exc.reason)
+
+        # 登录态预检：未登录时跑满 12 关键词×2 城只会全部重定向 + 反复撞验证码。
+        # 秒停在起点，返回 login_required（面板可见），一天最多消耗一次首页访问。
+        if combos and not precheck_logged_in():
+            return risk("login_required", "precheck_home")
 
         source_results: dict[str, dict[str, Any]] = {}
         recommendation_phase: dict[str, dict[str, Any]] = {}

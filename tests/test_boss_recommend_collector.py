@@ -145,12 +145,14 @@ class RecommendationOnlyTests(unittest.TestCase):
             randint=lambda _low, _high: 1,
         ).collect(request, _hooks(collected))
 
-        self.assertEqual(len(new_tab_calls), 1)  # 搜索开 tab，推荐复用 navigate
+        # 2026-10-25 登录态预检：搜索前多一次首页探测 tab（evaluate 默认 logged_in=True，不误杀）
+        self.assertEqual(len(new_tab_calls), 2)
+        self.assertIn("https://www.zhipin.com/", new_tab_calls)  # 预检首页
         self.assertTrue(any("/web/geek/job?" in url for url in new_tab_calls))
         self.assertTrue(any("/web/geek/recommend" in url for url in navigation_calls))
         self.assertEqual(len(collected), 2)
         self.assertEqual({c.source_channel for c in collected}, {"search", "recommendation"})
-        self.assertEqual(len(close_calls), 1)  # close_tab 全程一次
+        self.assertEqual(len(close_calls), 2)  # 预检 tab 用完即关 + worker 收尾一次
         # 推荐轮次跑满 → 总体 completed_with_shortage（计划书 §6.5），但两来源均已采集
         self.assertEqual(result.status, "completed_with_shortage")
         self.assertEqual(result.reason_code, "recommendation_scroll_limit")
