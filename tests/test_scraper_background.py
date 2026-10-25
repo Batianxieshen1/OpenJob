@@ -99,6 +99,7 @@ class ScraperBackgroundTests(unittest.TestCase):
              patch("openjob.scraper.jobs.new_tab", return_value="worker-target"), \
              patch("openjob.scraper.jobs.navigate", return_value=True), \
              patch("openjob.scraper.jobs.evaluate", side_effect=[
+                 json.dumps({"logged_in": True}),
                  json.dumps({"risk": None}), json.dumps(jobs),
                  json.dumps({"risk": None}), json.dumps(detail),
              ]), \
@@ -160,6 +161,7 @@ class ScraperBackgroundTests(unittest.TestCase):
              patch(
                  "openjob.scraper.jobs.evaluate",
                  side_effect=[
+                     json.dumps({"logged_in": True}),
                      json.dumps({"risk": None}), json.dumps(jobs),
                      json.dumps({"risk": None}), json.dumps(detail),
                  ],
@@ -176,7 +178,8 @@ class ScraperBackgroundTests(unittest.TestCase):
             count = scrape_jobs(config, ["AI"])
 
         self.assertEqual(count, 1)
-        new_tab.assert_called_once_with(
+        self.assertEqual(new_tab.call_count, 2)  # 登录态预检首页 + 搜索 tab
+        new_tab.assert_any_call(
             "https://www.zhipin.com/web/geek/job?query=AI&city=101010100",
             background=True,
         )
