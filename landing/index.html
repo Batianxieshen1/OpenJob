@@ -181,11 +181,12 @@
   .flowline {
     position: absolute;
     z-index: 1;
-    /* 两端各内缩 22px（与卡片圆角同值），避免线头从圆角外露出 */
+    /* 两端各内缩 22px（与卡片圆角同值），避免线头从圆角外露出。
+       SVG 是替换元素：width:auto 会取固有比例（viewBox 1000×2 → 1000px）而无视 left/right，
+       必须显式给宽度，否则右端会比左端短一截、左右不对称 */
     left: 22px;
-    right: 22px;
     top: 12px;
-    width: auto;
+    width: calc(100% - 44px);
     height: 2px;
     display: block;
     pointer-events: none;
