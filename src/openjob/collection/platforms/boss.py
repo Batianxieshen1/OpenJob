@@ -44,9 +44,10 @@ SEARCH_URL = "https://www.zhipin.com/web/geek/job?query={keyword}&city={city_cod
 
 JS_CHECK_LOGIN = """
 (() => {
-    const loginBtn = Array.from(document.querySelectorAll('a,button'))
-        .find(e => ['登录', '登录/注册'].includes((e.textContent || '').trim()));
-    return JSON.stringify({ logged_in: !loginBtn });
+    // 不能用"存在『登录』按钮"判断——BOSS 首页已登录也给招聘者保留登录入口
+    //（2026-10-26 假阴性：用户已登录被误判未登录）。改看个人中心是否被重定向：
+    // 未登录访问 /web/user/ 会被踢到 /web/user/login。
+    return JSON.stringify({ url: window.location.href });
 })()
 """
 
@@ -372,10 +373,14 @@ class BossCollector:
         def precheck_logged_in() -> bool:
             """采集启动前登录态预检（2026-10-25）：未登录时 12 关键词×2 城全被重定向，
             空转一整轮还反复撞验证码。查一次首页，未登录立即返回 False 秒停整轮。
-            预检失败（页面打不开/解析异常）一律视为已登录——只做快路径，不误杀。"""
+            预检失败（页面打不开/解析异常）一律视为已登录——只做快路径，不误杀。
+
+            判定（2026-10-26 修正）：直接打开个人中心 /web/user/ 看落地 URL——
+            未登录会被踢到 /web/user/login，已登录留在原地。不能用 DOM 找『登录』按钮：
+            BOSS 首页已登录也给招聘者保留登录入口（假阴性误判过一次）。"""
             probe: str | None = None
             try:
-                opened = self.browser.new_tab("https://www.zhipin.com/", background=True)
+                opened = self.browser.new_tab("https://www.zhipin.com/web/user/", background=True)
                 if not opened:
                     return True
                 probe = str(opened)
@@ -384,7 +389,10 @@ class BossCollector:
                 self.browser.wait_for_load(probe, timeout=10)
                 result = self.browser.evaluate(probe, JS_CHECK_LOGIN)
                 state = json.loads(result) if result else {}
-                return bool(state.get("logged_in", True))
+                url = str(state.get("url") or "")
+                if not url:
+                    return True
+                return "/web/user/login" not in url
             except Exception:
                 return True
             finally:
