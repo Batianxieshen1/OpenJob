@@ -181,10 +181,11 @@
   .flowline {
     position: absolute;
     z-index: 1;
-    left: 0;
-    right: 0;
+    /* 两端各内缩 22px（与卡片圆角同值），避免线头从圆角外露出 */
+    left: 22px;
+    right: 22px;
     top: 12px;
-    width: 100%;
+    width: auto;
     height: 2px;
     display: block;
     pointer-events: none;
@@ -212,6 +213,17 @@
   .flow-step + .flow-step {
     padding-left: 22px;
     border-left: 0;
+  }
+
+  /* 首尾工序外侧圆角对齐下方卡片（22px），中缝保持拼合直角 */
+  .flow-step:first-child {
+    border-top-left-radius: 22px;
+    border-bottom-left-radius: 22px;
+  }
+
+  .flow-step:last-child {
+    border-top-right-radius: 22px;
+    border-bottom-right-radius: 22px;
   }
 
   /* 节点独立放在连线上，节点与文字层完全分离 */
@@ -290,7 +302,7 @@
   @media (max-width: 860px) {
     .flow {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 34px 0;
+      gap: 18px;
       margin-top: 46px;
     }
 
@@ -299,9 +311,12 @@
       display: none;
     }
 
-    .flow-step {
-      padding: 0 18px;
-      background: transparent;
+    /* 移动端每张卡独立成块：全圆角 + 列间距，避免圆角相互挤压 */
+    .flow-step,
+    .flow-step:first-child,
+    .flow-step:last-child {
+      padding: 22px 18px;
+      border-radius: 22px;
     }
 
     .flow-step + .flow-step {
@@ -316,8 +331,11 @@
     }
 
     .flow-step,
-    .flow-step + .flow-step {
-      padding: 0 8px;
+    .flow-step + .flow-step,
+    .flow-step:first-child,
+    .flow-step:last-child {
+      padding: 22px 16px;
+      border-radius: 22px;
     }
 
     .flow-step p {
