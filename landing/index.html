@@ -215,13 +215,14 @@
     border-left: 0;
   }
 
-  /* 首尾工序外侧圆角对齐下方卡片（22px），中缝保持拼合直角 */
-  .flow-step:first-child {
+  /* 首尾工序外侧圆角对齐下方卡片（22px），中缝保持拼合直角。
+     用 of-type 而非 first-child：.flow 的首个子元素是连线 <svg>，:first-child 匹配不到任何工序卡 */
+  .flow-step:first-of-type {
     border-top-left-radius: 22px;
     border-bottom-left-radius: 22px;
   }
 
-  .flow-step:last-child {
+  .flow-step:last-of-type {
     border-top-right-radius: 22px;
     border-bottom-right-radius: 22px;
   }
@@ -313,8 +314,8 @@
 
     /* 移动端每张卡独立成块：全圆角 + 列间距，避免圆角相互挤压 */
     .flow-step,
-    .flow-step:first-child,
-    .flow-step:last-child {
+    .flow-step:first-of-type,
+    .flow-step:last-of-type {
       padding: 22px 18px;
       border-radius: 22px;
     }
@@ -332,8 +333,8 @@
 
     .flow-step,
     .flow-step + .flow-step,
-    .flow-step:first-child,
-    .flow-step:last-child {
+    .flow-step:first-of-type,
+    .flow-step:last-of-type {
       padding: 22px 16px;
       border-radius: 22px;
     }
