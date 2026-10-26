@@ -80,7 +80,7 @@
 
   /* 首屏通铺全宽：不放 .wrap 里，光晕背景按全屏调校 */
   header {
-    position: relative; padding: 176px 24px 150px; text-align: center; overflow: hidden;
+    position: relative; padding: 176px 24px 96px; text-align: center; overflow: hidden;
     background:
       radial-gradient(1600px 720px at 70% -28%, var(--glow-1), transparent 68%),
       radial-gradient(1200px 560px at 10% -16%, var(--glow-2), transparent 68%),
@@ -152,6 +152,8 @@
   .hero-meta { position: relative; margin-top: 58px; color: var(--faint); font-size: 12px; letter-spacing: .18em; }
 
   section { padding: 118px 0; }
+  /* 紧接 hero 的首个区块：上方收紧，避免 hero 底部留白与区块内边距叠加成大段空白 */
+  header + section { padding-top: 72px; }
   .kicker { font-size: 12px; font-weight: 700; letter-spacing: .22em; color: var(--primary); text-transform: uppercase; }
   h2 { margin-top: 14px; font-size: clamp(26px, 4vw, 40px); font-weight: 750; letter-spacing: -.01em; }
   .sec-sub { margin-top: 16px; color: var(--muted); font-size: 15px; max-width: 620px; line-height: 1.9; }
@@ -302,6 +304,10 @@
   }
 
   @media (max-width: 860px) {
+    /* 小屏 hero 上下留白收紧，避免首屏全是空 */
+    header { padding: 108px 24px 64px; }
+    header + section { padding-top: 56px; }
+
     .flow {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 18px;
