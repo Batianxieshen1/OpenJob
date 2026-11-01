@@ -44,10 +44,10 @@ SEARCH_URL = "https://www.zhipin.com/web/geek/job?query={keyword}&city={city_cod
 
 JS_CHECK_LOGIN = """
 (() => {
-    // 不能用"存在『登录』按钮"判断——BOSS 首页已登录也给招聘者保留登录入口
-    //（2026-10-26 假阴性：用户已登录被误判未登录）。改看个人中心是否被重定向：
-    // 未登录访问 /web/user/ 会被踢到 /web/user/login。
-    return JSON.stringify({ url: window.location.href });
+    // 双信号：header 的『登录/注册』按钮（未登录才渲染）+ 当前 URL
+    const loginBtn = Array.from(document.querySelectorAll('a,button'))
+        .find(e => ['登录', '登录/注册'].includes((e.textContent || '').trim()));
+    return JSON.stringify({ login_btn: !!loginBtn, url: window.location.href });
 })()
 """
 
@@ -369,18 +369,23 @@ class BossCollector:
         )
         worker_target: str | None = None
         page_failures = 0
+        _precheck_evidence_url = ""
 
         def precheck_logged_in() -> bool:
             """采集启动前登录态预检（2026-10-25）：未登录时 12 关键词×2 城全被重定向，
-            空转一整轮还反复撞验证码。查一次首页，未登录立即返回 False 秒停整轮。
+            空转一整轮还反复撞验证码。未登录立即返回 False 秒停整轮。
             预检失败（页面打不开/解析异常）一律视为已登录——只做快路径，不误杀。
 
-            判定（2026-10-26 修正）：直接打开个人中心 /web/user/ 看落地 URL——
-            未登录会被踢到 /web/user/login，已登录留在原地。不能用 DOM 找『登录』按钮：
-            BOSS 首页已登录也给招聘者保留登录入口（假阴性误判过一次）。"""
+            判定（2026-11-01 双信号版）：单一探测各有假阳性/假阴性史——
+            DOM『登录』按钮（10-26 已登录误报：招聘者入口）、/web/user/ 重定向
+            （11-01 未登录漏报：该页不总是跳转）。改为双信号取交集：
+              A. 首页 header 出现『登录/注册』按钮（未登录才渲染）
+              B. 搜索页被重定向离开 /web/geek/job（未登录才发生）
+            两者同时成立才判未登录；任一不确定 → 视为已登录继续（confirm_risk 兜底）。"""
+            nonlocal _precheck_evidence_url
             probe: str | None = None
             try:
-                opened = self.browser.new_tab("https://www.zhipin.com/web/user/", background=True)
+                opened = self.browser.new_tab("https://www.zhipin.com/", background=True)
                 if not opened:
                     return True
                 probe = str(opened)
@@ -389,10 +394,22 @@ class BossCollector:
                 self.browser.wait_for_load(probe, timeout=10)
                 result = self.browser.evaluate(probe, JS_CHECK_LOGIN)
                 state = json.loads(result) if result else {}
-                url = str(state.get("url") or "")
-                if not url:
+                if not state.get("login_btn", False):
+                    return True  # 信号 A 不成立（无登录按钮）→ 已登录
+                # 信号 A 成立（有登录按钮）→ 用搜索页重定向做信号 B 二次确认
+                kw, city_code = combos[0][2], combos[0][1]
+                search_probe = SEARCH_URL.format(keyword=quote(kw), city_code=city_code)
+                self.browser.navigate(probe, search_probe)
+                if _wait_or_stop(hooks.stop_event, 3 * delay_multiplier, self.sleep):
                     return True
-                return "/web/user/login" not in url
+                self.browser.wait_for_load(probe, timeout=10)
+                result2 = self.browser.evaluate(probe, JS_CHECK_LOGIN)
+                state2 = json.loads(result2) if result2 else {}
+                url2 = str(state2.get("url") or "")
+                if "/web/geek/job" in url2:
+                    return True  # 信号 B 不成立（搜索页未被重定向）→ 已登录
+                _precheck_evidence_url = url2[:80]
+                return False
             except Exception:
                 return True
             finally:
@@ -574,7 +591,7 @@ class BossCollector:
         # 登录态预检：未登录时跑满 12 关键词×2 城只会全部重定向 + 反复撞验证码。
         # 秒停在起点，返回 login_required（面板可见），一天最多消耗一次首页访问。
         if combos and not precheck_logged_in():
-            return risk("login_required", "precheck_home")
+            return risk("login_required", f"precheck_url={_precheck_evidence_url[:80]}")
 
         source_results: dict[str, dict[str, Any]] = {}
         recommendation_phase: dict[str, dict[str, Any]] = {}

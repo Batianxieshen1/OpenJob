@@ -147,7 +147,8 @@ class RecommendationOnlyTests(unittest.TestCase):
 
         # 2026-10-25 登录态预检：搜索前多一次首页探测 tab（evaluate 默认 logged_in=True，不误杀）
         self.assertEqual(len(new_tab_calls), 2)
-        self.assertIn("https://www.zhipin.com/web/user/", new_tab_calls)  # 预检个人中心（重定向探测）
+        self.assertIn("https://www.zhipin.com/", new_tab_calls)  # 预检首页（信号 A）
+        self.assertTrue(any("/web/geek/job?" in u for u in new_tab_calls[1:2]))  # 预检信号 B：搜索页重定向探测
         self.assertTrue(any("/web/geek/job?" in url for url in new_tab_calls))
         self.assertTrue(any("/web/geek/recommend" in url for url in navigation_calls))
         self.assertEqual(len(collected), 2)
