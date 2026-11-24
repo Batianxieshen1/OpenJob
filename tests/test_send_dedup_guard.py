@@ -6,6 +6,10 @@ from unittest.mock import patch
 
 from openjob.executor.sender import _has_outgoing_messages, _send_greeting_once
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 
 class HasOutgoingMessagesTests(unittest.TestCase):
     def test_true_when_me_sender_present(self):

@@ -28,6 +28,10 @@ from openjob.executor.sender import _submit_chat_message_background
 from openjob.executor.sender import _submit_startchat_greeting
 from openjob.executor.sender import _wait_for_chat_page
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 
 def _job(job_id: str, title: str = "Engineer") -> dict:
     return {

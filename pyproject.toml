@@ -41,6 +41,9 @@ artifacts = [
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src"]
+# 慢测试标记：浏览器/真实进程类，本地快速反馈可用 `pytest -m "not slow"`
+# 注意：默认不加过滤，CI 仍跑全量
+markers = ["slow: 浏览器/真实进程交互类慢测试（单文件可达 30s）"]
 
 [tool.ruff]
 line-length = 120

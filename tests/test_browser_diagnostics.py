@@ -4,6 +4,10 @@ from unittest.mock import Mock, patch
 
 from rich.console import Console
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 
 class BrowserDiagnosticsTests(unittest.TestCase):
     def test_zhilian_page_script_recognizes_current_login_wall_markers(self):

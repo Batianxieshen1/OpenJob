@@ -63,3 +63,12 @@ src/openjob/web/frontend/ui-acceptance-screenshots/
 _*.py
 .coverage
 landing/pr-preview/
+
+# Landing 审核截图与本地截图脚本（一次性 QA 产物，不入库）
+landing/audit-*.png
+landing/rev-*.png
+landing/theme-*.png
+landing/wb-*.png
+landing/boss-state-check.png
+landing/midea-check.png
+landing/shot*.cjs
